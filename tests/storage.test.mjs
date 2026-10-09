@@ -336,6 +336,38 @@ test('saves work again after a successful load, a first run, or a reset', () => 
   assert(store.save(store.getSeedData()) === true, 'reset unblocks saving');
 });
 
+// ---------------------------------------------------------------------------
+// 5. Recovery contract for the storage-error banner (Phase 2.2.1)
+// The banner is dismissed only when a recovery save returns true, i.e.
+// exactly when these store-level sequences report success.
+// ---------------------------------------------------------------------------
+
+test('import-like recovery sequence re-enables saving', () => {
+  const fake = makeFake();
+  fake._map.set(STORAGE_KEY, 'broken{');
+  store.load();
+  assert(store.save(store.getSeedData()) === false, 'blocked while failed');
+  // Mirrors importBackup: validated backup + explicit consent, then save.
+  const parsed = store.importData(JSON.stringify(store.getSeedData()));
+  assert(parsed.success === true, 'backup parses');
+  store.clearStorageError();
+  assert(store.save(parsed.data) === true, 'recovery save succeeds');
+  assert(fake._map.has(STORAGE_KEY), 'recovered data persisted');
+});
+
+test('failed import changes nothing: latch and warning stay', () => {
+  const fake = makeFake();
+  fake._map.set(STORAGE_KEY, 'broken{');
+  store.load();
+  assert(store.getStorageError() instanceof StorageError, 'error recorded');
+  // importData rejects garbage without touching storage or the latch.
+  const parsed = store.importData('not json at all{{{');
+  assert(parsed.success === false, 'import fails');
+  assert(store.getStorageError() instanceof StorageError, 'latch intact');
+  assert(store.save(store.getSeedData()) === false, 'save still refused');
+  assert(fake._map.get(STORAGE_KEY) === 'broken{', 'stored value preserved');
+});
+
 restoreRealisticEnv();
 
 // ---------------------------------------------------------------------------
