@@ -277,6 +277,65 @@ test('load()/save() survive a missing localStorage implementation', () => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// 4. Failed load latches saves off (Phase 2.2 regression coverage)
+// ---------------------------------------------------------------------------
+
+test('failed load blocks ordinary save: original value survives', () => {
+  const fake = makeFake();
+  // 1. Existing data is stored and loads fine.
+  const original = store.getSeedData();
+  original.modules.push({
+    id: 'mod-keep', code: 'K1', title: 'Keep me', accent: '#b45309',
+    targetGrade: 5.0, createdAt: 1, updatedAt: 1,
+  });
+  assert(store.save(original) === true, 'setup save works');
+  const storedRaw = fake._map.get(STORAGE_KEY);
+  // 2. Loading now fails (stored JSON became invalid).
+  fake._map.set(STORAGE_KEY, storedRaw.slice(0, 10) + '~~~broken');
+  const data = store.load();
+  assert(data.modules.length === 0, 'safe blank data, not demo, not original');
+  assert(store.getStorageError() instanceof StorageError, 'error recorded');
+  // 3. A normal save through the store API must fail without writing.
+  const attempt = store.getSeedData();
+  attempt.modules.push({
+    id: 'mod-new', code: 'N1', title: 'New', accent: '#b45309',
+    targetGrade: 5.0, createdAt: 2, updatedAt: 2,
+  });
+  assert(store.save(attempt) === false, 'save refused while load failed');
+  assert(store.saveTimerState({ running: true }) === false, 'timer save refused too');
+  // 4. The original stored value is untouched.
+  assert(fake._map.get(STORAGE_KEY) === storedRaw.slice(0, 10) + '~~~broken', 'stored value preserved');
+});
+
+test('failed read (not just corrupt JSON) also blocks saves', () => {
+  const fake = makeFake([[STORAGE_KEY, JSON.stringify(store.getSeedData())]], { failGet: true });
+  const data = store.load();
+  assert(data.modules.length === 0, 'safe blank data');
+  assert(store.save(store.getSeedData()) === false, 'save refused');
+  assert(fake._map.get(STORAGE_KEY) === JSON.stringify(store.getSeedData()), 'storage untouched');
+});
+
+test('saves work again after a successful load, a first run, or a reset', () => {
+  // After successful load.
+  let fake = makeFake();
+  assert(store.save(store.getSeedData()) === true, 'setup save works');
+  store.load();
+  assert(store.save(store.getSeedData()) === true, 'save works after successful load');
+  // Legitimate first run (missing key): saves work, enabling normal setup.
+  fake = makeFake();
+  const first = store.load();
+  assert(first.modules.length >= 1, 'first-run data');
+  assert(store.save(first) === true, 'save works after first-run init');
+  // Explicit reset after a failure unblocks saving.
+  fake = makeFake();
+  fake._map.set(STORAGE_KEY, 'broken{');
+  store.load();
+  assert(store.save(store.getSeedData()) === false, 'blocked while failed');
+  store.clearAll();
+  assert(store.save(store.getSeedData()) === true, 'reset unblocks saving');
+});
+
 restoreRealisticEnv();
 
 // ---------------------------------------------------------------------------

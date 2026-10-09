@@ -907,3 +907,45 @@ CREATE TRIGGER trg_settings_module_owner
 - **Supabase remains untouched and the app still uses localStorage** via the
   unchanged `activeAdapter` default. No SQL executed, no users, no
   credentials, nothing uploaded. Stopping here; Phase 3 not started.
+
+---
+
+## Completion report (Phase 2.2 — final reliability check)
+
+- **Save latch (`js/services/store.js`):** `save()` and `saveTimerState()`
+  return `false` without writing while a storage read failure is recorded —
+  one in-memory flag (`lastStorageError`, already introduced in 2.1), no new
+  abstractions. The latch clears on the next successful `load()`, on explicit
+  `clearAll()` (confirmed reset = consent to discard), and on backup import
+  (`settings.js:importBackup` calls `clearStorageError()` first — choosing a
+  file is explicit consent to replace storage). First-run saves still work.
+- **Regression tests (`tests/storage.test.mjs`, now 21 tests):** the exact
+  required sequence passes — store data, corrupt it, `load()` fails to blank
+  (not demo), `save()`/`saveTimerState()` return `false`, original raw value
+  byte-identical afterwards; plus read-failure variant, and re-enablement via
+  successful load / first run / reset. Full suite: **21 passed, 0 failed**.
+- **UI surfacing (`js/app.js`):** toast auto-hides, so a persistent
+  `role="alert"` banner is injected in `init()` only when `load()` failed —
+  German message stating data could not be read and saving is disabled, with
+  an "Einstellungen öffnen" button to the recovery paths (import/reset).
+  Inline styles reuse existing theme vars; no CSS, layout, or redesign.
+  Verified by code inspection against `index.html` (`#main`) and existing
+  `var(--red)` usage; browser rendering itself could not be executed here.
+- **Schema verification (no change):** `exam_results` three-column FK
+  positionally matches `(user_id, exam_id, module_id) → exams(user_id, id,
+  module_id)` with supporting `uq_exams_user_id_module`; names unique,
+  types UUID/TEXT/TEXT both sides, CASCADE transitive, all columns NOT NULL.
+  Fence re-scan confirms the appendix untouched and clean (1 fence, 0
+  Markdown markers, census 10/10/10/10/2/2/9/2, parens 134/134, 63
+  semicolons). No concrete correctness issue found — no schema change made.
+- **Checks actually run:** `npm test` (21/21 pass); `node --check` on ESM
+  copies of `app.js`/`settings.js`/`store.js` (parse OK; DOM code not
+  executed); fence scan; `git status`/`diff --stat`. SQL not executed, as
+  required. No local PG tooling exists; browser rendering not available.
+- **Remaining limitations:** banner copy assumes German UI (matches app);
+  stored JSON scalars (`false`, `"null"`) normalize to blank/first-run via
+  the pre-existing migration path without recording an error (they carry no
+  recoverable data); `getStorageError()` banner shows only at startup.
+- **Supabase remains untouched:** no SQL executed, no project changes, no
+  auth/RLS/cloud work, `activeAdapter` still localStorage, no credentials,
+  nothing uploaded, nothing committed or pushed. Stopping here.

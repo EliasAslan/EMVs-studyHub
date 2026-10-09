@@ -214,8 +214,15 @@ export function load() {
  * Returns the adapter result verbatim: true only when the write
  * actually succeeded, false on quota errors or access failures.
  * Never reports success when the underlying write failed.
+ *
+ * Safety latch: while a storage read failure is recorded (see load()),
+ * saves are refused with `false` and nothing is written, so ordinary
+ * app saves cannot overwrite data that failed to load. The latch clears
+ * on the next successful load, on an explicit reset (clearAll), or when
+ * the user knowingly replaces storage (backup import clears it first).
  */
 export function save(data) {
+  if (lastStorageError) return false;
   try {
     return activeAdapter.setItem(STORAGE_KEY, data);
   } catch (e) {
@@ -765,9 +772,13 @@ export function importData(jsonString) {
 }
 
 /**
- * Clear all data (reset to seed)
+ * Clear all data (reset to seed).
+ * Explicit, confirmation-gated reset: discarding storage is the user's
+ * stated intent here, so any recorded read failure is cleared and saving
+ * works again immediately.
  */
 export function clearAll() {
+  clearStorageError();
   activeAdapter.removeItem(STORAGE_KEY);
   activeAdapter.removeItem(TIMER_KEY);
   return getSeedData();
@@ -776,8 +787,10 @@ export function clearAll() {
 /**
  * Timer persistence - survives page refresh.
  * Returns true only when the write actually succeeded.
+ * Refused (false, no write) while a storage read failure is recorded.
  */
 export function saveTimerState(timerState) {
+  if (lastStorageError) return false;
   try {
     return activeAdapter.setItem(TIMER_KEY, timerState);
   } catch (e) {
