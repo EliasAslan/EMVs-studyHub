@@ -205,7 +205,7 @@ CREATE TABLE weekly_reviews (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   id TEXT NOT NULL,
   week INTEGER NOT NULL CHECK (week BETWEEN 1 AND 53),
-  year INTEGER NOT NULL CHECK (year >= 2020),
+  year INTEGER NOT NULL CHECK (year BETWEEN 2020 AND 2030),
   module_id TEXT,
   module_title TEXT NOT NULL DEFAULT '',
   went_well TEXT NOT NULL DEFAULT '',
