@@ -9,6 +9,8 @@ const TIMER_KEY = 'emvs_timer_v1';
 const MIGRATION_KEY = 'emvs_schema_version';
 const CURRENT_SCHEMA_VERSION = 1;
 
+import { activeAdapter, readLegacyStorage } from './storageAdapter.js';
+
 /**
  * Generate a stable, unique ID
  * Uses timestamp + random for collision resistance
@@ -115,7 +117,7 @@ function getIsoWeekFallback(date = new Date()) {
  */
 export function load() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = activeAdapter.getItem(STORAGE_KEY);
     if (!raw) {
       // True first run: honour legacy data if present, else demo seed.
       const migrated = migrateFromLegacy({});
@@ -133,7 +135,8 @@ export function load() {
       return demo;
     }
     
-    const parsed = JSON.parse(raw);
+    // raw is already parsed by the adapter
+    const parsed = raw;
     
     // Migration logic here if schema version changes
     const version = parsed.schemaVersion || 0;
@@ -176,7 +179,7 @@ export function load() {
  */
 export function save(data) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    activeAdapter.setItem(STORAGE_KEY, data);
     return true;
   } catch (e) {
     console.error('Failed to save data:', e);
@@ -208,7 +211,9 @@ function migrateFromLegacy(data) {
   // Try to load legacy data
   let legacy = null;
   try {
-    const raw = localStorage.getItem(legacyKey) || localStorage.getItem(legacyKey2);
+    const raw1 = readLegacyStorage(legacyKey);
+    const raw2 = readLegacyStorage(legacyKey2);
+    const raw = raw1 || raw2;
     if (raw) legacy = JSON.parse(raw);
   } catch {}
   
@@ -726,8 +731,8 @@ export function importData(jsonString) {
  * Clear all data (reset to seed)
  */
 export function clearAll() {
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(TIMER_KEY);
+  activeAdapter.removeItem(STORAGE_KEY);
+  activeAdapter.removeItem(TIMER_KEY);
   return getSeedData();
 }
 
@@ -736,7 +741,7 @@ export function clearAll() {
  */
 export function saveTimerState(timerState) {
   try {
-    localStorage.setItem(TIMER_KEY, JSON.stringify(timerState));
+    activeAdapter.setItem(TIMER_KEY, timerState);
     return true;
   } catch (e) {
     console.error('Failed to save timer state:', e);
@@ -746,9 +751,8 @@ export function saveTimerState(timerState) {
 
 export function loadTimerState() {
   try {
-    const raw = localStorage.getItem(TIMER_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    const raw = activeAdapter.getItem(TIMER_KEY);
+    return raw === null ? null : raw;
   } catch (e) {
     console.error('Failed to load timer state:', e);
     return null;
@@ -756,7 +760,7 @@ export function loadTimerState() {
 }
 
 export function clearTimerState() {
-  localStorage.removeItem(TIMER_KEY);
+  activeAdapter.removeItem(TIMER_KEY);
 }
 
 /**
