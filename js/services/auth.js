@@ -270,14 +270,23 @@ export function renderAuthPanel(container) {
           return;
         }
       }
-      const { clearStorageError } = await import('./store.js');
-      clearStorageError();
-      window.EMVS.setState(cloud);
-      const saved = window.EMVS.save();
-      if (!saved) throw new Error('Lokales Speichern nach Download fehlgeschlagen.');
-      window.EMVS.renderSidebar?.();
-      window.EMVS.navigate?.('today');
-      const { setLastSyncedUid, getSessionUserId } = await import('./cloudSync.js');
+      const store = await import('./store.js');
+      const { commitDownloadReplacement, setLastSyncedUid, getSessionUserId } = await import('./cloudSync.js');
+      // Safe commit: keeps the previous in-memory state and restores it
+      // when local persistence fails, so a failed save can never leave
+      // replaced state behind while reporting "unchanged". The storage
+      // latch is cleared only here at the confirmed commit point.
+      commitDownloadReplacement(
+        {
+          getState: () => window.EMVS.getState(),
+          setState: (s) => window.EMVS.setState(s),
+          save: () => window.EMVS.save(),
+          clearStorageError: store.clearStorageError,
+          renderSidebar: () => window.EMVS.renderSidebar?.(),
+          navigate: (v) => window.EMVS.navigate?.(v),
+        },
+        cloud,
+      );
       try {
         setLastSyncedUid(await getSessionUserId(supabase));
       } catch {}

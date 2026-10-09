@@ -19,6 +19,7 @@ import {
   TABLE_FOR_COLLECTION,
   toCloudDataset,
   fromCloudDataset,
+  fromRow,
   isEmptyDataset,
   countDataset,
 } from './cloudMap.js';
@@ -167,20 +168,50 @@ export async function uploadLocalData(client, localState, opts = {}) {
     ledger.push({ table, written: res.written, skipped: false });
   }
 
-  // Verified read-back before anything local may change.
+  // Verified read-back before anything local may change: every uploaded
+  // record's normalized field values (not just its id) must match the
+  // cloud, settings included. Both sides run through fromRow() so
+  // intentional mappings compare equal (exam_results.updatedAt derived
+  // from created_at, mock score TEXT<->number, ''<->NULL nullables).
+  // A mismatch or failed read prevents completion and never touches the
+  // account-sync ledger. No cloud deletes, no ownership changes.
   const verifyTables = await fetchCloudDataset(client);
-  const verifyState = fromCloudDataset(verifyTables);
-  for (const collection of UPLOAD_ORDER.filter((c) => c !== 'settings')) {
-    const localIds = new Set((localState?.[collection] || []).map((x) => x.id));
-    const cloudIds = new Set((verifyState?.[collection] || []).map((x) => x.id));
-    for (const id of localIds) {
-      if (!cloudIds.has(id)) {
-        const err = new Error(`Verifikation fehlgeschlagen: ${collection}/${id} fehlt in der Cloud. Lokale Daten bleiben unverändert.`);
-        err.code = 'VERIFY_FAILED';
-        err.ledger = ledger;
-        throw err;
+  const mismatches = [];
+  for (const collection of UPLOAD_ORDER) {
+    const table = TABLE_FOR_COLLECTION[collection];
+    const sentRows = dataset[table] || [];
+    if (sentRows.length === 0) continue;
+    const backRows = verifyTables[table] || [];
+    if (collection === 'settings') {
+      const expected = fromRow('settings', sentRows[0]);
+      const actualRow = backRows[0];
+      const actual = actualRow ? fromRow('settings', actualRow) : null;
+      if (!actualRow || JSON.stringify(actual) !== JSON.stringify(expected)) {
+        mismatches.push({ table, reason: actualRow ? 'value-mismatch' : 'missing' });
+      }
+      continue;
+    }
+    const byId = new Map(backRows.map((r) => [r?.id, r]));
+    for (const sent of sentRows) {
+      const back = byId.get(sent.id);
+      if (!back) {
+        mismatches.push({ table, id: sent.id, reason: 'missing' });
+        continue;
+      }
+      const expected = fromRow(collection, sent);
+      const actual = fromRow(collection, back);
+      if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+        mismatches.push({ table, id: sent.id, reason: 'value-mismatch' });
       }
     }
+  }
+  if (mismatches.length > 0) {
+    const first = mismatches[0];
+    const err = new Error(`Verifikation fehlgeschlagen (${mismatches.length} Datensätze weichen ab, z.B. ${first.table}/${first.id || 'settings'}). Lokale Daten bleiben unverändert.`);
+    err.code = 'VERIFY_FAILED';
+    err.ledger = ledger;
+    err.mismatches = mismatches;
+    throw err;
   }
 
   setLastSyncedUid(uid);
@@ -198,6 +229,46 @@ export async function downloadCloudData(client) {
   const state = fromCloudDataset(tables);
   const conflict = { cloudCounts: countDataset(state) };
   return { state, tables, conflict };
+}
+
+/**
+ * Commit an already fetched and explicitly confirmed cloud dataset to the
+ * local in-memory state with persistence verification.
+ *
+ * The caller must have offered a JSON backup and received explicit user
+ * confirmation before invoking this. On success the cloud state becomes
+ * active. When local persistence fails (save() false/throws), the previous
+ * in-memory state is restored so the app never ends up with replaced
+ * state while claiming local data is unchanged.
+ *
+ * The storage safety latch is cleared only here at the confirmed commit
+ * point (explicit consent, mirroring backup import) — never earlier.
+ *
+ * deps: { getState, setState, save, clearStorageError?, renderSidebar?, navigate? }
+ */
+export function commitDownloadReplacement(deps, cloudState) {
+  if (!deps?.getState || !deps?.setState || !deps?.save) {
+    throw new TypeError('commitDownloadReplacement needs getState/setState/save.');
+  }
+  const previous = deps.getState();
+  deps.clearStorageError?.();
+  deps.setState(cloudState);
+  let saved = false;
+  try {
+    saved = deps.save();
+  } catch {
+    saved = false;
+  }
+  if (!saved) {
+    deps.setState(previous);
+    deps.renderSidebar?.();
+    const err = new Error('Lokales Speichern nach Download fehlgeschlagen. Vorheriger Stand wurde wiederhergestellt; lokale Daten unverändert.');
+    err.code = 'PERSIST_FAILED';
+    throw err;
+  }
+  deps.renderSidebar?.();
+  deps.navigate?.('today');
+  return { replaced: true };
 }
 
 /**

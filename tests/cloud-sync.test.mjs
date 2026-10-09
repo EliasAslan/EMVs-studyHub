@@ -12,6 +12,7 @@ import {
   uploadLocalData,
   downloadCloudData,
   downloadReplacementCheck,
+  commitDownloadReplacement,
   checkAccountBinding,
   getLastSyncedUid,
   setLastSyncedUid,
@@ -40,7 +41,7 @@ async function test(name, fn) {
   }
 }
 
-function makeClient({ userId = 'user-a', tables = {}, failOn = null, failUpsertOn = null } = {}) {
+function makeClient({ userId = 'user-a', tables = {}, failOn = null, failUpsertOn = null, corrupt = null } = {}) {
   const calls = [];
   const store = JSON.parse(JSON.stringify(tables));
   const client = {
@@ -76,6 +77,10 @@ function makeClient({ userId = 'user-a', tables = {}, failOn = null, failUpsertO
             );
             if (ix >= 0) store[table][ix] = { ...store[table][ix], ...row };
             else store[table].push({ ...row });
+          }
+          if (corrupt && corrupt.table === table) {
+            const target = store[table].find((r) => table === 'user_settings' || r.id === corrupt.id);
+            if (target) Object.assign(target, corrupt.patch);
           }
           return { error: null };
         },
@@ -285,6 +290,88 @@ await test('download replacement requires explicit decision on conflicts', async
   const check = downloadReplacementCheck(local, cloud);
   assert.equal(check.needsDecision, true);
   assert.equal(countDataset(local).total > 0, true);
+});
+
+await test('failed local persistence restores the previous in-memory state', async () => {
+  const previous = syntheticLocal();
+  let current = previous;
+  let latchCleared = false;
+  let renders = 0;
+  const deps = {
+    getState: () => current,
+    setState: (s) => { current = s; },
+    save: () => false, // quota / blocked persistence
+    clearStorageError: () => { latchCleared = true; },
+    renderSidebar: () => { renders += 1; },
+    navigate: () => { throw new Error('must not navigate on failure'); },
+  };
+  const cloud = syntheticLocal();
+  cloud.modules[0] = { ...cloud.modules[0], title: 'CLOUD' };
+  let err = null;
+  try {
+    commitDownloadReplacement(deps, cloud);
+  } catch (e) {
+    err = e;
+  }
+  assert.ok(err, 'commit must throw when persistence fails');
+  assert.equal(err.code, 'PERSIST_FAILED');
+  assert.equal(current, previous, 'previous in-memory state restored');
+  assert.equal(current.modules[0].title, 'M', 'previous values intact');
+  assert.equal(latchCleared, true, 'latch cleared only at the confirmed commit point');
+  assert.ok(renders >= 1, 'UI repainted with restored state');
+});
+
+await test('successful download commit keeps cloud state', async () => {
+  const previous = syntheticLocal();
+  let current = previous;
+  let latchCleared = false;
+  let navigated = null;
+  const cloud = syntheticLocal();
+  const res = commitDownloadReplacement({
+    getState: () => current,
+    setState: (s) => { current = s; },
+    save: () => true,
+    clearStorageError: () => { latchCleared = true; },
+    renderSidebar: () => {},
+    navigate: (v) => { navigated = v; },
+  }, cloud);
+  assert.deepEqual(res, { replaced: true });
+  assert.equal(current, cloud, 'cloud state active after verified save');
+  assert.equal(latchCleared, true);
+  assert.equal(navigated, 'today');
+});
+
+await test('upload fails when a cloud row ID exists but a field value differs', async () => {
+  const client = makeClient({
+    corrupt: { table: 'modules', id: 'mod-1', patch: { title: 'TAMPERED' } },
+  });
+  let err = null;
+  try {
+    await uploadLocalData(client, syntheticLocal());
+  } catch (e) {
+    err = e;
+  }
+  assert.ok(err, 'verification must fail on value mismatch');
+  assert.equal(err.code, 'VERIFY_FAILED');
+  assert.ok(Array.isArray(err.mismatches) && err.mismatches.length > 0);
+  assert.equal(getLastSyncedUid(), null, 'account-sync ledger must not update');
+});
+
+await test('upload verifies the user_settings row too', async () => {
+  const client = makeClient({
+    corrupt: { table: 'user_settings', patch: { theme: 'light' } },
+  });
+  // Local settings theme is 'dark'; tampered read-back says 'light'.
+  let err = null;
+  try {
+    await uploadLocalData(client, syntheticLocal());
+  } catch (e) {
+    err = e;
+  }
+  assert.ok(err, 'settings mismatch must fail verification');
+  assert.equal(err.code, 'VERIFY_FAILED');
+  assert.ok(err.mismatches.some((m) => m.table === 'user_settings'));
+  assert.equal(getLastSyncedUid(), null, 'account-sync ledger must not update');
 });
 
 console.log(`\n${passed} passed`);
