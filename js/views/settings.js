@@ -5,6 +5,7 @@
 import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal, confirmDialog } from '../components/modal.js';
 import { generateId, exportData, importData, clearAll, clearStorageError } from '../services/store.js';
+import { renderAuthPanel } from '../services/auth.js';
 
 export function renderSettings(state) {
   const moduleId = state.settings.currentModuleId;
@@ -51,6 +52,13 @@ export function renderSettings(state) {
       </div>
     </div>
     
+    <hr class="rule">
+
+    <div style="margin-bottom: 32px;">
+      <div class="section-label">Konto / Supabase</div>
+      <div id="supabase-auth-panel"></div>
+    </div>
+
     <hr class="rule">
     
     <div style="margin-bottom: 32px;">
@@ -100,6 +108,8 @@ export function renderSettings(state) {
     </div>
   `;
   
+  renderAuthPanel(el.querySelector('#supabase-auth-panel'));
+
   // Handlers
   if (m) {
     el.querySelector('#set-target')?.addEventListener('input', e => {
