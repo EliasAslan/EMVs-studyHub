@@ -7,17 +7,53 @@
  */
 
 /**
+ * Error thrown when a storage read fails.
+ * A missing key is NOT an error — getItem() returns null for those.
+ * Throwing (instead of returning null) keeps corrupted or inaccessible
+ * data distinguishable from a genuine first run.
+ */
+export class StorageError extends Error {
+  /**
+   * @param {string} key - Storage key that failed.
+   * @param {string} code - 'READ_FAILED' (backend access failed) or
+   *   'PARSE_FAILED' (stored value is not valid JSON).
+   * @param {Error} [cause] - Underlying error.
+   */
+  constructor(key, code, cause) {
+    super(`Storage read("${key}") failed (${code})`);
+    this.name = 'StorageError';
+    this.key = key;
+    this.code = code;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/**
  * LocalStorage adapter.
  * Serializes/deserializes via JSON so callers pass/receive objects.
+ *
+ * Contract:
+ * - getItem() returns null ONLY when the key is genuinely missing
+ *   (or holds JSON null). Read/access failures and invalid JSON throw
+ *   StorageError so callers never mistake them for "no data".
+ * - setItem()/removeItem() return booleans and never throw, so quota
+ *   errors and access failures surface as `false`, never as crashes.
  */
 export const localStorageAdapter = {
   getItem(key) {
+    let raw;
     try {
-      const raw = localStorage.getItem(key);
-      return raw === null ? null : JSON.parse(raw);
+      raw = localStorage.getItem(key);
     } catch (e) {
       console.error(`Storage getItem("${key}") failed:`, e);
-      return null;
+      throw new StorageError(key, 'READ_FAILED', e);
+    }
+    if (raw === null) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      console.error(`Storage getItem("${key}") found invalid JSON:`, e);
+      throw new StorageError(key, 'PARSE_FAILED', e);
     }
   },
 
@@ -45,6 +81,8 @@ export const localStorageAdapter = {
 /**
  * Raw-string reader for migration from legacy keys.
  * Returns the unparsed string so legacy parsing stays intact.
+ * Best-effort by design: legacy keys are optional, so access failures
+ * yield null (treated as "no legacy data") instead of throwing.
  */
 export function readLegacyStorage(key) {
   try {

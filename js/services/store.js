@@ -4,12 +4,29 @@
  * Stable IDs for all entities to survive editing, export/import, reordering
  */
 
-const STORAGE_KEY = 'emvs_data_v1';
-const TIMER_KEY = 'emvs_timer_v1';
+export const STORAGE_KEY = 'emvs_data_v1';
+export const TIMER_KEY = 'emvs_timer_v1';
 const MIGRATION_KEY = 'emvs_schema_version';
 const CURRENT_SCHEMA_VERSION = 1;
 
-import { activeAdapter, readLegacyStorage } from './storageAdapter.js';
+import { activeAdapter, readLegacyStorage, StorageError } from './storageAdapter.js';
+
+/**
+ * Last storage read failure observed by load().
+ * Null means the most recent load saw no read failure.
+ * Lets the UI distinguish "no data yet" (null + first-run data) from
+ * "data exists but is unreadable" (non-null + blank safe data) without
+ * risking the stored value: load() never writes.
+ */
+let lastStorageError = null;
+
+export function getStorageError() {
+  return lastStorageError;
+}
+
+export function clearStorageError() {
+  lastStorageError = null;
+}
 
 /**
  * Generate a stable, unique ID
@@ -113,12 +130,30 @@ function getIsoWeekFallback(date = new Date()) {
 }
 
 /**
- * Load data from localStorage with migration support
+ * Load data from localStorage with migration support.
+ *
+ * Three outcomes, kept strictly apart:
+ * - key missing → existing first-run path (legacy migration or demo seed).
+ * - key present and valid → normalized data.
+ * - read access failure or invalid JSON → blank seed WITHOUT demo data,
+ *   recorded via getStorageError(). The stored value is never written,
+ *   so corrupt data survives for inspection/recovery instead of being
+ *   replaced by demo content.
  */
 export function load() {
+  let raw;
   try {
-    const raw = activeAdapter.getItem(STORAGE_KEY);
-    if (!raw) {
+    raw = activeAdapter.getItem(STORAGE_KEY);
+  } catch (e) {
+    lastStorageError = e instanceof StorageError
+      ? e
+      : new StorageError(STORAGE_KEY, 'READ_FAILED', e);
+    console.error('Failed to read stored data:', lastStorageError);
+    return getSeedData();
+  }
+  clearStorageError();
+  try {
+    if (raw === null) {
       // True first run: honour legacy data if present, else demo seed.
       const migrated = migrateFromLegacy({});
       const hasContent = migrated.modules.length || migrated.learningObjectives.length ||
@@ -175,12 +210,21 @@ export function load() {
 }
 
 /**
- * Save data to localStorage
+ * Save data to localStorage.
+ * Returns the adapter result verbatim: true only when the write
+ * actually succeeded, false on quota errors or access failures.
+ * Never reports success when the underlying write failed.
+ *
+ * Safety latch: while a storage read failure is recorded (see load()),
+ * saves are refused with `false` and nothing is written, so ordinary
+ * app saves cannot overwrite data that failed to load. The latch clears
+ * on the next successful load, on an explicit reset (clearAll), or when
+ * the user knowingly replaces storage (backup import clears it first).
  */
 export function save(data) {
+  if (lastStorageError) return false;
   try {
-    activeAdapter.setItem(STORAGE_KEY, data);
-    return true;
+    return activeAdapter.setItem(STORAGE_KEY, data);
   } catch (e) {
     console.error('Failed to save data:', e);
     return false;
@@ -728,21 +772,27 @@ export function importData(jsonString) {
 }
 
 /**
- * Clear all data (reset to seed)
+ * Clear all data (reset to seed).
+ * Explicit, confirmation-gated reset: discarding storage is the user's
+ * stated intent here, so any recorded read failure is cleared and saving
+ * works again immediately.
  */
 export function clearAll() {
+  clearStorageError();
   activeAdapter.removeItem(STORAGE_KEY);
   activeAdapter.removeItem(TIMER_KEY);
   return getSeedData();
 }
 
 /**
- * Timer persistence - survives page refresh
+ * Timer persistence - survives page refresh.
+ * Returns true only when the write actually succeeded.
+ * Refused (false, no write) while a storage read failure is recorded.
  */
 export function saveTimerState(timerState) {
+  if (lastStorageError) return false;
   try {
-    activeAdapter.setItem(TIMER_KEY, timerState);
-    return true;
+    return activeAdapter.setItem(TIMER_KEY, timerState);
   } catch (e) {
     console.error('Failed to save timer state:', e);
     return false;
@@ -754,6 +804,8 @@ export function loadTimerState() {
     const raw = activeAdapter.getItem(TIMER_KEY);
     return raw === null ? null : raw;
   } catch (e) {
+    // Corrupt or inaccessible timer state is ephemeral: report no timer
+    // rather than crashing. The stored value is left untouched.
     console.error('Failed to load timer state:', e);
     return null;
   }

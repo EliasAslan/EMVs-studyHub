@@ -3,7 +3,7 @@
  * Orchestrates views, state, and persistence
  */
 
-import { load, save, generateId, exportData, importData, clearAll } from './services/store.js';
+import { load, save, generateId, exportData, importData, clearAll, getStorageError } from './services/store.js';
 import { renderSidebar } from './components/sidebar.js';
 import { initPalette } from './components/palette.js';
 import { initModal } from './components/modal.js';
@@ -37,6 +37,12 @@ if (window.__EMVS_pendingNavigate) delete window.__EMVS_pendingNavigate;
 
 // Initialize app
 function init() {
+  // Storage failure banner: local data unreadable means saving is latched
+  // off (see save()) so nothing gets overwritten. One persistent message
+  // with a way to reach recovery (backup import / reset in settings).
+  const storageError = getStorageError();
+  if (storageError) showStorageErrorBanner(storageError);
+
   // Apply theme
   document.documentElement.dataset.theme = state.settings.theme || 'light';
   
@@ -117,3 +123,30 @@ function init() {
 init();
 
 export { state };
+
+/**
+ * Persistent storage-failure notice. Rendered once at startup when load()
+ * recorded a read failure; stays visible because the condition (saving
+ * disabled) stays true until the user recovers via settings or reloads
+ * with readable data. Inline styles reuse existing theme vars — no CSS
+ * or layout changes.
+ */
+function showStorageErrorBanner(err) {
+  const main = document.getElementById('main');
+  if (!main || document.getElementById('storage-error-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'storage-error-banner';
+  banner.setAttribute('role', 'alert');
+  banner.style.cssText = 'margin:0 0 16px;padding:12px 16px;border:1px solid var(--red);'
+    + 'border-radius:8px;background:color-mix(in srgb, var(--red) 12%, transparent);'
+    + 'color:var(--ink);font-size:14px;line-height:1.5;';
+  const detail = err && err.code ? ` (${err.code})` : '';
+  banner.innerHTML = '<strong>⚠ Lokale Daten konnten nicht geladen werden' + detail + '.</strong> '
+    + '<span>Speichern ist deaktiviert, damit keine Daten überschrieben werden. '
+    + 'Stelle ein Backup wieder her oder setze die Daten zurück.</span> '
+    + '<button type="button" class="btn" data-action="open-settings" style="margin-left:8px;">Einstellungen öffnen</button>';
+  main.prepend(banner);
+  banner.querySelector('[data-action="open-settings"]')?.addEventListener('click', () => {
+    navigate('settings');
+  });
+}

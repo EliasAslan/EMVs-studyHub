@@ -4,7 +4,7 @@
 
 import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal, confirmDialog } from '../components/modal.js';
-import { generateId, exportData, importData, clearAll } from '../services/store.js';
+import { generateId, exportData, importData, clearAll, clearStorageError } from '../services/store.js';
 
 export function renderSettings(state) {
   const moduleId = state.settings.currentModuleId;
@@ -270,6 +270,9 @@ export function importBackup() {
       const result = importData(evt.target.result);
       if (result.success) {
         const data = result.data;
+        // Choosing a backup file is explicit consent to replace storage,
+        // so it lifts the failed-load save latch (see save()).
+        clearStorageError();
         window.EMVS.setState(data);
         window.EMVS.save();
         document.documentElement.dataset.theme = data.settings.theme || 'light';

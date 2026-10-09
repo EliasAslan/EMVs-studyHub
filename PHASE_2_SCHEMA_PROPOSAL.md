@@ -179,7 +179,13 @@ startTime (epoch ms), pausedTime (accumulated ms), running (bool)}`
 - **Composite foreign keys `(user_id, parent_id) → parent(user_id, id)`** for
   every non-nullable parent reference: a row can only point at a parent owned
   by the same user. Cross-owner inserts fail at the database level, regardless
-  of application bugs.
+  of application bugs. `exam_results` goes one step further with a three-column
+  key `(user_id, exam_id, module_id) → exams(user_id, id, module_id)` (row 5):
+  the referenced exam must match the result's user *and* module together, so a
+  same-user but wrong-module exam reference is rejected. All three columns are
+  `NOT NULL`, so there are no null-matching subtleties; deletion still
+  cascades (module → exams → results transitively), and user isolation is
+  unchanged (strictly stronger, never weaker).
 - **Two nullable references need special handling** because `ON DELETE SET NULL`
   on a composite FK would attempt to null `user_id` (which is `NOT NULL` / PK):
   - `captures.objective_id`: **trigger-only, no FK** (decision D7). The app
@@ -215,7 +221,7 @@ by negative tests in Phase 3 (§7 step 4).
 | 2 | resources.module_id → modules | composite FK | `CASCADE` (app cascade, `:160`) |
 | 3 | study_sessions.module_id → modules | composite FK | `CASCADE` (app cascade, `:161`) |
 | 4 | exams.module_id → modules | composite FK | `CASCADE` (app cascade, `:162`) |
-| 5 | exam_results.(module_id, exam_id) → modules, exams | two composite FKs | `CASCADE` both (app cascades, `:163` + `module-exams.js:139`) |
+| 5 | exam_results.(module_id, exam_id) → exams | single three-column FK `(user_id, exam_id, module_id) → exams(user_id, id, module_id)` (backed by `uq_exams_user_id_module`): guarantees the referenced exam is same-user **and** same-module as the result — a result carrying M2 for an exam in M1 is rejected | `CASCADE` (app cascades, `settings.js:163` + `module-exams.js:139`; module delete reaches results transitively via exams) |
 | 6 | plan_items.module_id → modules | composite FK | `CASCADE` (app cascade, `:164`) |
 | 7 | captures.module_id → modules (nullable; NULL skips the check, NULL-module captures survive — exactly as the app's `filter(c => c.moduleId !== id)` treats them, `:165`) | composite FK | `CASCADE` |
 | 8 | weekly_reviews.module_id → modules (nullable = global; same NULL semantics, `:166`) | composite FK | `CASCADE` |
@@ -462,6 +468,7 @@ Assessment:
 4. **Isolation test gate (must pass before any app work):** positive (own CRUD
    on every table incl. settings) and negative (cross-user SELECT/INSERT/
    UPDATE/DELETE denied; cross-owner `module_id` insert rejected by FK;
+   cross-module `exam_results` insert rejected by the three-column FK;
    cross-owner `objective_id`/`current_module_id` rejected by triggers;
    `anon` sees nothing; delete of `auth.users` cascades). Real data sync is
    blocked until green — RLS is not claimed secure until this passes.
@@ -503,7 +510,7 @@ form; and identifier legality (`type`, `text`, `timestamp`, `date`, `number`,
 An automated scan of the fenced block additionally confirms: exactly 1 fence,
 0 backticks, 0 asterisks, balanced parentheses, even quote counts, and the
 expected statement census (10 tables, 10 RLS enables, 10 grants, 10 policies,
-2 functions, 2 triggers, 9 indexes, 1 constraint).
+2 functions, 2 triggers, 9 indexes, 2 constraints).
 
 ```sql
 -- =====================================================================
@@ -614,6 +621,11 @@ CREATE TABLE exams (
   FOREIGN KEY (user_id, module_id) REFERENCES modules (user_id, id) ON DELETE CASCADE
 );
 
+-- Supporting UNIQUE for the exam_results invariant (§2.2 row 5): the
+-- three-column foreign key below needs (user_id, id, module_id) to be
+-- a UNIQUE constraint on exams.
+ALTER TABLE exams ADD CONSTRAINT uq_exams_user_id_module UNIQUE (user_id, id, module_id);
+
 CREATE TABLE exam_results (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   id TEXT NOT NULL,
@@ -627,8 +639,11 @@ CREATE TABLE exam_results (
   notes TEXT NOT NULL DEFAULT '',
   created_at BIGINT NOT NULL,
   PRIMARY KEY (user_id, id),
-  FOREIGN KEY (user_id, exam_id) REFERENCES exams (user_id, id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id, module_id) REFERENCES modules (user_id, id) ON DELETE CASCADE
+  -- One three-column key enforces BOTH invariants at once: the referenced
+  -- exam must belong to the same user AND to the same module as the result.
+  -- A result pointing at same-user exam E (module M1) while carrying
+  -- module_id M2 matches no exams row (E, M2) and is rejected.
+  FOREIGN KEY (user_id, exam_id, module_id) REFERENCES exams (user_id, id, module_id) ON DELETE CASCADE
 );
 
 CREATE TABLE plan_items (
@@ -857,3 +872,80 @@ CREATE TRIGGER trg_settings_module_owner
 - **Supabase remains untouched:** nothing executed anywhere (no local engine
   exists to execute on), no project changes, no users, no credentials, no
   adapter switch, no behavior or data changes. Stopping here per boundary.
+
+---
+
+## Completion report (Phase 2.1 — storage reliability and schema consistency)
+
+- **Code fixes (`js/services/storageAdapter.js`, `js/services/store.js`):**
+  (1) `getItem()` now returns `null` only for genuinely missing keys and throws
+  a typed `StorageError` (`READ_FAILED` / `PARSE_FAILED`) on access or JSON
+  failures, instead of collapsing both cases to `null`; (2) `save()` and
+  `saveTimerState()` return the adapter's boolean verbatim, so quota/access
+  failures report `false` instead of unconditional `true`; (3) `load()`
+  routes read failures to a blank seed (never demo data), records the error
+  for `getStorageError()`/`clearStorageError()`, and never writes — the
+  stored value survives; missing keys keep the exact first-run path;
+  `loadTimerState()` returns `null` on corrupt timer state without throwing
+  or writing. Verified no caller branches on these return values (60+ sites
+  fire-and-forget), so the change is behavior-preserving on success paths.
+  Additive exports only (`StorageError`, `STORAGE_KEY`, `TIMER_KEY`,
+  `getStorageError`, `clearStorageError`).
+- **Proposal fixes (`PHASE_2_SCHEMA_PROPOSAL.md`):** `exam_results` now uses
+  one three-column FK `(user_id, exam_id, module_id) → exams(user_id, id,
+  module_id)` backed by `uq_exams_user_id_module`, enforcing same-user AND
+  same-module in a single constraint; user isolation strictly stronger, never
+  weaker; all-`NOT NULL` columns (no null-matching subtleties); CASCADE
+  preserved transitively. Register row 5, §2.1, §7 gate, and census updated.
+- **Tests (`tests/storage.test.mjs`, `npm test`):** 18/18 pass. Negative
+  control against pre-fix HEAD code confirms all three bugs were real
+  (save→true on quota failure; corrupt→demo seed; no error accessor).
+- **Remaining risks:** UI does not yet surface `getStorageError()` (banner
+  work belongs to a UI phase); `readLegacyStorage` stays best-effort
+  null-on-failure (legacy keys only, documented); weekly G3 and link-array
+  G1/G2 gaps unchanged; RLS/triggers still unexecuted by design.
+- **Supabase remains untouched and the app still uses localStorage** via the
+  unchanged `activeAdapter` default. No SQL executed, no users, no
+  credentials, nothing uploaded. Stopping here; Phase 3 not started.
+
+---
+
+## Completion report (Phase 2.2 — final reliability check)
+
+- **Save latch (`js/services/store.js`):** `save()` and `saveTimerState()`
+  return `false` without writing while a storage read failure is recorded —
+  one in-memory flag (`lastStorageError`, already introduced in 2.1), no new
+  abstractions. The latch clears on the next successful `load()`, on explicit
+  `clearAll()` (confirmed reset = consent to discard), and on backup import
+  (`settings.js:importBackup` calls `clearStorageError()` first — choosing a
+  file is explicit consent to replace storage). First-run saves still work.
+- **Regression tests (`tests/storage.test.mjs`, now 21 tests):** the exact
+  required sequence passes — store data, corrupt it, `load()` fails to blank
+  (not demo), `save()`/`saveTimerState()` return `false`, original raw value
+  byte-identical afterwards; plus read-failure variant, and re-enablement via
+  successful load / first run / reset. Full suite: **21 passed, 0 failed**.
+- **UI surfacing (`js/app.js`):** toast auto-hides, so a persistent
+  `role="alert"` banner is injected in `init()` only when `load()` failed —
+  German message stating data could not be read and saving is disabled, with
+  an "Einstellungen öffnen" button to the recovery paths (import/reset).
+  Inline styles reuse existing theme vars; no CSS, layout, or redesign.
+  Verified by code inspection against `index.html` (`#main`) and existing
+  `var(--red)` usage; browser rendering itself could not be executed here.
+- **Schema verification (no change):** `exam_results` three-column FK
+  positionally matches `(user_id, exam_id, module_id) → exams(user_id, id,
+  module_id)` with supporting `uq_exams_user_id_module`; names unique,
+  types UUID/TEXT/TEXT both sides, CASCADE transitive, all columns NOT NULL.
+  Fence re-scan confirms the appendix untouched and clean (1 fence, 0
+  Markdown markers, census 10/10/10/10/2/2/9/2, parens 134/134, 63
+  semicolons). No concrete correctness issue found — no schema change made.
+- **Checks actually run:** `npm test` (21/21 pass); `node --check` on ESM
+  copies of `app.js`/`settings.js`/`store.js` (parse OK; DOM code not
+  executed); fence scan; `git status`/`diff --stat`. SQL not executed, as
+  required. No local PG tooling exists; browser rendering not available.
+- **Remaining limitations:** banner copy assumes German UI (matches app);
+  stored JSON scalars (`false`, `"null"`) normalize to blank/first-run via
+  the pre-existing migration path without recording an error (they carry no
+  recoverable data); `getStorageError()` banner shows only at startup.
+- **Supabase remains untouched:** no SQL executed, no project changes, no
+  auth/RLS/cloud work, `activeAdapter` still localStorage, no credentials,
+  nothing uploaded, nothing committed or pushed. Stopping here.
