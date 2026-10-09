@@ -8,7 +8,7 @@ export const SUPABASE_URL = 'https://atotphhdrsjcxjtpptkg.supabase.co';
 
 // Supabase Dashboard → Project Settings → API Keys → publishable key.
 // Replace this placeholder before testing authentication.
-export const SUPABASE_PUBLISHABLE_KEY = 'PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_uRP3ELY3TJtQRxuL0aS5Uw_gaxfKSKx';
 
 export function isSupabaseConfigured() {
   return Boolean(
