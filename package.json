@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/storage.test.mjs && node tests/supabase-data.test.mjs"
+    "test": "node tests/storage.test.mjs && node tests/supabase-data.test.mjs && node tests/cloud-sync.test.mjs"
   }
 }
