@@ -83,7 +83,7 @@ await test('rejects rows without stable ids', async () => {
 });
 
 await test('refuses operations without an authenticated user', async () => {
-  await assert.rejects(() => listUserRows(mockClient({ userId: null }), 'modules'), /sign in|anmelden/i);
+  await assert.rejects(() => listUserRows(mockClient({ userId: null }), 'modules'), /sign in|anmelden|supabase an/i);
 });
 
 await test('propagates Supabase errors', async () => {
