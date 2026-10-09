@@ -5,6 +5,7 @@
 import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal, confirmDialog } from '../components/modal.js';
 import { generateId, exportData, importData, clearAll, clearStorageError } from '../services/store.js';
+import { renderAuthPanel } from '../services/auth.js';
 
 export function renderSettings(state) {
   const moduleId = state.settings.currentModuleId;
@@ -51,6 +52,13 @@ export function renderSettings(state) {
       </div>
     </div>
     
+    <hr class="rule">
+
+    <div style="margin-bottom: 32px;">
+      <div class="section-label">Konto / Supabase</div>
+      <div id="supabase-auth-panel"></div>
+    </div>
+
     <hr class="rule">
     
     <div style="margin-bottom: 32px;">
@@ -100,6 +108,8 @@ export function renderSettings(state) {
     </div>
   `;
   
+  renderAuthPanel(el.querySelector('#supabase-auth-panel'));
+
   // Handlers
   if (m) {
     el.querySelector('#set-target')?.addEventListener('input', e => {
@@ -140,7 +150,9 @@ export function renderSettings(state) {
     if (await confirmDialog('Wirklich ALLE Daten unwiderruflich löschen? Dies kann nicht rückgängig gemacht werden.', 'Daten zurücksetzen')) {
       const fresh = clearAll();
       window.EMVS.setState(fresh);
-      window.EMVS.save();
+      // Dismiss the storage-failure banner only once saving verifiably
+      // works again — clearAll() lifted the latch, so true means recovered.
+      if (window.EMVS.save()) hideStorageErrorBanner();
       document.documentElement.dataset.theme = fresh.settings.theme;
       window.EMVS.renderSidebar();
       navigate('today');
@@ -274,7 +286,9 @@ export function importBackup() {
         // so it lifts the failed-load save latch (see save()).
         clearStorageError();
         window.EMVS.setState(data);
-        window.EMVS.save();
+        // Dismiss the storage-failure banner only once the recovery save
+        // verifiably succeeded — a failed save keeps warning and latch.
+        if (window.EMVS.save()) hideStorageErrorBanner();
         document.documentElement.dataset.theme = data.settings.theme || 'light';
         window.EMVS.renderSidebar();
         navigate('today');
@@ -291,4 +305,14 @@ export function importBackup() {
 // Make navigate available
 function navigate(view) {
   window.EMVS.navigate?.(view);
+}
+
+/**
+ * Remove the startup storage-failure banner (see showStorageErrorBanner in
+ * app.js). Called only after a recovery save returned true — i.e. saving is
+ * verifiably re-enabled — never on mere navigation to settings, and never
+ * after a failed import or failed save.
+ */
+function hideStorageErrorBanner() {
+  document.getElementById('storage-error-banner')?.remove();
 }
