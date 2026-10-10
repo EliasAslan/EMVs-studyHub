@@ -68,13 +68,15 @@ function session(id, objIds = ['o1'], duration = 30, start = new Date(NOW).toISO
 
 await test('logging a session updates objective time and history', async () => {
   const st = baseState();
-  const before = Date.now();
   store.updateObjectiveHistory(st, session('s1', ['o1'], 45));
   const o = st.learningObjectives[0];
   assert.equal(o.totalStudyTime, 45);
   assert.equal(o.sessionHistory.length, 1);
   assert.deepEqual(o.sessionHistory[0], { sessionId: 's1', date: new Date(NOW).toISOString(), duration: 45, note: 'n' });
-  assert.ok(o.lastTouched >= before);
+  // Phase 9 semantics: lastTouched is a fact about the session date, not the
+  // wall-clock log time — backdated sessions must not mark objectives
+  // "touched now". Exact equality also removes the old time-of-day coupling.
+  assert.equal(o.lastTouched, NOW);
   store.updateObjectiveHistory(st, session('s2', ['o1'], 15));
   assert.equal(st.learningObjectives[0].totalStudyTime, 60);
   assert.equal(st.learningObjectives[0].sessionHistory[0].sessionId, 's2');
