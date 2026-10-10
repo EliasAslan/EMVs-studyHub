@@ -12,7 +12,7 @@
  * storage untouched but are no longer asked.)
  */
 
-import { escapeHtml, formatDate, getWeekDateRange, getCurrentWeekNumber, getWeekActivity, hasWeeklyReview } from '../utils/helpers.js';
+import { escapeHtml, formatDate, getWeekDateRange, getCurrentWeekNumber, getWeekActivity, hasWeeklyReview, getReviewAttention } from '../utils/helpers.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { generateId } from '../services/store.js';
 import { navigate } from './router.js';
@@ -53,6 +53,8 @@ export function renderWeeklyReview(state) {
     <div class="mb-3">
       <button class="btn ${due ? '' : 'primary'}" id="add-review">＋ ${due ? 'Wochenreview schreiben' : `Neues Review (KW ${currentWeek}/${currentYear})`}</button>
     </div>
+
+    ${renderAttention(state, currentModuleId)}
 
     ${reviews.length ? `
       <div class="reviews-list">
@@ -96,6 +98,38 @@ export function renderWeeklyReview(state) {
 
 function moduleOf(state, moduleId) {
   return state.modules.find(m => m.id === moduleId);
+}
+
+/**
+ * "Nächste Schritte" — forward-looking attention block for reviews.
+ * Read-only rendering of getReviewAttention(): due reviews, the top
+ * weakness signal, and unfinished past-week plan items. Text-only, no
+ * navigation, no data changes.
+ */
+function renderAttention(state, moduleId) {
+  const a = getReviewAttention(state, { moduleId });
+  const bits = [];
+  if (a.dueCount) {
+    const first = a.due[0];
+    bits.push(`<div>🔁 <strong>${a.dueCount} Review${a.dueCount === 1 ? '' : 's'} fällig</strong>`
+      + (first ? ` — zuerst: LZ ${first.number ?? '–'} „${escapeHtml((first.title || '').slice(0, 60))}“` : '') + `</div>`);
+  }
+  if (a.weakSpots.length) {
+    const w = a.weakSpots[0];
+    bits.push(`<div>⚠️ <strong>Schwachstelle:</strong> LZ ${w.objective.number ?? '–'}`
+      + ` „${escapeHtml((w.objective.title || '').slice(0, 60))}“ (Signal ${w.breakdown.score})</div>`);
+  }
+  if (a.leftovers.length) {
+    const oldest = a.leftovers[0];
+    bits.push(`<div>🗂 <strong>${a.leftovers.length} offene Plan-Reste</strong>`
+      + ` — ältester: „${escapeHtml(((oldest.text || oldest.title) || '').slice(0, 60))}“ (W${oldest.week})</div>`);
+  }
+  return `
+    <div class="section-label">Nächste Schritte</div>
+    ${bits.length
+      ? `<div class="card" style="margin-bottom: 24px; display: grid; gap: 8px; font-size: 14px; line-height: 1.6;">${bits.join('')}</div>`
+      : `<p class="today-empty-line" style="margin-bottom: 24px;">Alles im Rhythmus — keine offenen Punkte.</p>`}
+  `;
 }
 
 function renderEvidenceFacts(state, week, year, moduleId) {
@@ -214,6 +248,8 @@ export function openReviewModal(review = null, preset = {}) {
         <div class="section-label">Fakten dieser Woche</div>
         <div id="review-evidence"></div>
 
+        <div id="review-attention"></div>
+
         <hr class="rule" style="margin: 20px 0;">
         <div class="section-label">Drei Fragen · ca. 5 Minuten</div>
 
@@ -261,6 +297,8 @@ export function openReviewModal(review = null, preset = {}) {
     const mid = fd?.get('moduleId') || null;
     const st = window.EMVS.getState();
     host.innerHTML = renderEvidenceFacts(st, w, y, mid);
+    const attention = document.getElementById('review-attention');
+    if (attention) attention.innerHTML = renderAttention(st, mid);
   };
 
   setTimeout(() => {
