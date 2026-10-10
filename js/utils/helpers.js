@@ -200,6 +200,30 @@ export function hasWeeklyReview(state, week, year, moduleId = null) {
 }
 
 /**
+ * Forward-looking review input: what needs attention next.
+ *
+ * Pure read-only aggregation for weekly reviews — due (spaced) reviews,
+ * top weakness signals, and unfinished past-week plan items — scoped to
+ * one module or, when moduleId is null, across all modules.
+ * Nothing here writes, merges, or deletes user data.
+ */
+export function getReviewAttention(state, { moduleId = null, limit = 5, now = Date.now() } = {}) {
+  const allDue = getDueObjectives(state, moduleId, now);
+  const weakSpots = getWeakSpots(state, { moduleId, limit: 3 });
+  const scopes = moduleId ? [moduleId] : (state.modules || []).map(m => m.id);
+  const leftovers = scopes
+    .flatMap(id => getPlanLeftovers(state, id, new Date(now)))
+    .sort((a, b) => (a.week - b.week) || ((a.createdAt || 0) - (b.createdAt || 0)))
+    .slice(0, limit);
+  return {
+    due: allDue.slice(0, limit),
+    dueCount: allDue.length,
+    weakSpots,
+    leftovers,
+  };
+}
+
+/**
  * Adaptive plan — weeks are suggestions, not a cage.
  *
  * Drift detection: an open, non-dropped item whose suggested week's Sunday
