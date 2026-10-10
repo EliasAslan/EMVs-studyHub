@@ -103,6 +103,78 @@ export function normalizeVerifyTimestamps(collection, record) {
   return out;
 }
 
+/**
+ * Demo-seed upload exclusion (Phase 10).
+ *
+ * Identity rule: a record is demo-only iff its OWN id starts with `demo-`.
+ * Every record minted by getDemoSeedData() matches (demo-mod-*, demo-obj*-*,
+ * demo-res-*, demo-ses*-*, demo-exam-*, demo-plan-*), in all collections that
+ * carry seed rows (modules, learningObjectives, resources, studySessions,
+ * exams, planItems) and — for forward/backward compatibility — in
+ * examResults, captures, and weeklyReviews, which carry none today.
+ * Genuine app records use generateId() (`<base36-time>-<base36-random>`):
+ * the `demo-` prefix would require the timestamp part to equal exactly
+ * "demo" (a 1970 date), so collisions are unreachable for real timestamps
+ * and no genuine record is ever classified as demo. Records with missing or
+ * non-string ids are NOT demo and keep flowing (upsert still rejects them
+ * exactly as before — nothing is silently discarded).
+ *
+ * FK closure (schema-dictated, minimal): composite FKs require a kept record's
+ * module (objectives/resources/sessions/exams/planItems non-null moduleId;
+ * examResults/captures/weeklyReviews non-null moduleId) and a kept
+ * examResult's exam to exist in the cloud. A demo module/exam referenced by
+ * an included genuine record is therefore force-included (re-upserted by
+ * stable id, so it can never accumulate); unreferenced demo records stay
+ * excluded. Plain link arrays (linkedObjectiveIds, exam objectiveResults)
+ * carry no FK and need no closure. Settings has no id and always uploads.
+ *
+ * Pure w.r.t. local state: returns filtered copies, never mutates input.
+ * Mapping (toCloudDataset) is untouched, so the marker can never enter the
+ * Supabase schema — exclusion is a sync-layer policy applied at the single
+ * upload route (uploadLocalData).
+ */
+export function isDemoId(id) {
+  return typeof id === 'string' && id.startsWith('demo-');
+}
+
+export function excludeDemoRecords(localState) {
+  if (!localState || typeof localState !== 'object') return localState;
+  const out = { ...localState };
+  const kept = {};
+  const demo = {};
+  for (const collection of UPLOAD_ORDER) {
+    if (collection === 'settings') continue;
+    const items = localState[collection];
+    if (!Array.isArray(items)) continue;
+    kept[collection] = [];
+    demo[collection] = [];
+    for (const item of items) {
+      if (item && typeof item === 'object' && isDemoId(item.id)) demo[collection].push(item);
+      else kept[collection].push(item);
+    }
+  }
+  const requiredModuleIds = new Set();
+  const requiredExamIds = new Set();
+  for (const collection of Object.keys(kept)) {
+    if (collection === 'modules') continue;
+    for (const item of kept[collection]) {
+      if (!item || typeof item !== 'object') continue;
+      if (typeof item.moduleId === 'string' && item.moduleId !== '') requiredModuleIds.add(item.moduleId);
+      if (collection === 'examResults' && typeof item.examId === 'string' && item.examId !== '') {
+        requiredExamIds.add(item.examId);
+      }
+    }
+  }
+  for (const m of demo.modules || []) {
+    if (m && typeof m === 'object' && requiredModuleIds.has(m.id)) kept.modules.push(m);
+  }
+  for (const e of demo.exams || []) {
+    if (e && typeof e === 'object' && requiredExamIds.has(e.id)) kept.exams.push(e);
+  }
+  for (const collection of Object.keys(kept)) out[collection] = kept[collection];
+  return out;
+}
+
 function readUidKey() {
   try {
     if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage) return null;
@@ -231,7 +303,10 @@ export async function uploadLocalData(client, localState, opts = {}) {
     throw err;
   }
 
-  const dataset = toCloudDataset(localState);
+  // Demo/example content stays local: only genuine user records (plus demo
+  // parents genuinely referenced by them, for FK safety) enter the dataset.
+  // The single upload route guarantees uniform exclusion everywhere.
+  const dataset = toCloudDataset(excludeDemoRecords(localState));
   const ledger = [];
   for (const collection of UPLOAD_ORDER) {
     const table = TABLE_FOR_COLLECTION[collection];
