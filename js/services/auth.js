@@ -7,6 +7,13 @@
  */
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient.js';
 import { confirmDialog } from '../components/modal.js';
+import {
+  getSyncStatus,
+  describeSyncStatus,
+  recordSyncSuccess,
+  recordSyncFailure,
+  translateSyncError,
+} from './syncStatus.js';
 
 let activeSubscription = null;
 
@@ -42,10 +49,12 @@ export function renderAuthPanel(container) {
     <div id="supabase-sync-panel" style="margin-top:16px; border-top:1px solid var(--rule-2); padding-top:12px; max-width:560px;" hidden>
       <div class="section-label">Cloud-Synchronisation (manuell)</div>
       <p style="font-size:13px; color:var(--ink-2); max-width:58ch;">
-        localStorage bleibt der Standard. Nichts geschieht automatisch — nur die
-        Aktionen unten schreiben oder ersetzen Daten.
+        localStorage bleibt der Standard. Lokale Änderungen werden NICHT
+        automatisch synchronisiert — nur die Aktionen unten schreiben oder
+        ersetzen Daten.
       </p>
       <div id="supabase-sync-account" role="status" aria-live="polite" style="font-size:13px; color:var(--ink-2); margin-bottom:8px;"></div>
+      <div id="supabase-sync-status" role="status" aria-live="polite" style="font-size:13px; color:var(--ink-2); margin-bottom:8px;"></div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="btn primary" id="cloud-upload" type="button">Lokale Daten hochladen</button>
         <button class="btn" id="cloud-download" type="button">Cloud-Daten herunterladen</button>
@@ -73,6 +82,43 @@ export function renderAuthPanel(container) {
     if (!syncMessageEl) return;
     syncMessageEl.textContent = message || '';
     syncMessageEl.style.color = isError ? 'var(--red)' : 'var(--ink-2)';
+  };
+
+  // Render a translated sync error: clear German title + next action,
+  // technical detail kept collapsible for debugging (sanitized, no secrets).
+  const setSyncError = (error) => {
+    if (!syncMessageEl) return;
+    const t = translateSyncError(error);
+    syncMessageEl.innerHTML = '';
+    syncMessageEl.style.color = 'var(--red)';
+    const title = document.createElement('div');
+    title.textContent = t.title;
+    const action = document.createElement('div');
+    action.textContent = t.action;
+    action.style.cssText = 'color:var(--ink-2); margin-top:4px;';
+    const details = document.createElement('details');
+    details.style.cssText = 'margin-top:4px; font-size:12px; color:var(--ink-2);';
+    const summary = document.createElement('summary');
+    summary.textContent = `Details (${t.code})`;
+    const tech = document.createElement('div');
+    tech.textContent = t.technical;
+    tech.style.cssText = 'font-family:var(--mono, monospace); word-break:break-word; margin-top:4px;';
+    details.appendChild(summary);
+    details.appendChild(tech);
+    syncMessageEl.append(title, action, details);
+  };
+
+  // Persistent sync history: last successful upload/download times and
+  // last failure. Written only after verified success/failure, never before.
+  const refreshSyncStatus = () => {
+    const el = container.querySelector('#supabase-sync-status');
+    if (!el) return;
+    el.innerHTML = '';
+    for (const line of describeSyncStatus(getSyncStatus())) {
+      const div = document.createElement('div');
+      div.textContent = line;
+      el.appendChild(div);
+    }
   };
 
   const refreshSyncAccount = async () => {
@@ -103,7 +149,10 @@ export function renderAuthPanel(container) {
     // or clears study data. The panel is merely shown/hidden.
     if (syncPanel) syncPanel.hidden = !user;
     if (!user) setSyncMessage('');
-    else refreshSyncAccount();
+    else {
+      refreshSyncAccount();
+      refreshSyncStatus();
+    }
   };
 
   const setMessage = (message, isError = false) => {
@@ -222,11 +271,14 @@ export function renderAuthPanel(container) {
       }
       const result = await uploadLocalData(supabase, state);
       const parts = result.ledger.filter((l) => !l.skipped).map((l) => `${l.table}: ${l.written}`);
+      recordSyncSuccess('upload');
+      refreshSyncStatus();
       setSyncMessage(`Upload erfolgreich (${parts.join(', ') || 'nichts zu schreiben'}). Lokale Daten bleiben aktiv.`);
       window.EMVS?.toast?.show?.('Cloud-Upload erfolgreich');
       refreshSyncAccount();
     } catch (error) {
-      setSyncMessage(error?.message || 'Upload fehlgeschlagen. Lokale Daten unverändert.', true);
+      recordSyncFailure(error?.code);
+      setSyncError(error);
     } finally {
       uploadButton.disabled = false;
       downloadButton.disabled = false;
@@ -291,10 +343,13 @@ export function renderAuthPanel(container) {
         setLastSyncedUid(await getSessionUserId(supabase));
       } catch {}
       refreshSyncAccount();
+      recordSyncSuccess('download');
+      refreshSyncStatus();
       setSyncMessage(`Download erfolgreich (${cloudCounts.total} Datensätze übernommen).`);
       window.EMVS?.toast?.show?.('Cloud-Daten übernommen');
     } catch (error) {
-      setSyncMessage((error?.message || 'Download fehlgeschlagen.') + ' Lokale Daten unverändert.', true);
+      recordSyncFailure(error?.code);
+      setSyncError(error);
     } finally {
       uploadButton.disabled = false;
       downloadButton.disabled = false;
