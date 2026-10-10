@@ -278,24 +278,35 @@ export function importBackup() {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = evt => {
+    reader.onerror = () => {
+      window.EMVS.toast.show('Backup konnte nicht gelesen werden — Datei prüfen und erneut versuchen');
+    };
+    reader.onload = async evt => {
       const result = importData(evt.target.result);
-      if (result.success) {
-        const data = result.data;
-        // Choosing a backup file is explicit consent to replace storage,
-        // so it lifts the failed-load save latch (see save()).
-        clearStorageError();
-        window.EMVS.setState(data);
-        // Dismiss the storage-failure banner only once the recovery save
-        // verifiably succeeded — a failed save keeps warning and latch.
-        if (window.EMVS.save()) hideStorageErrorBanner();
-        document.documentElement.dataset.theme = data.settings.theme || 'light';
-        window.EMVS.renderSidebar();
-        navigate('today');
-        window.EMVS.toast.show('Backup erfolgreich importiert');
-      } else {
+      if (!result.success) {
         window.EMVS.toast.show('Import fehlgeschlagen: ' + result.error);
+        return;
       }
+      // Importing replaces the entire local dataset — require explicit
+      // confirmation AFTER the file parsed, so a wrong-file click or a
+      // corrupt file can never silently destroy current data.
+      const ok = await confirmDialog(
+        'Backup importieren? Dies ersetzt alle aktuellen Daten unwiderruflich. Exportiere zuerst ein Backup, falls du den aktuellen Stand behalten willst.',
+        'Backup importieren'
+      );
+      if (!ok) return;
+      const data = result.data;
+      // Choosing a backup file is explicit consent to replace storage,
+      // so it lifts the failed-load save latch (see save()).
+      clearStorageError();
+      window.EMVS.setState(data);
+      // Dismiss the storage-failure banner only once the recovery save
+      // verifiably succeeded — a failed save keeps warning and latch.
+      if (window.EMVS.save()) hideStorageErrorBanner();
+      document.documentElement.dataset.theme = data.settings.theme || 'light';
+      window.EMVS.renderSidebar();
+      navigate('today');
+      window.EMVS.toast.show('Backup erfolgreich importiert');
     };
     reader.readAsText(file);
   };

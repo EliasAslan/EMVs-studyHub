@@ -745,7 +745,9 @@ export function importData(jsonString) {
     imported.schemaVersion = imported.schemaVersion || CURRENT_SCHEMA_VERSION;
     imported.settings = imported.settings || getSeedData().settings;
     
-    // Generate missing IDs for any entities without them
+    // Generate missing IDs for any entities without them.
+    // Non-object entries (null, strings, numbers) are rejected instead of
+    // being silently spread into blank rows ({...null} === {}).
     const entityArrays = [
       'modules', 'learningObjectives', 'resources',
       'studySessions', 'exams', 'examResults',
@@ -753,12 +755,17 @@ export function importData(jsonString) {
     ];
     
     for (const key of entityArrays) {
-      imported[key] = imported[key].map(item => ({
-        ...item,
-        id: item.id || generateId(),
-        createdAt: item.createdAt || Date.now(),
-        updatedAt: item.updatedAt || Date.now()
-      }));
+      imported[key] = imported[key].map(item => {
+        if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+          throw new Error(`Invalid ${key} entry (expected object)`);
+        }
+        return {
+          ...item,
+          id: item.id || generateId(),
+          createdAt: item.createdAt || Date.now(),
+          updatedAt: item.updatedAt || Date.now()
+        };
+      });
     }
     imported.learningObjectives.forEach(ensureObjectiveFields);
     imported.exams.forEach(ensureExamFields);
@@ -816,12 +823,95 @@ export function clearTimerState() {
 }
 
 /**
+ * Remove all references to a deleted objective from linked entities.
+ * Called on explicit objective delete (user-confirmed): resources, sessions,
+ * exams (links + per-objective diagnosis entries, re-synced), plan items keep
+ * their text but lose the link, captures keep their text but lose the link.
+ * Returns the state for chaining. Never deletes the entities themselves.
+ */
+export function unlinkObjectiveEverywhere(state, objectiveId) {
+  if (!state || !objectiveId) return state;
+  const strip = (arr) => Array.isArray(arr) && arr.includes(objectiveId)
+    ? arr.filter(x => x !== objectiveId)
+    : arr;
+  for (const res of state.resources || []) {
+    if (Array.isArray(res?.linkedObjectiveIds) && res.linkedObjectiveIds.includes(objectiveId)) {
+      res.linkedObjectiveIds = strip(res.linkedObjectiveIds);
+      res.updatedAt = Date.now();
+    }
+  }
+  for (const s of state.studySessions || []) {
+    if (Array.isArray(s?.linkedObjectiveIds) && s.linkedObjectiveIds.includes(objectiveId)) {
+      s.linkedObjectiveIds = strip(s.linkedObjectiveIds);
+      s.updatedAt = Date.now();
+    }
+  }
+  for (const exam of state.exams || []) {
+    if (!exam) continue;
+    let touched = false;
+    if (Array.isArray(exam.linkedObjectiveIds) && exam.linkedObjectiveIds.includes(objectiveId)) {
+      exam.linkedObjectiveIds = strip(exam.linkedObjectiveIds);
+      touched = true;
+    }
+    if (Array.isArray(exam.objectiveResults) && exam.objectiveResults.some(r => r && r.objectiveId === objectiveId)) {
+      exam.objectiveResults = exam.objectiveResults.filter(r => r && r.objectiveId !== objectiveId);
+      touched = true;
+    }
+    if (touched) {
+      syncExamObjectives(exam);
+      exam.updatedAt = Date.now();
+    }
+  }
+  for (const p of state.planItems || []) {
+    if (Array.isArray(p?.linkedObjectiveIds) && p.linkedObjectiveIds.includes(objectiveId)) {
+      p.linkedObjectiveIds = strip(p.linkedObjectiveIds);
+      p.updatedAt = Date.now();
+    }
+  }
+  for (const c of state.captures || []) {
+    if (c && c.objectiveId === objectiveId) {
+      c.objectiveId = null;
+      c.updatedAt = Date.now();
+    }
+  }
+  return state;
+}
+
+/**
+ * Remove all references to a deleted resource from linked entities.
+ * Sessions and plan items keep their own content, only the link is dropped.
+ * Returns the state for chaining.
+ */
+export function unlinkResourceEverywhere(state, resourceId) {
+  if (!state || !resourceId) return state;
+  for (const s of state.studySessions || []) {
+    if (Array.isArray(s?.linkedResourceIds) && s.linkedResourceIds.includes(resourceId)) {
+      s.linkedResourceIds = s.linkedResourceIds.filter(x => x !== resourceId);
+      s.updatedAt = Date.now();
+    }
+  }
+  for (const p of state.planItems || []) {
+    if (Array.isArray(p?.linkedResourceIds) && p.linkedResourceIds.includes(resourceId)) {
+      p.linkedResourceIds = p.linkedResourceIds.filter(x => x !== resourceId);
+      p.updatedAt = Date.now();
+    }
+  }
+  return state;
+}
+
+/**
  * Update objective history when a session is logged
  * Called after a session is created/updated
  */
 export function updateObjectiveHistory(state, session) {
   const { linkedObjectiveIds = [], duration, startTime } = session;
   const now = Date.now();
+  // "Last touched" is a fact about the session date, not about when the user
+  // happened to log/edit it: backdated sessions must not mark everything as
+  // touched right now, or staleness signals (rhythm, weak spots) corrupt.
+  const sessionTs = new Date(startTime).getTime();
+  const touchedAt = Number.isFinite(sessionTs) ? sessionTs : now;
+  const mins = typeof duration === 'number' && Number.isFinite(duration) ? duration : 0;
   
   linkedObjectiveIds.forEach(objId => {
     const obj = state.learningObjectives.find(o => o.id === objId);
@@ -829,10 +919,10 @@ export function updateObjectiveHistory(state, session) {
     ensureObjectiveFields(obj);
     
     // Update total study time
-    obj.totalStudyTime = (obj.totalStudyTime || 0) + duration;
+    obj.totalStudyTime = (obj.totalStudyTime || 0) + mins;
     
-    // Update last touched
-    obj.lastTouched = now;
+    // Update last touched (never backwards: keep the latest known session date)
+    obj.lastTouched = Math.max(obj.lastTouched || 0, touchedAt);
     
     // Add to session history (keep last 20)
     obj.sessionHistory = obj.sessionHistory || [];

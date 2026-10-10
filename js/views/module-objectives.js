@@ -18,7 +18,7 @@ import {
 import { openModal, closeModal } from '../components/modal.js';
 import {
   generateId, ensureObjectiveFields, recordReview, markUnderstood,
-  reopenObjective,
+  reopenObjective, unlinkObjectiveEverywhere,
 } from '../services/store.js';
 import { refresh, registerPatcher } from './router.js';
 import { openSessionModal } from './module-sessions.js';
@@ -195,6 +195,9 @@ function bindObjectiveCard(item, state) {
     e.stopPropagation();
     if (confirm('Lernziel wirklich löschen? Verlauf, Reviews und Verknüpfungen gehen verloren.')) {
       state.learningObjectives = state.learningObjectives.filter(x => x.id !== id);
+      // Strip the deleted id from all linked entities so exam/plan/resource
+      // views stay consistent instead of counting orphaned links.
+      unlinkObjectiveEverywhere(state, id);
       window.EMVS.save();
       refresh('objectives-rebuild');
     }
