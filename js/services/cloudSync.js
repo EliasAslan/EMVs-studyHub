@@ -27,6 +27,82 @@ import {
 export const CLOUD_UID_KEY = 'emvs_cloud_uid_v1';
 export const EXPECTED_TABLES = Object.freeze(Object.values(TABLE_FOR_COLLECTION));
 
+/**
+ * Structural equality for upload verification read-back.
+ * PostgreSQL JSONB does not preserve object key order (it normalizes it),
+ * so a semantically identical nested object (e.g. review_history entries
+ * like { timestamp, outcome } or review_schedule) can read back with a
+ * different key order than it was sent with. The previous
+ * JSON.stringify(a) === JSON.stringify(b) check is order-sensitive and
+ * therefore reports false VERIFY_FAILED mismatches.
+ * recordsEqual() ignores object key order, preserves array order, and
+ * distinguishes genuinely different values (strict primitive equality,
+ * different key sets, different array lengths/order all compare unequal).
+ * Plain JSON values only (no Date/Map/Set handling needed: fromRow()
+ * output is JSON-compatible).
+ */
+export function recordsEqual(a, b) {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== 'object') return a === b;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (!recordsEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const k of keysA) {
+    if (!Object.hasOwn(b, k)) return false;
+  }
+  for (const k of keysA) {
+    if (!recordsEqual(a[k], b[k])) return false;
+  }
+  return true;
+}
+
+/**
+ * Verification-only timestamp canonicalization (TIMESTAMPTZ text format).
+ *
+ * The app sends timestamps as Date.toISOString() ("...T22:13:20.000Z"), but
+ * PostgreSQL timestamptz_out + PostgREST read the same instant back as
+ * "...T22:13:20+00:00" (offset form, fractional seconds dropped when zero).
+ * fromRow() passes these strings through verbatim, so even recordsEqual()
+ * would flag them — correctly as strings, but wrongly as data: both denote
+ * the identical instant. normalizeVerifyTimestamps() rewrites the known
+ * TIMESTAMPTZ-backed fields to canonical toISOString() form on BOTH compared
+ * sides before recordsEqual() runs.
+ *
+ * Narrowly scoped: verification path only (uploadLocalData read-back), only
+ * the two timestamptz-backed fields (studySessions.startTime,
+ * captures.timestamp — the schema's only TIMESTAMPTZ columns). DATE columns
+ * (exams/exam_results/plan_items) round-trip textually identical and are
+ * deliberately untouched. Unparseable values are left as-is and still compare
+ * strictly, so genuine corruption is never masked. Inputs are never mutated.
+ */
+const VERIFY_TIMESTAMP_FIELDS = Object.freeze({
+  studySessions: Object.freeze(['startTime']),
+  captures: Object.freeze(['timestamp']),
+});
+
+export function normalizeVerifyTimestamps(collection, record) {
+  const fields = VERIFY_TIMESTAMP_FIELDS[collection];
+  if (!fields || !record || typeof record !== 'object' || Array.isArray(record)) return record;
+  const out = { ...record };
+  for (const f of fields) {
+    const v = out[f];
+    if (typeof v !== 'string' || v === '') continue;
+    const t = Date.parse(v);
+    if (Number.isFinite(t)) out[f] = new Date(t).toISOString();
+  }
+  return out;
+}
+
 function readUidKey() {
   try {
     if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage) return null;
@@ -183,10 +259,10 @@ export async function uploadLocalData(client, localState, opts = {}) {
     if (sentRows.length === 0) continue;
     const backRows = verifyTables[table] || [];
     if (collection === 'settings') {
-      const expected = fromRow('settings', sentRows[0]);
+      const expected = normalizeVerifyTimestamps(collection, fromRow('settings', sentRows[0]));
       const actualRow = backRows[0];
-      const actual = actualRow ? fromRow('settings', actualRow) : null;
-      if (!actualRow || JSON.stringify(actual) !== JSON.stringify(expected)) {
+      const actual = actualRow ? normalizeVerifyTimestamps(collection, fromRow('settings', actualRow)) : null;
+      if (!actualRow || !recordsEqual(actual, expected)) {
         mismatches.push({ table, reason: actualRow ? 'value-mismatch' : 'missing' });
       }
       continue;
@@ -198,9 +274,9 @@ export async function uploadLocalData(client, localState, opts = {}) {
         mismatches.push({ table, id: sent.id, reason: 'missing' });
         continue;
       }
-      const expected = fromRow(collection, sent);
-      const actual = fromRow(collection, back);
-      if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      const expected = normalizeVerifyTimestamps(collection, fromRow(collection, sent));
+      const actual = normalizeVerifyTimestamps(collection, fromRow(collection, back));
+      if (!recordsEqual(actual, expected)) {
         mismatches.push({ table, id: sent.id, reason: 'value-mismatch' });
       }
     }
