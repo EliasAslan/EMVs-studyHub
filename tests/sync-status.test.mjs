@@ -133,7 +133,11 @@ await test('sign-in, network, and RLS errors translate to German', async () => {
 await test('error without code or message stays debuggable', async () => {
   const t = translateSyncError(undefined);
   assert.equal(t.code, 'UNKNOWN');
-  assert.ok(t.title.length > 0 && t.action.length > 0 && t.technical.length > 0);
+  assert.ok(t.title.length > 0 && t.action.length > 0);
+  assert.equal(t.technical, 'Keine Details verfügbar.');
+  assert.equal(translateSyncError(null).technical, 'Keine Details verfügbar.');
+  assert.equal(translateSyncError(new Error('')).technical, 'Keine Details verfügbar.');
+  assert.equal(translateSyncError('nur ein String').technical, 'nur ein String');
 });
 
 await test('secrets are sanitized from technical details', async () => {

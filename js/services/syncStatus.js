@@ -146,8 +146,10 @@ function pickCode(error) {
  */
 export function translateSyncError(error) {
   const code = pickCode(error);
-  const raw = error?.message || String(error ?? '');
-  const technical = sanitizeTechnical(raw) || 'Keine Details verfügbar.';
+  const raw = typeof error === 'string'
+    ? error
+    : (error && typeof error.message === 'string' && error.message ? error.message : '');
+  const technical = raw ? sanitizeTechnical(raw) : 'Keine Details verfügbar.';
   const msg = raw.toLowerCase();
 
   if (code === 'ACCOUNT_MISMATCH') {
