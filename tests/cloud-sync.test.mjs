@@ -17,6 +17,8 @@ import {
   getLastSyncedUid,
   setLastSyncedUid,
   clearLastSyncedUid,
+  recordsEqual,
+  normalizeVerifyTimestamps,
 } from '../js/services/cloudSync.js';
 
 // Fake localStorage for the account-association key.
@@ -371,6 +373,208 @@ await test('upload verifies the user_settings row too', async () => {
   assert.ok(err, 'settings mismatch must fail verification');
   assert.equal(err.code, 'VERIFY_FAILED');
   assert.ok(err.mismatches.some((m) => m.table === 'user_settings'));
+  assert.equal(getLastSyncedUid(), null, 'account-sync ledger must not update');
+});
+
+await test('recordsEqual ignores object key order but preserves array order', async () => {
+  // Semantically identical nested objects with different key order must pass.
+  const a = fromRow('learningObjectives', toRow('learningObjectives', {
+    id: 'demo-obj1-mv1ff5nk', moduleId: 'mod-1', number: 1, title: 'T',
+    reviewHistory: [{ timestamp: 1700000000000, outcome: 'solid' }],
+    reviewSchedule: { interval: 4, nextReview: 1700000000001, reviewCount: 1 },
+  }));
+  const b = fromRow('learningObjectives', toRow('learningObjectives', {
+    id: 'demo-obj1-mv1ff5nk', moduleId: 'mod-1', number: 1, title: 'T',
+    reviewHistory: [{ outcome: 'solid', timestamp: 1700000000000 }],
+    reviewSchedule: { reviewCount: 1, nextReview: 1700000000001, interval: 4 },
+  }));
+  assert.notEqual(JSON.stringify(a), JSON.stringify(b), 'old JSON.stringify check would flag this');
+  assert.ok(recordsEqual(a, b), 'structurally identical records must compare equal');
+  // Array order is significant.
+  const c = { ...b, reviewHistory: [...b.reviewHistory] };
+  assert.ok(!recordsEqual({ v: [1, 2] }, { v: [2, 1] }), 'array reorder must compare unequal');
+  void c;
+  // Genuinely different values still fail.
+  assert.ok(!recordsEqual(a, { ...b, title: 'OTHER' }), 'different scalar must compare unequal');
+  assert.ok(!recordsEqual({ v: 1 }, { v: '1' }), '1 vs "1" must compare unequal');
+  assert.ok(!recordsEqual({ v: null }, { v: '' }), 'null vs "" must compare unequal');
+  assert.ok(!recordsEqual({ v: [1] }, { v: [1, 2] }), 'different array length must compare unequal');
+});
+
+await test('upload passes when Postgres JSONB reorders nested object keys', async () => {
+  // Simulate PostgreSQL JSONB key normalization: recursively reverse object
+  // key order on every read-back row. Nested history/schedule objects come
+  // back semantically identical but with different key order.
+  function reverseKeysDeep(v) {
+    if (Array.isArray(v)) return v.map(reverseKeysDeep);
+    if (v && typeof v === 'object') {
+      const out = {};
+      for (const k of Object.keys(v).reverse()) out[k] = reverseKeysDeep(v[k]);
+      return out;
+    }
+    return v;
+  }
+  const base = makeClient({});
+  const origFrom = base.from.bind(base);
+  base.from = (table) => {
+    const q = origFrom(table);
+    return {
+      select() {
+        return {
+          async eq(col, val) {
+            const res = await q.select().eq(col, val);
+            if (res.error || !Array.isArray(res.data)) return res;
+            return { data: res.data.map(reverseKeysDeep), error: null };
+          },
+        };
+      },
+      upsert: q.upsert.bind(q),
+    };
+  };
+  const res = await uploadLocalData(base, syntheticLocal());
+  assert.ok(res.uid === 'user-a', 'upload succeeds despite key reordering');
+  assert.equal(getLastSyncedUid(), 'user-a');
+});
+
+// ---------------------------------------------------------------------------
+// Faithful PostgreSQL read-back simulation for the production VERIFY_FAILED:
+// jsonb columns come back with normalized key order (length-then-bytewise),
+// timestamptz columns come back as ISO text with numeric offset and zero
+// fractional seconds dropped ("...+00:00" instead of "...T....000Z").
+// ---------------------------------------------------------------------------
+
+const PG_JSONB_COLUMNS = [
+  'confidence_history', 'session_history', 'review_history', 'review_schedule',
+  'usage_history', 'understood_history', 'objective_results',
+];
+const PG_TS_COLUMNS = ['start_time', 'timestamp'];
+
+function pgJsonbNormalize(v) {
+  if (Array.isArray(v)) return v.map(pgJsonbNormalize);
+  if (v && typeof v === 'object') {
+    const out = {};
+    const keys = Object.keys(v).sort(
+      (x, y) => (x.length - y.length) || (x < y ? -1 : x > y ? 1 : 0),
+    );
+    for (const k of keys) out[k] = pgJsonbNormalize(v[k]);
+    return out;
+  }
+  return v;
+}
+
+function pgTimestamptzText(iso) {
+  const d = new Date(iso);
+  const base = d.toISOString().slice(0, 19); // YYYY-MM-DDTHH:MM:SS
+  const ms = d.getUTCMilliseconds();
+  return ms ? `${base}.${String(ms).padStart(3, '0')}+00:00` : `${base}+00:00`;
+}
+
+function pgReadBackRow(row) {
+  const out = { ...row };
+  for (const c of PG_JSONB_COLUMNS) {
+    if (out[c] !== undefined) out[c] = pgJsonbNormalize(out[c]);
+  }
+  for (const c of PG_TS_COLUMNS) {
+    if (typeof out[c] === 'string' && out[c] !== '') {
+      const t = Date.parse(out[c]);
+      if (Number.isFinite(t)) out[c] = pgTimestamptzText(out[c]);
+    }
+  }
+  return out;
+}
+
+function pgSimulatingClient() {
+  const base = makeClient({});
+  const origFrom = base.from.bind(base);
+  base.from = (table) => {
+    const q = origFrom(table);
+    return {
+      select() {
+        return {
+          async eq(col, val) {
+            const res = await q.select().eq(col, val);
+            if (res.error || !Array.isArray(res.data)) return res;
+            return { data: res.data.map(pgReadBackRow), error: null };
+          },
+        };
+      },
+      upsert: q.upsert.bind(q),
+    };
+  };
+  return base;
+}
+
+await test('normalizeVerifyTimestamps equates timestamptz text variants only', async () => {
+  const z = { id: 's', startTime: '2023-11-14T22:13:20.000Z' };
+  const pg = { id: 's', startTime: '2023-11-14T22:13:20+00:00' };
+  assert.ok(
+    recordsEqual(normalizeVerifyTimestamps('studySessions', z), normalizeVerifyTimestamps('studySessions', pg)),
+    'same instant in Z vs +00:00 text must compare equal',
+  );
+  assert.equal(
+    normalizeVerifyTimestamps('studySessions', { id: 's', startTime: '2023-11-14T22:13:20.123+00:00' }).startTime,
+    '2023-11-14T22:13:20.123Z',
+    'fractional seconds preserved in canonical form',
+  );
+  const shifted = { id: 's', startTime: '2023-11-14T23:13:20+00:00' };
+  assert.ok(
+    !recordsEqual(normalizeVerifyTimestamps('studySessions', z), normalizeVerifyTimestamps('studySessions', shifted)),
+    'a genuinely different instant must still mismatch',
+  );
+  const garbage = { id: 's', startTime: 'not-a-date' };
+  assert.equal(normalizeVerifyTimestamps('studySessions', garbage).startTime, 'not-a-date', 'unparseable left as-is');
+  assert.ok(
+    !recordsEqual(normalizeVerifyTimestamps('studySessions', z), normalizeVerifyTimestamps('studySessions', garbage)),
+    'garbage timestamp still mismatches',
+  );
+  const mod = { id: 'm', code: 'X' };
+  assert.ok(normalizeVerifyTimestamps('modules', mod) === mod, 'other collections pass through untouched');
+  assert.ok(normalizeVerifyTimestamps('studySessions', null) === null, 'null passes through');
+  const frozen = Object.freeze({ ...z });
+  normalizeVerifyTimestamps('studySessions', frozen);
+  assert.equal(frozen.startTime, z.startTime, 'input records are never mutated');
+  assert.ok(
+    recordsEqual(
+      normalizeVerifyTimestamps('captures', { id: 'c', timestamp: '2023-11-14T22:13:20.000Z' }),
+      normalizeVerifyTimestamps('captures', { id: 'c', timestamp: '2023-11-14T22:13:20+00:00' }),
+    ),
+    'captures.timestamp is covered too',
+  );
+});
+
+await test('upload passes under faithful Postgres read-back (jsonb reorder + timestamptz reformat)', async () => {
+  // Reproduces the production VERIFY_FAILED shape (demo seed: objectives +
+  // sessions + exam differ textually after a PG round-trip) and proves the
+  // fixed verification accepts it.
+  const client = pgSimulatingClient();
+  const local = syntheticLocal();
+  const snapshot = JSON.stringify(local);
+  const res = await uploadLocalData(client, local);
+  assert.ok(res.uid === 'user-a', 'upload succeeds despite PG serialization');
+  assert.equal(getLastSyncedUid(), 'user-a');
+  assert.equal(JSON.stringify(local), snapshot, 'local state byte-identical');
+  // Prove the simulation is non-trivial: textual read-back differs from sent,
+  // so the old JSON.stringify check would still fail here.
+  const sentSession = client._calls.find((c) => c[0] === 'upsert' && c[1] === 'study_sessions')[2][0];
+  assert.notEqual(pgReadBackRow(sentSession).start_time, sentSession.start_time, 'timestamptz text differs after PG round-trip');
+  const sentObj = client._calls.find((c) => c[0] === 'upsert' && c[1] === 'learning_objectives')[2][0];
+  assert.notEqual(JSON.stringify(pgReadBackRow(sentObj)), JSON.stringify(sentObj), 'jsonb key order differs after PG round-trip');
+});
+
+await test('upload still fails when a timestamp genuinely differs', async () => {
+  const shifted = new Date(1700000000000 + 3600000).toISOString();
+  const client = makeClient({
+    corrupt: { table: 'study_sessions', id: 'ses-1', patch: { start_time: shifted } },
+  });
+  let err = null;
+  try {
+    await uploadLocalData(client, syntheticLocal());
+  } catch (e) {
+    err = e;
+  }
+  assert.ok(err, 'shifted timestamp must fail verification (no over-normalization)');
+  assert.equal(err.code, 'VERIFY_FAILED');
+  assert.ok(err.mismatches.some((m) => m.table === 'study_sessions' && m.id === 'ses-1'));
   assert.equal(getLastSyncedUid(), null, 'account-sync ledger must not update');
 });
 

@@ -27,6 +27,154 @@ import {
 export const CLOUD_UID_KEY = 'emvs_cloud_uid_v1';
 export const EXPECTED_TABLES = Object.freeze(Object.values(TABLE_FOR_COLLECTION));
 
+/**
+ * Structural equality for upload verification read-back.
+ * PostgreSQL JSONB does not preserve object key order (it normalizes it),
+ * so a semantically identical nested object (e.g. review_history entries
+ * like { timestamp, outcome } or review_schedule) can read back with a
+ * different key order than it was sent with. The previous
+ * JSON.stringify(a) === JSON.stringify(b) check is order-sensitive and
+ * therefore reports false VERIFY_FAILED mismatches.
+ * recordsEqual() ignores object key order, preserves array order, and
+ * distinguishes genuinely different values (strict primitive equality,
+ * different key sets, different array lengths/order all compare unequal).
+ * Plain JSON values only (no Date/Map/Set handling needed: fromRow()
+ * output is JSON-compatible).
+ */
+export function recordsEqual(a, b) {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== 'object') return a === b;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (!recordsEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const k of keysA) {
+    if (!Object.hasOwn(b, k)) return false;
+  }
+  for (const k of keysA) {
+    if (!recordsEqual(a[k], b[k])) return false;
+  }
+  return true;
+}
+
+/**
+ * Verification-only timestamp canonicalization (TIMESTAMPTZ text format).
+ *
+ * The app sends timestamps as Date.toISOString() ("...T22:13:20.000Z"), but
+ * PostgreSQL timestamptz_out + PostgREST read the same instant back as
+ * "...T22:13:20+00:00" (offset form, fractional seconds dropped when zero).
+ * fromRow() passes these strings through verbatim, so even recordsEqual()
+ * would flag them — correctly as strings, but wrongly as data: both denote
+ * the identical instant. normalizeVerifyTimestamps() rewrites the known
+ * TIMESTAMPTZ-backed fields to canonical toISOString() form on BOTH compared
+ * sides before recordsEqual() runs.
+ *
+ * Narrowly scoped: verification path only (uploadLocalData read-back), only
+ * the two timestamptz-backed fields (studySessions.startTime,
+ * captures.timestamp — the schema's only TIMESTAMPTZ columns). DATE columns
+ * (exams/exam_results/plan_items) round-trip textually identical and are
+ * deliberately untouched. Unparseable values are left as-is and still compare
+ * strictly, so genuine corruption is never masked. Inputs are never mutated.
+ */
+const VERIFY_TIMESTAMP_FIELDS = Object.freeze({
+  studySessions: Object.freeze(['startTime']),
+  captures: Object.freeze(['timestamp']),
+});
+
+export function normalizeVerifyTimestamps(collection, record) {
+  const fields = VERIFY_TIMESTAMP_FIELDS[collection];
+  if (!fields || !record || typeof record !== 'object' || Array.isArray(record)) return record;
+  const out = { ...record };
+  for (const f of fields) {
+    const v = out[f];
+    if (typeof v !== 'string' || v === '') continue;
+    const t = Date.parse(v);
+    if (Number.isFinite(t)) out[f] = new Date(t).toISOString();
+  }
+  return out;
+}
+
+/**
+ * Demo-seed upload exclusion (Phase 10).
+ *
+ * Identity rule: a record is demo-only iff its OWN id starts with `demo-`.
+ * Every record minted by getDemoSeedData() matches (demo-mod-*, demo-obj*-*,
+ * demo-res-*, demo-ses*-*, demo-exam-*, demo-plan-*), in all collections that
+ * carry seed rows (modules, learningObjectives, resources, studySessions,
+ * exams, planItems) and — for forward/backward compatibility — in
+ * examResults, captures, and weeklyReviews, which carry none today.
+ * Genuine app records use generateId() (`<base36-time>-<base36-random>`):
+ * the `demo-` prefix would require the timestamp part to equal exactly
+ * "demo" (a 1970 date), so collisions are unreachable for real timestamps
+ * and no genuine record is ever classified as demo. Records with missing or
+ * non-string ids are NOT demo and keep flowing (upsert still rejects them
+ * exactly as before — nothing is silently discarded).
+ *
+ * FK closure (schema-dictated, minimal): composite FKs require a kept record's
+ * module (objectives/resources/sessions/exams/planItems non-null moduleId;
+ * examResults/captures/weeklyReviews non-null moduleId) and a kept
+ * examResult's exam to exist in the cloud. A demo module/exam referenced by
+ * an included genuine record is therefore force-included (re-upserted by
+ * stable id, so it can never accumulate); unreferenced demo records stay
+ * excluded. Plain link arrays (linkedObjectiveIds, exam objectiveResults)
+ * carry no FK and need no closure. Settings has no id and always uploads.
+ *
+ * Pure w.r.t. local state: returns filtered copies, never mutates input.
+ * Mapping (toCloudDataset) is untouched, so the marker can never enter the
+ * Supabase schema — exclusion is a sync-layer policy applied at the single
+ * upload route (uploadLocalData).
+ */
+export function isDemoId(id) {
+  return typeof id === 'string' && id.startsWith('demo-');
+}
+
+export function excludeDemoRecords(localState) {
+  if (!localState || typeof localState !== 'object') return localState;
+  const out = { ...localState };
+  const kept = {};
+  const demo = {};
+  for (const collection of UPLOAD_ORDER) {
+    if (collection === 'settings') continue;
+    const items = localState[collection];
+    if (!Array.isArray(items)) continue;
+    kept[collection] = [];
+    demo[collection] = [];
+    for (const item of items) {
+      if (item && typeof item === 'object' && isDemoId(item.id)) demo[collection].push(item);
+      else kept[collection].push(item);
+    }
+  }
+  const requiredModuleIds = new Set();
+  const requiredExamIds = new Set();
+  for (const collection of Object.keys(kept)) {
+    if (collection === 'modules') continue;
+    for (const item of kept[collection]) {
+      if (!item || typeof item !== 'object') continue;
+      if (typeof item.moduleId === 'string' && item.moduleId !== '') requiredModuleIds.add(item.moduleId);
+      if (collection === 'examResults' && typeof item.examId === 'string' && item.examId !== '') {
+        requiredExamIds.add(item.examId);
+      }
+    }
+  }
+  for (const m of demo.modules || []) {
+    if (m && typeof m === 'object' && requiredModuleIds.has(m.id)) kept.modules.push(m);
+  }
+  for (const e of demo.exams || []) {
+    if (e && typeof e === 'object' && requiredExamIds.has(e.id)) kept.exams.push(e);
+  }
+  for (const collection of Object.keys(kept)) out[collection] = kept[collection];
+  return out;
+}
+
 function readUidKey() {
   try {
     if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage) return null;
@@ -155,7 +303,10 @@ export async function uploadLocalData(client, localState, opts = {}) {
     throw err;
   }
 
-  const dataset = toCloudDataset(localState);
+  // Demo/example content stays local: only genuine user records (plus demo
+  // parents genuinely referenced by them, for FK safety) enter the dataset.
+  // The single upload route guarantees uniform exclusion everywhere.
+  const dataset = toCloudDataset(excludeDemoRecords(localState));
   const ledger = [];
   for (const collection of UPLOAD_ORDER) {
     const table = TABLE_FOR_COLLECTION[collection];
@@ -183,10 +334,10 @@ export async function uploadLocalData(client, localState, opts = {}) {
     if (sentRows.length === 0) continue;
     const backRows = verifyTables[table] || [];
     if (collection === 'settings') {
-      const expected = fromRow('settings', sentRows[0]);
+      const expected = normalizeVerifyTimestamps(collection, fromRow('settings', sentRows[0]));
       const actualRow = backRows[0];
-      const actual = actualRow ? fromRow('settings', actualRow) : null;
-      if (!actualRow || JSON.stringify(actual) !== JSON.stringify(expected)) {
+      const actual = actualRow ? normalizeVerifyTimestamps(collection, fromRow('settings', actualRow)) : null;
+      if (!actualRow || !recordsEqual(actual, expected)) {
         mismatches.push({ table, reason: actualRow ? 'value-mismatch' : 'missing' });
       }
       continue;
@@ -198,9 +349,9 @@ export async function uploadLocalData(client, localState, opts = {}) {
         mismatches.push({ table, id: sent.id, reason: 'missing' });
         continue;
       }
-      const expected = fromRow(collection, sent);
-      const actual = fromRow(collection, back);
-      if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      const expected = normalizeVerifyTimestamps(collection, fromRow(collection, sent));
+      const actual = normalizeVerifyTimestamps(collection, fromRow(collection, back));
+      if (!recordsEqual(actual, expected)) {
         mismatches.push({ table, id: sent.id, reason: 'value-mismatch' });
       }
     }
