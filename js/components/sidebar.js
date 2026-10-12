@@ -71,13 +71,19 @@ export function renderSidebar() {
 
   // Module headers - click to switch module
   container.querySelectorAll('.chapter-header').forEach(h => {
-    h.addEventListener('click', () => {
+    h.setAttribute('tabindex', '0');
+    h.setAttribute('role', 'button');
+    const activate = () => {
       const id = h.closest('.chapter').dataset.module;
       if (state.settings.currentModuleId === id && currentView.startsWith('module-')) return;
       state.settings.currentModuleId = id;
       window.EMVS.save();
       renderSidebar();
       navigate('module-home');
+    };
+    h.addEventListener('click', activate);
+    h.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
     });
   });
 
@@ -134,7 +140,11 @@ export function renderSidebar() {
     mainItems.forEach(item => {
       const nv = item.dataset.view;
       item.classList.toggle('active', nv === currentView && ch.dataset.module === state.settings.currentModuleId);
-      item.onclick = e => { e.stopPropagation(); navigate(nv); };
+      item.setAttribute('tabindex', '0');
+      item.setAttribute('role', 'link');
+      const go = e => { e?.stopPropagation?.(); navigate(nv); };
+      item.onclick = go;
+      item.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } };
     });
   });
 
@@ -164,12 +174,20 @@ export function renderSidebar() {
 
     visibleItems.forEach(n => {
       n.classList.toggle('active', n.dataset.view === currentView);
-      n.onclick = () => navigate(n.dataset.view);
+      n.setAttribute('tabindex', '0');
+      n.setAttribute('role', 'link');
+      const go = () => navigate(n.dataset.view);
+      n.onclick = go;
+      n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
     });
 
     overflowMenu.querySelectorAll('.toc-item').forEach(n => {
       n.classList.toggle('active', n.dataset.view === currentView);
-      n.onclick = () => navigate(n.dataset.view);
+      n.setAttribute('tabindex', '0');
+      n.setAttribute('role', 'link');
+      const go = () => navigate(n.dataset.view);
+      n.onclick = go;
+      n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
     });
 
     overflowWrap.hidden = !useOverflow;

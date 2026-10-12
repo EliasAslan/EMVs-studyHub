@@ -56,14 +56,20 @@ function init() {
   navigate('today');
   
   // Mobile menu toggle
-  document.getElementById('menuBtn').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.add('open');
-    document.getElementById('sidebarOverlay').classList.add('open');
+  const menuBtn = document.getElementById('menuBtn');
+  const sidebarEl = document.getElementById('sidebar');
+  const overlayEl = document.getElementById('sidebarOverlay');
+  const setSidebar = (open) => {
+    sidebarEl?.classList.toggle('open', open);
+    overlayEl?.classList.toggle('open', open);
+    menuBtn?.setAttribute('aria-expanded', String(open));
+    menuBtn?.setAttribute('aria-label', open ? 'Menü schließen' : 'Menü öffnen');
+    if (open) sidebarEl?.querySelector('.toc-item')?.focus?.();
+  };
+  menuBtn?.addEventListener('click', () => {
+    setSidebar(!sidebarEl?.classList.contains('open'));
   });
-  document.getElementById('sidebarOverlay').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('sidebarOverlay').classList.remove('open');
-  });
+  overlayEl?.addEventListener('click', () => setSidebar(false));
   
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -76,6 +82,9 @@ function init() {
     if (e.key === 'Escape') {
       window.EMVS.modal?.close();
       window.EMVS.palette?.close();
+      document.getElementById('sidebar')?.classList.remove('open');
+      document.getElementById('sidebarOverlay')?.classList.remove('open');
+      document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
       return;
     }
     if (window.EMVS.palette?.isOpen()) return;
