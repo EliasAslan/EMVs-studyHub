@@ -26,6 +26,7 @@ export function initTabbar() {
   });
   document.getElementById('moreBtn')?.addEventListener('click', openMore);
   document.getElementById('railMore')?.addEventListener('click', openMore);
+  document.getElementById('railMod')?.addEventListener('click', () => navigate('overview'));
   document.getElementById('more-close')?.addEventListener('click', closeMore);
   document.getElementById('more-overlay')?.addEventListener('click', e => {
     if (e.target.id === 'more-overlay') closeMore();
@@ -57,24 +58,23 @@ export function updateBadges() {
   try {
     const st = window.EMVS.getState();
     const due = getDueObjectives(st).length;
-    const weak = document.getElementById('badgeWeak');
-    if (weak) {
-      weak.hidden = due === 0;
-      weak.textContent = due > 9 ? '9+' : String(due);
-      weak.setAttribute('aria-label', `${due} fällige Wiederholungen`);
-    }
+    setBadge(document.getElementById('badgeWeak'), document.getElementById('railBadgeWeak'), due, `${due} fällige Wiederholungen`);
     const soon = (st.exams || []).filter(e => {
       if (!e.date) return false;
       const d = Math.ceil((new Date(e.date + 'T08:00:00') - Date.now()) / 86400000);
       return d >= 0 && d <= 14;
     }).length;
-    const eb = document.getElementById('badgeExam');
-    if (eb) {
-      eb.hidden = soon === 0;
-      eb.textContent = soon > 9 ? '9+' : String(soon);
-      eb.setAttribute('aria-label', `${soon} Prüfungen in den nächsten 14 Tagen`);
-    }
+    setBadge(document.getElementById('badgeExam'), document.getElementById('railBadgeExam'), soon, `${soon} Prüfungen in den nächsten 14 Tagen`);
   } catch {}
+}
+
+function setBadge(tabBadge, railBadge, n, label) {
+  for (const b of [tabBadge, railBadge]) {
+    if (!b) continue;
+    b.hidden = n === 0;
+    b.textContent = n > 9 ? '9+' : String(n);
+    b.setAttribute('aria-label', label);
+  }
 }
 
 function openMore() {

@@ -34,13 +34,16 @@
 
     <div class="toc-label">Menü</div>
     <nav class="toc" id="nav-global" role="list">
-      <div class="toc-item" data-view="today" role="listitem"><span class="toc-num">01</span> Heute</div>
-      <div class="toc-item" data-view="overview" role="listitem"><span class="toc-num">02</span> Module</div>
-      <div class="toc-item" data-view="weak-spots" role="listitem"><span class="toc-num">03</span> Schwach</div>
-      <div class="toc-item" data-view="exams-global" role="listitem"><span class="toc-num">04</span> Prüfungen</div>
+      <div class="toc-item" data-view="today" role="listitem"><span class="toc-ico" aria-hidden="true">◉</span><span class="toc-num">01</span> <span class="toc-lb">Heute</span></div>
+      <div class="toc-item" data-view="overview" role="listitem"><span class="toc-ico" aria-hidden="true">▦</span><span class="toc-num">02</span> <span class="toc-lb">Module</span></div>
+      <div class="rail-div" aria-hidden="true"></div>
+      <button class="rail-fab" id="railCapture" aria-label="Schnell erfassen"><span aria-hidden="true">+</span></button>
+      <div class="toc-item" data-view="weak-spots" role="listitem"><span class="toc-ico" aria-hidden="true">△</span><span class="toc-num">03</span> <span class="toc-lb">Schwach</span><span class="rail-badge" id="railBadgeWeak" hidden></span></div>
+      <div class="toc-item" data-view="exams-global" role="listitem"><span class="toc-ico" aria-hidden="true">◷</span><span class="toc-num">04</span> <span class="toc-lb">Prüfungen</span><span class="rail-badge" id="railBadgeExam" hidden></span></div>
+      <div class="rail-div" aria-hidden="true"></div>
+      <button class="rail-more" id="railMore" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
+      <button class="rail-mod" id="railMod" hidden><span class="rail-mod-dot" aria-hidden="true"></span><span class="rail-mod-code"></span></button>
     </nav>
-    <button class="rail-fab" id="railCapture" aria-label="Schnell erfassen"><span aria-hidden="true">+</span></button>
-    <button class="rail-more" id="railMore" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span>Mehr</button>
     <div class="sidebar-overflow" id="sidebar-overflow" hidden>
       <button class="overflow-toggle" type="button" aria-label="Weitere allgemeine Ansichten">Mehr <span>▾</span></button>
       <div class="overflow-menu" id="overflow-menu"></div>

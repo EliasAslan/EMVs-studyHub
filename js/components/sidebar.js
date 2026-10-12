@@ -159,7 +159,17 @@ export function renderSidebar() {
   const overflowWrap = document.getElementById('sidebar-overflow');
   const overflowMenu = document.getElementById('overflow-menu');
   if (globalNav && overflowWrap && overflowMenu) {
-    [...overflowMenu.querySelectorAll('.toc-item')].forEach(item => globalNav.appendChild(item));
+    // Restore any overflowed items in canonical order (nav also holds
+    // dividers/buttons, so plain appendChild would scramble the layout).
+    const ORDER = ['today', 'overview', 'weak-spots', 'exams-global'];
+    [...overflowMenu.querySelectorAll('.toc-item')].forEach(item => {
+      item.classList.remove('overflow-item');
+      const idx = ORDER.indexOf(item.dataset.view);
+      const ref = [...globalNav.querySelectorAll('.toc-item')].find(
+        el => ORDER.indexOf(el.dataset.view) > idx
+      );
+      globalNav.insertBefore(item, ref || globalNav.querySelector('.rail-div, .rail-fab, .rail-more, .rail-mod'));
+    });
     overflowMenu.replaceChildren();
 
     const allGlobalItems = [...globalNav.querySelectorAll('.toc-item')];
@@ -208,6 +218,18 @@ export function renderSidebar() {
         overflowMenu.hidden = !isOpen;
       };
       overflowMenu.hidden = true;
+    }
+  }
+
+  // Current-module presence chip in the rail
+  const railMod = document.getElementById('railMod');
+  if (railMod) {
+    const cur = state.modules.find(m => m.id === state.settings.currentModuleId) || null;
+    railMod.hidden = !cur;
+    if (cur) {
+      railMod.querySelector('.rail-mod-code').textContent = cur.code;
+      railMod.title = `Aktuelles Modul ${cur.code} — Module wählen`;
+      railMod.querySelector('.rail-mod-dot').style.background = 'var(--accent)';
     }
   }
 }
