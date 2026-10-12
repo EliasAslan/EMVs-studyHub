@@ -163,7 +163,7 @@ export function renderSidebar() {
     overflowMenu.replaceChildren();
 
     const allGlobalItems = [...globalNav.querySelectorAll('.toc-item')];
-    const visibleViews = ['today', 'weak-spots', 'captures'];
+    const visibleViews = ['today', 'overview', 'weak-spots', 'exams-global'];
     const hiddenItems = allGlobalItems.filter(item => !visibleViews.includes(item.dataset.view));
     const useOverflow = hiddenItems.length > 1;
     const visibleItems = useOverflow

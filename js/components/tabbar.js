@@ -15,10 +15,8 @@ export function initTabbar() {
   document.querySelectorAll('#tabbar .tab[data-route]').forEach(t => {
     t.addEventListener('click', () => navigate(t.dataset.route));
   });
-  document.getElementById('tabCapture')?.addEventListener('click', () => {
-    const st = window.EMVS.getState();
-    openQuickCapture({ moduleId: st.settings.currentModuleId || null });
-  });
+  document.getElementById('tabCapture')?.addEventListener('click', quickCapture);
+  document.getElementById('railCapture')?.addEventListener('click', quickCapture);
 
   document.querySelectorAll('#more-sheet [data-route]').forEach(b => {
     b.addEventListener('click', () => {
@@ -27,6 +25,7 @@ export function initTabbar() {
     });
   });
   document.getElementById('moreBtn')?.addEventListener('click', openMore);
+  document.getElementById('railMore')?.addEventListener('click', openMore);
   document.getElementById('more-close')?.addEventListener('click', closeMore);
   document.getElementById('more-overlay')?.addEventListener('click', e => {
     if (e.target.id === 'more-overlay') closeMore();
@@ -45,8 +44,13 @@ export function initTabbar() {
     lastY = y;
   }, { passive: true });
 
-  window.EMVS.tabbar = { updateBadges };
+  window.EMVS.tabbar = { updateBadges, openMore };
   updateBadges();
+}
+
+function quickCapture() {
+  const st = window.EMVS.getState();
+  openQuickCapture({ moduleId: st.settings.currentModuleId || null });
 }
 
 export function updateBadges() {
@@ -80,6 +84,7 @@ function openMore() {
   ov.classList.add('open');
   ov.setAttribute('aria-hidden', 'false');
   document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'true');
+  document.getElementById('railMore')?.setAttribute('aria-expanded', 'true');
   moreTrap = trapFocus(document.getElementById('more-sheet'), { onClose: () => {} });
 }
 
@@ -92,11 +97,13 @@ function closeMore() {
     ov?.classList.remove('open');
     ov?.setAttribute('aria-hidden', 'true');
     document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'false');
-    (moreTrigger || document.getElementById('moreBtn'))?.focus?.();
+    document.getElementById('railMore')?.setAttribute('aria-expanded', 'false');
+    (moreTrigger || document.getElementById('railMore') || document.getElementById('moreBtn'))?.focus?.();
     moreTrigger = null;
     return;
   }
   ov?.classList.remove('open');
   ov?.setAttribute('aria-hidden', 'true');
   document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'false');
+  document.getElementById('railMore')?.setAttribute('aria-expanded', 'false');
 }
