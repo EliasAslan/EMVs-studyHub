@@ -2,7 +2,10 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="EMVS Study Hub — Module, Lernziele, Sitzungen und Prüfungen lokal und fokussiert verwalten.">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f3ea">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16120c">
   <title>EMVS Study Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,11 +13,16 @@
   <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
+<a class="skip-link" href="#main">Zum Inhalt springen</a>
 
 <div class="app">
   <header class="mobile-header">
     <span class="mobile-brand">EMVS</span>
-    <button class="menu-btn" id="menuBtn" aria-label="Menü öffnen">☰</button>
+    <div class="mobile-actions">
+      <button class="icon-btn" id="searchBtn" aria-label="Suchen und Befehle (Strg+K)">⌕</button>
+      <button class="icon-btn" id="moreBtn" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
+      <button class="menu-btn" id="menuBtn" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sidebar">☰</button>
+    </div>
   </header>
   <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
 
@@ -50,16 +58,40 @@
     </div>
   </aside>
 
-  <main class="main" id="main" role="main">
+  <main class="main" id="main" role="main" tabindex="-1">
     <div class="page" id="view-root"></div>
   </main>
+
+  <nav class="tabbar" id="tabbar" aria-label="Hauptbereiche">
+    <button class="tab" data-route="today" aria-current="false"><span class="tab-ico" aria-hidden="true">◉</span><span class="tab-lb">Heute</span></button>
+    <button class="tab" data-route="overview" aria-current="false"><span class="tab-ico" aria-hidden="true">▦</span><span class="tab-lb">Module</span></button>
+    <button class="tab fab" id="tabCapture" aria-label="Schnell erfassen"><span class="tab-fab-plus" aria-hidden="true">+</span></button>
+    <button class="tab" data-route="weak-spots" aria-current="false"><span class="tab-ico" aria-hidden="true">△</span><span class="tab-lb">Schwach</span><span class="tab-badge" id="badgeWeak" hidden></span></button>
+    <button class="tab" data-route="exams-global" aria-current="false"><span class="tab-ico" aria-hidden="true">◷</span><span class="tab-lb">Prüfungen</span><span class="tab-badge" id="badgeExam" hidden></span></button>
+  </nav>
+
+  <div class="sheet-overlay" id="more-overlay" aria-hidden="true">
+    <div class="sheet" id="more-sheet" role="dialog" aria-modal="true" aria-labelledby="more-title">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <h2 class="sheet-title" id="more-title">Weitere Bereiche</h2>
+      <div class="sheet-list">
+        <button class="sheet-item" data-route="weekly-review"><span aria-hidden="true">✎</span> Review</button>
+        <button class="sheet-item" data-route="tools"><span aria-hidden="true">⚒</span> Werkzeuge</button>
+        <button class="sheet-item" data-route="exam-prep"><span aria-hidden="true">⧉</span> Prüfungsvorbereitung</button>
+        <button class="sheet-item" data-route="mock-exam"><span aria-hidden="true">⏱</span> Mock-Prüfung</button>
+        <button class="sheet-item" data-route="captures"><span aria-hidden="true">⚡</span> Alle Erfassungen</button>
+        <button class="sheet-item" data-route="settings"><span aria-hidden="true">⚙</span> Einstellungen</button>
+      </div>
+      <button class="btn ghost sheet-close" id="more-close">Schließen</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal Overlay -->
-<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
-  <div class="modal" id="modal">
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title">
+  <div class="modal" id="modal" role="document">
     <div class="modal-header">
-      <h3 class="modal-title" id="modal-title">Titel</h3>
+      <h2 class="modal-title" id="modal-title">Titel</h2>
       <button class="modal-close" id="modal-close" aria-label="Schließen">×</button>
     </div>
     <div class="modal-body" id="modal-body"></div>
@@ -68,9 +100,9 @@
 </div>
 
 <!-- Command Palette -->
-<div class="palette-overlay" id="palette-overlay" role="dialog" aria-modal="true" aria-hidden="true">
-  <div class="palette">
-    <input class="palette-input" id="palette-input" placeholder="Springe zu… oder führe aus…" autocomplete="off" aria-label="Befehlsuche">
+<div class="palette-overlay" id="palette-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Befehlspalette">
+  <div class="palette" role="document">
+    <input class="palette-input" id="palette-input" type="search" enterkeyhint="go" placeholder="Springe zu… oder führe aus…" autocomplete="off" aria-label="Befehlsuche" aria-controls="palette-list" aria-expanded="false">
     <div class="palette-list" id="palette-list" role="listbox"></div>
   </div>
 </div>

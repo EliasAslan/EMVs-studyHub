@@ -14,7 +14,7 @@ import {
   linkedResourceCount, resourcesForObjective, capturesForObjective,
   getResourceUsage,
 } from '../utils/helpers.js';
-import { navigate } from './router.js';
+import { navigate, getCurrentParams } from './router.js';
 import { openObjectiveHistory } from './module-objectives.js';
 import { openSessionModal } from './module-sessions.js';
 import { openResourceHistory } from './module-resources.js';
@@ -35,7 +35,14 @@ export function renderWeakSpots(state) {
   `;
 
   const filterHost = el.querySelector('#ws-modules');
-  let activeModule = null;
+  let activeModule = getCurrentParams().module || null;
+  if (activeModule && !modules.some(m => m.id === activeModule)) activeModule = null;
+
+  const syncUrl = () => {
+    const base = '#/schwach';
+    const next = activeModule ? `${base}?module=${encodeURIComponent(activeModule)}` : base;
+    history.replaceState(null, '', next);
+  };
 
   const paintFilters = () => {
     filterHost.innerHTML =
@@ -43,6 +50,7 @@ export function renderWeakSpots(state) {
       modules.map(m => `<button class="badge filter-btn ${activeModule === m.id ? 'active' : ''}" data-wsmod="${m.id}">Modul ${escapeHtml(m.code)}</button>`).join('');
     filterHost.querySelectorAll('[data-wsmod]').forEach(b => b.addEventListener('click', () => {
       activeModule = b.dataset.wsmod || null;
+      syncUrl();
       paintFilters();
       paintList();
     }));

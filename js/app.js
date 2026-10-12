@@ -8,7 +8,8 @@ import { renderSidebar } from './components/sidebar.js';
 import { initPalette } from './components/palette.js';
 import { initModal } from './components/modal.js';
 import { initToast } from './components/toast.js';
-import { navigate, VIEWS, getCurrentView } from './views/router.js';
+import { initTabbar } from './components/tabbar.js';
+import { navigate, VIEWS, getCurrentView, routeFromHash } from './views/router.js';
 import { openQuickCapture } from './views/captures.js';
 import { startTimer } from './views/module-sessions.js';
 import { openObjectiveHistory } from './views/module-objectives.js';
@@ -50,20 +51,31 @@ function init() {
   initModal();
   initToast();
   initPalette();
-  
+  initTabbar();
+
+  // Hash routing (deep-linkable tabs + module sub-tabs)
+  window.addEventListener('hashchange', routeFromHash);
+
   // Render sidebar and initial view
   renderSidebar();
-  navigate('today');
+  if (location.hash) routeFromHash();
+  else navigate('today');
   
   // Mobile menu toggle
-  document.getElementById('menuBtn').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.add('open');
-    document.getElementById('sidebarOverlay').classList.add('open');
+  const menuBtn = document.getElementById('menuBtn');
+  const sidebarEl = document.getElementById('sidebar');
+  const overlayEl = document.getElementById('sidebarOverlay');
+  const setSidebar = (open) => {
+    sidebarEl?.classList.toggle('open', open);
+    overlayEl?.classList.toggle('open', open);
+    menuBtn?.setAttribute('aria-expanded', String(open));
+    menuBtn?.setAttribute('aria-label', open ? 'Menü schließen' : 'Menü öffnen');
+    if (open) sidebarEl?.querySelector('.toc-item')?.focus?.();
+  };
+  menuBtn?.addEventListener('click', () => {
+    setSidebar(!sidebarEl?.classList.contains('open'));
   });
-  document.getElementById('sidebarOverlay').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('sidebarOverlay').classList.remove('open');
-  });
+  overlayEl?.addEventListener('click', () => setSidebar(false));
   
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -76,14 +88,17 @@ function init() {
     if (e.key === 'Escape') {
       window.EMVS.modal?.close();
       window.EMVS.palette?.close();
+      document.getElementById('sidebar')?.classList.remove('open');
+      document.getElementById('sidebarOverlay')?.classList.remove('open');
+      document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
       return;
     }
     if (window.EMVS.palette?.isOpen()) return;
     if (!isMod && !e.target.matches('input, textarea, select')) {
       if (e.key === '1') navigate('today');
-      else if (e.key === '2') navigate('weak-spots');
-      else if (e.key === '3') navigate('exams-global');
-      else if (e.key === '4') navigate('captures');
+      else if (e.key === '2') navigate('overview');
+      else if (e.key === '3') navigate('weak-spots');
+      else if (e.key === '4') navigate('exams-global');
       else if (e.key === '5') navigate('weekly-review');
       else if (e.key === '6') navigate('tools');
       else if (e.key === '7') navigate('settings');
