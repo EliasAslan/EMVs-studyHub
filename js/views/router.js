@@ -1,5 +1,8 @@
 /**
- * Router - View management
+ * Router - hash-based view management.
+ * Routes: #/heute #/module #/modul/:id/:tab #/schwach #/pruefungen
+ * Legacy view names (today, overview, weak-spots, ...) still work
+ * via navigate(view) for backward compatibility.
  */
 
 import { stopHomeTimerDisplay } from './module-home.js';
@@ -9,6 +12,40 @@ import { stopMockExamDisplay } from './mock-exam.js';
 export const VIEWS = {};
 let currentView = 'today';
 let previousView = 'today';
+let currentParams = {};
+
+const LEGACY_TO_HASH = {
+  'today': '#/heute',
+  'overview': '#/module',
+  'weak-spots': '#/schwach',
+  'exams-global': '#/pruefungen',
+  'captures': '#/erfassen',
+  'weekly-review': '#/review',
+  'tools': '#/werkzeuge',
+  'settings': '#/einstellungen',
+  'exam-prep': '#/vorbereitung',
+  'mock-exam': '#/mock',
+  'module-home': '#/modul',
+  'module-objectives': '#/modul/__cur__/ziele',
+  'module-resources': '#/modul/__cur__/material',
+  'module-sessions': '#/modul/__cur__/sessions',
+  'module-exams': '#/modul/__cur__/material',
+  'module-plan': '#/modul/__cur__/plan',
+};
+
+const HASH_TO_VIEW = {
+  '/heute': 'today',
+  '/module': 'overview',
+  '/schwach': 'weak-spots',
+  '/pruefungen': 'exams-global',
+  '/erfassen': 'captures',
+  '/review': 'weekly-review',
+  '/werkzeuge': 'tools',
+  '/einstellungen': 'settings',
+  '/vorbereitung': 'exam-prep',
+  '/mock': 'mock-exam',
+  '/modul': 'module',
+};
 
 export function getCurrentView() {
   return currentView;
@@ -19,6 +56,10 @@ export function getCurrentView() {
 // so we export a function and also keep this accessor for compat.
 export function getPreviousView() {
   return previousView;
+}
+
+export function getCurrentParams() {
+  return { ...currentParams };
 }
 
 export function registerView(name, renderFn) {
@@ -60,26 +101,115 @@ export function refresh(reason, payload) {
   render();
 }
 
-export function navigate(view) {
+export function navigate(view, params = {}) {
+  // New-style: navigate('module', { id, tab })
+  if (view === 'module' && (params.id || params.tab)) {
+    const id = params.id || window.EMVS?.getState()?.settings?.currentModuleId || '';
+    const tab = params.tab || 'ziele';
+    setHash(`#/modul/${id}/${tab}`);
+    return;
+  }
+  if (LEGACY_TO_HASH[view]) {
+    let hash = LEGACY_TO_HASH[view];
+    if (hash.includes('__cur__')) {
+      const cur = window.EMVS?.getState()?.settings?.currentModuleId || '';
+      hash = hash.replace('__cur__', cur);
+    }
+    // Preserve explicit module sub-tab requests
+    if (view.startsWith('module-') && params.id) {
+      const tab = view === 'module-objectives' ? 'ziele'
+        : view === 'module-plan' ? 'plan'
+        : view === 'module-sessions' ? 'sessions' : 'material';
+      setHash(`#/modul/${params.id}/${tab}`);
+      return;
+    }
+    setHash(hash + (params.qs || ''));
+    return;
+  }
   if (!VIEWS[view]) {
     console.warn(`Unknown view "${view}", falling back to today`);
-    view = 'today';
+    setHash('#/heute');
+    return;
   }
   previousView = currentView;
   currentView = view;
+  currentParams = { ...params };
   render();
+  closeChrome();
+}
+
+function setHash(hash) {
+  if (location.hash === hash) {
+    routeFromHash();
+  } else {
+    location.hash = hash;
+  }
+}
+
+export function routeFromHash() {
+  const raw = (location.hash || '#/heute').replace(/^#/, '');
+  const [pathPart, qsPart] = raw.split('?');
+  const qs = Object.fromEntries(new URLSearchParams(qsPart || ''));
+  const segs = pathPart.split('/').filter(Boolean);
+
+  // #/modul/:id/:tab
+  if (segs[0] === 'modul') {
+    const st = window.EMVS?.getState?.();
+    let id = segs[1] || st?.settings?.currentModuleId || st?.modules?.[0]?.id || '';
+    const tab = segs[2] || 'ziele';
+    if (st && id && st.settings) {
+      st.settings.currentModuleId = id;
+      try { window.EMVS.save(); } catch {}
+    }
+    previousView = currentView;
+    currentView = 'module';
+    currentParams = { id, tab, ...qs };
+    render();
+    closeChrome();
+    return;
+  }
+
+  const key = '/' + segs.join('/');
+  const view = HASH_TO_VIEW[key] || HASH_TO_VIEW['/' + (segs[0] || 'heute')] || 'today';
+  // Unknown module-subtab legacy handled above; unknown paths fall back
+  if (!VIEWS[view]) {
+    previousView = currentView;
+    currentView = 'today';
+    currentParams = {};
+    render();
+    closeChrome();
+    return;
+  }
+  previousView = currentView;
+  currentView = view;
+  currentParams = { ...qs };
+  // Keep module context from ?module=
+  if (qs.module && window.EMVS?.getState?.()?.settings) {
+    const st = window.EMVS.getState();
+    st.settings.currentModuleId = qs.module;
+    try { window.EMVS.save(); } catch {}
+  }
+  render();
+  closeChrome();
+}
+
+function closeChrome() {
   // Close mobile sidebar after navigation
   document.getElementById('sidebar')?.classList.remove('open');
   document.getElementById('sidebarOverlay')?.classList.remove('open');
+  document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
+  document.getElementById('more-overlay')?.classList.remove('open');
+  document.getElementById('more-overlay')?.setAttribute('aria-hidden', 'true');
+  document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'false');
 }
 
 export { currentView };
 
 function render() {
   const state = window.EMVS.getState();
-  
+
   // Cleanup previous view-specific intervals
-  if (previousView === 'module-home') {
+  if (previousView === 'module-home' || previousView === 'module') {
     stopHomeTimerDisplay();
   }
   if (previousView === 'module-sessions') {
@@ -88,29 +218,48 @@ function render() {
   if (previousView === 'mock-exam') {
     stopMockExamDisplay();
   }
-  
+
   // Update global nav active state
   document.querySelectorAll('#nav-global .toc-item').forEach(n => {
-    n.classList.toggle('active', n.dataset.view === currentView);
+    const on = n.dataset.view === currentView;
+    n.classList.toggle('active', on);
+    if (on) n.setAttribute('aria-current', 'page');
+    else n.removeAttribute('aria-current');
   });
-  
+
   // Update module nav active state
   document.querySelectorAll('.chapter-nav .toc-item').forEach(n => {
-    n.classList.toggle('active', n.dataset.view === currentView);
+    const on = n.dataset.view === currentView;
+    n.classList.toggle('active', on);
+    if (on) n.setAttribute('aria-current', 'page');
+    else n.removeAttribute('aria-current');
   });
   document.querySelectorAll('.chapter').forEach(ch => {
     const isCurrent = ch.dataset.module === state.settings.currentModuleId;
     ch.classList.toggle('expanded', isCurrent);
     ch.querySelector('.chapter-header')?.classList.toggle('active', isCurrent);
   });
-  
+
+  // Bottom tabbar state (module detail counts as overview)
+  const tabFor = currentView === 'module' ? 'overview'
+    : currentView === 'today' ? 'today'
+    : currentView === 'weak-spots' ? 'weak-spots'
+    : currentView === 'exams-global' ? 'exams-global' : '';
+  document.querySelectorAll('#tabbar .tab[data-route]').forEach(t => {
+    const on = t.dataset.route === tabFor;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-current', on ? 'page' : 'false');
+  });
+  window.EMVS?.tabbar?.updateBadges?.();
+
   const fn = VIEWS[currentView] || VIEWS['today'] || VIEWS['overview'];
   const root = document.getElementById('view-root');
   if (!root) return;
   root.dataset.view = currentView;
   root.innerHTML = '';
-  const node = fn(state);
+  const node = fn(state, currentParams);
   if (node) root.appendChild(node);
+  document.getElementById('main')?.scrollTo?.({ top: 0 });
 }
 
 // Make navigate available globally for palette (guard: window.EMVS is

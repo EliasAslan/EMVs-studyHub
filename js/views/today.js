@@ -14,8 +14,9 @@ export function renderToday(state) {
   const now = new Date();
   const dateLine = now.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const exam = getNextExam(state);
   const focus = pickFocus(state);
+  const nextUp = pickNextUp(state, focus);
+  const closestExams = closestTests(state, 3);
   const weak = focus?.objective
     ? getRiskiestObjective(state, [focus.objective.id])
     : getRiskiestObjective(state);
@@ -32,12 +33,16 @@ export function renderToday(state) {
     <div class="eyebrow">Heute · ${escapeHtml(dateLine)}</div>
     <h1 class="page-title today-title">Was jetzt <em>zählt.</em></h1>
 
-    <div class="today-exam">${renderExamLine(state, exam)}</div>
-
-    <hr class="rule today-rule">
-
-    <div class="section-label">Fokus heute</div>
+    <div class="section-label">Jetzt</div>
     ${renderFocus(focus, state)}
+
+    ${nextUp.length ? `
+      <div class="section-label" style="margin-top: 24px;">Als Nächstes</div>
+      <div class="nextup-list">${nextUp.map(n => renderNextUp(n, state)).join('')}</div>
+    ` : ''}
+
+    <div class="section-label" style="margin-top: 24px;">Nächste Prüfungen</div>
+    ${renderClosestExams(closestExams, state)}
 
     ${due.length ? `
       <div class="section-label" style="margin-top: 28px;">Wieder fällig · ${dueCount}</div>
@@ -48,7 +53,7 @@ export function renderToday(state) {
     ${weak ? `
       <div class="section-label" style="margin-top: 28px;">Schwaches Signal</div>
       ${renderWeak(weak, state)}
-      <a href="#" class="today-prompt-link" id="today-weak-all">Alle Schwachstellen →</a>
+      <a href="#/schwach" class="today-prompt-link" id="today-weak-all">Alle Schwachstellen →</a>
     ` : ''}
 
     <hr class="rule today-rule">
@@ -71,7 +76,7 @@ export function renderToday(state) {
 
     <div class="today-prompt">
       <span class="today-prompt-q">„${escapeHtml(prompt)}“</span>
-      <a href="#" class="today-prompt-link" id="today-review-link">Zum Wochenreview →</a>
+      <a href="#/review" class="today-prompt-link" id="today-review-link">Zum Wochenreview →</a>
     </div>
   `;
 
@@ -99,7 +104,7 @@ export function renderToday(state) {
       st.settings.currentModuleId = row.dataset.module;
       window.EMVS.save();
       window.EMVS.renderSidebar();
-      navigate('module-sessions');
+      navigate('module', { id: row.dataset.module, tab: 'sessions' });
     };
     row.addEventListener('click', open);
     row.addEventListener('keydown', e => {
@@ -142,7 +147,80 @@ export function renderToday(state) {
     navigate('weak-spots');
   });
 
+  // Next-up actions
+  el.querySelectorAll('[data-next-obj]').forEach(b =>
+    b.addEventListener('click', () => {
+      const obj = window.EMVS.getState().learningObjectives.find(o => o.id === b.dataset.nextObj);
+      if (obj) startSessionFor(obj);
+    })
+  );
+  el.querySelectorAll('[data-next-hist]').forEach(b =>
+    b.addEventListener('click', () => openObjectiveHistory(b.dataset.nextHist))
+  );
+
   return el;
+}
+
+/**
+ * Recommender: one focus + max two secondary actions.
+ * Secondary = next due (excluding focus) + riskiest excluding focus/due.
+ */
+function pickNextUp(state, focus) {
+  const out = [];
+  const focusId = focus?.objective?.id;
+  const due = getDueObjectives(state).filter(o => o.id !== focusId).slice(0, 1);
+  due.forEach(o => out.push({ kind: 'due', objective: o }));
+  if (out.length < 2) {
+    const excl = [focusId, ...out.map(n => n.objective.id)].filter(Boolean);
+    const r = getRiskiestObjective(state, excl);
+    if (r) out.push({ kind: 'weak', objective: r });
+  }
+  return out.slice(0, 2);
+}
+
+function renderNextUp(n, state) {
+  const m = moduleOf(state, n.objective.moduleId);
+  const tag = n.kind === 'due' ? 'Fällig' : 'Schwach';
+  return `
+    <div class="nextup-row">
+      <span class="badge nextup-tag">${tag}</span>
+      <span class="nextup-title">${escapeHtml(n.objective.title)}</span>
+      <span class="nextup-meta">LZ ${escapeHtml(String(n.objective.number ?? '–'))}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
+      <span class="nextup-actions">
+        <button class="btn ghost nextup-btn" data-next-hist="${n.objective.id}">Verlauf</button>
+        <button class="btn ghost nextup-btn" data-next-obj="${n.objective.id}">▶</button>
+      </span>
+    </div>`;
+}
+
+/** Closest tests sorted by date, then weight. */
+function closestTests(state, n = 3) {
+  return [...(state.exams || [])]
+    .filter(e => e.date)
+    .map(e => ({ e, d: daysUntil(e.date) }))
+    .filter(x => x.d !== null && x.d >= -30)
+    .sort((a, b) => (a.d - b.d) || ((b.e.weight || 0) - (a.e.weight || 0)))
+    .slice(0, n)
+    .map(x => x.e);
+}
+
+function renderClosestExams(list, state) {
+  if (!list.length) return `<p class="today-empty-line">Keine Prüfung eingetragen — lege unter Prüfungen die nächste an.</p>`;
+  return `
+    <div class="exam-strip" role="list">
+      ${list.map(e => {
+        const m = moduleOf(state, e.moduleId);
+        const d = daysUntil(e.date);
+        const when = d === null ? '' : d < 0 ? 'überschritten' : d === 0 ? 'heute' : d === 1 ? 'morgen' : `in ${d} Tagen`;
+        const urgent = d !== null && d <= 14;
+        return `
+          <a class="exam-chip ${urgent ? 'urgent' : ''}" role="listitem" href="#/pruefungen">
+            <span class="exam-chip-name">${escapeHtml(e.name)}</span>
+            <span class="exam-chip-meta">${m ? `Modul ${escapeHtml(m.code)} · ` : ''}${escapeHtml(when)}${e.weight ? ` · ${escapeHtml(String(e.weight))}%` : ''}</span>
+          </a>`;
+      }).join('')}
+    </div>
+    <a href="#/pruefungen" class="today-prompt-link">Alle Prüfungen →</a>`;
 }
 
 /**

@@ -107,14 +107,21 @@ function paintCaptureList(el, state, modules, allObjectives) {
       openCaptureModal(capture);
     });
 
-    item.querySelector('.delete-capture-btn')?.addEventListener('click', e => {
+    item.querySelector('.delete-capture-btn')?.addEventListener('click', async e => {
       e.stopPropagation();
-      if (confirm('Erfassung löschen?')) {
-        state.captures = state.captures.filter(x => x.id !== id);
-        window.EMVS.save();
-        if (getCurrentView() === 'captures') navigate('captures');
-        else paintCaptureList(el, state, modules, allObjectives);
-      }
+      const snapshot = JSON.parse(JSON.stringify(state.captures));
+      const { deleteWithUndo } = await import('../components/undoDelete.js');
+      deleteWithUndo({
+        message: 'Erfassung gelöscht',
+        snapshot,
+        remove: () => {
+          state.captures = state.captures.filter(x => x.id !== id);
+        },
+        restore: (snap) => {
+          state.captures = snap;
+        },
+      });
+      paintCaptureList(el, state, modules, allObjectives);
     });
   });
 }
@@ -203,20 +210,20 @@ export function openQuickCapture(preset = {}) {
           ${CAPTURE_TYPES.map(t => `<button type="button" class="badge filter-btn qc-type ${t === quickType ? 'active' : ''}" data-qtype="${t}">${getCaptureIcon(t)} ${CAPTURE_TYPE_LABELS[t]}</button>`).join('')}
         </div>
         <div class="field-row" style="margin-top:12px;">
-          <label>Was geht dir durch den Kopf?</label>
+          <label for="qc-content">Was geht dir durch den Kopf?</label>
           <textarea name="content" id="qc-content" rows="3" required
             placeholder="Frage, Fehler, Begriff, Gedanke…">${escapeHtml(preset.content || '')}</textarea>
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
           <div class="field-row" style="flex:1;min-width:160px;">
-            <label>Modul (optional)</label>
+            <label for="qc-module">Modul (optional)</label>
             <select name="moduleId" id="qc-module">
               <option value="">—</option>
               ${modules.map(m => `<option value="${m.id}" ${defaultModuleId === m.id ? 'selected' : ''}>${escapeHtml(m.code)}</option>`).join('')}
             </select>
           </div>
           <div class="field-row" style="flex:2;min-width:200px;">
-            <label>Lernziel (optional)</label>
+            <label for="qc-objective">Lernziel (optional)</label>
             <select name="objectiveId" id="qc-objective">
               <option value="">—</option>
               ${objectives.map(o => `<option value="${o.id}" ${preset.objectiveId === o.id ? 'selected' : ''}>LZ ${o.number}: ${escapeHtml(o.title.slice(0, 40))}</option>`).join('')}

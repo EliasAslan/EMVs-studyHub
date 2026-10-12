@@ -18,7 +18,11 @@
 <div class="app">
   <header class="mobile-header">
     <span class="mobile-brand">EMVS</span>
-    <button class="menu-btn" id="menuBtn" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sidebar">☰</button>
+    <div class="mobile-actions">
+      <button class="icon-btn" id="searchBtn" aria-label="Suchen und Befehle (Strg+K)">⌕</button>
+      <button class="icon-btn" id="moreBtn" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
+      <button class="menu-btn" id="menuBtn" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sidebar">☰</button>
+    </div>
   </header>
   <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
 
@@ -57,6 +61,30 @@
   <main class="main" id="main" role="main" tabindex="-1">
     <div class="page" id="view-root"></div>
   </main>
+
+  <nav class="tabbar" id="tabbar" aria-label="Hauptbereiche">
+    <button class="tab" data-route="today" aria-current="false"><span class="tab-ico" aria-hidden="true">◉</span><span class="tab-lb">Heute</span></button>
+    <button class="tab" data-route="overview" aria-current="false"><span class="tab-ico" aria-hidden="true">▦</span><span class="tab-lb">Module</span></button>
+    <button class="tab fab" id="tabCapture" aria-label="Schnell erfassen"><span class="tab-fab-plus" aria-hidden="true">+</span></button>
+    <button class="tab" data-route="weak-spots" aria-current="false"><span class="tab-ico" aria-hidden="true">△</span><span class="tab-lb">Schwach</span><span class="tab-badge" id="badgeWeak" hidden></span></button>
+    <button class="tab" data-route="exams-global" aria-current="false"><span class="tab-ico" aria-hidden="true">◷</span><span class="tab-lb">Prüfungen</span><span class="tab-badge" id="badgeExam" hidden></span></button>
+  </nav>
+
+  <div class="sheet-overlay" id="more-overlay" aria-hidden="true">
+    <div class="sheet" id="more-sheet" role="dialog" aria-modal="true" aria-labelledby="more-title">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <h2 class="sheet-title" id="more-title">Weitere Bereiche</h2>
+      <div class="sheet-list">
+        <button class="sheet-item" data-route="weekly-review"><span aria-hidden="true">✎</span> Review</button>
+        <button class="sheet-item" data-route="tools"><span aria-hidden="true">⚒</span> Werkzeuge</button>
+        <button class="sheet-item" data-route="exam-prep"><span aria-hidden="true">⧉</span> Prüfungsvorbereitung</button>
+        <button class="sheet-item" data-route="mock-exam"><span aria-hidden="true">⏱</span> Mock-Prüfung</button>
+        <button class="sheet-item" data-route="captures"><span aria-hidden="true">⚡</span> Alle Erfassungen</button>
+        <button class="sheet-item" data-route="settings"><span aria-hidden="true">⚙</span> Einstellungen</button>
+      </div>
+      <button class="btn ghost sheet-close" id="more-close">Schließen</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal Overlay -->

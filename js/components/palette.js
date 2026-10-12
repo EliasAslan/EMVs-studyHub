@@ -133,14 +133,17 @@ export function initPalette() {
   function open() {
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-expanded', 'true');
     input.value = '';
     input.focus();
     build('');
   }
-  
+
   function close() {
     overlay.classList.remove('open');
     overlay.setAttribute('aria-hidden', 'true');
+    input.setAttribute('aria-expanded', 'false');
   }
   
   function move(delta) {

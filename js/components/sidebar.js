@@ -75,11 +75,10 @@ export function renderSidebar() {
     h.setAttribute('role', 'button');
     const activate = () => {
       const id = h.closest('.chapter').dataset.module;
-      if (state.settings.currentModuleId === id && currentView.startsWith('module-')) return;
       state.settings.currentModuleId = id;
       window.EMVS.save();
       renderSidebar();
-      navigate('module-home');
+      navigate('module', { id, tab: 'ziele' });
     };
     h.addEventListener('click', activate);
     h.addEventListener('keydown', (e) => {
@@ -132,7 +131,9 @@ export function renderSidebar() {
           e.stopPropagation();
           wrap.classList.remove('open');
           menu.hidden = true;
-          navigate(nv);
+          state.settings.currentModuleId = ch.dataset.module;
+          window.EMVS.save();
+          navigate('module', { id: ch.dataset.module, tab: moduleTabFor(nv) });
         };
       });
     }
@@ -142,7 +143,12 @@ export function renderSidebar() {
       item.classList.toggle('active', nv === currentView && ch.dataset.module === state.settings.currentModuleId);
       item.setAttribute('tabindex', '0');
       item.setAttribute('role', 'link');
-      const go = e => { e?.stopPropagation?.(); navigate(nv); };
+      const go = e => {
+        e?.stopPropagation?.();
+        state.settings.currentModuleId = ch.dataset.module;
+        window.EMVS.save();
+        navigate('module', { id: ch.dataset.module, tab: moduleTabFor(nv) });
+      };
       item.onclick = go;
       item.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } };
     });
@@ -204,6 +210,14 @@ export function renderSidebar() {
       overflowMenu.hidden = true;
     }
   }
+}
+
+function moduleTabFor(view) {
+  if (view === 'module-objectives') return 'ziele';
+  if (view === 'module-plan') return 'plan';
+  if (view === 'module-sessions') return 'sessions';
+  if (view === 'module-resources' || view === 'module-exams') return 'material';
+  return 'ziele';
 }
 
 function escapeHtml(s) {
