@@ -611,13 +611,24 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   .brand { flex-direction: column; align-items: center; gap: 2px; margin-bottom: 16px; }
   .brand-mark { font-size: 19px; }
   .brand-sub { display: none; }
-  .toc-label { text-align: center; font-size: 9px; }
-  .toc-item { flex-direction: column; align-items: center; gap: 2px; text-align: center; font-size: 10.5px; min-height: 52px; justify-content: center; }
+  .toc-label { text-align: center; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toc-item {
+    flex-direction: column; align-items: center; gap: 2px; text-align: center;
+    font-size: 10px; line-height: 1.25; min-height: 52px; justify-content: center;
+    max-width: 100%; overflow: hidden; overflow-wrap: anywhere;
+  }
   .toc-num { display: none; }
-  .chapter-title { font-size: 13px; text-align: center; }
-  .chapter-sub, .chapter-nav, .sidebar-overflow, .chapter-overflow { display: none; }
-  .chapter-header { flex-direction: column; align-items: center; text-align: center; min-height: 52px; justify-content: center; }
+  .chapter-title { font-size: 12px; text-align: center; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sidebar .chapter-sub,
+  .sidebar .chapter-nav,
+  .sidebar .sidebar-overflow,
+  .sidebar .chapter-overflow,
+  .sidebar .chapter.expanded .chapter-nav { display: none !important; }
+  .sidebar { overflow-x: hidden; }
+  .chapter-header { flex-direction: column; align-items: center; text-align: center; min-height: 52px; justify-content: center; max-width: 100%; }
   .chapter-num { min-width: 0; }
+  /* One title only: sub-views keep their lede, not their header */
+  .mod-body .eyebrow, .mod-body .page-title { display: none; }
   .sidebar-footer .cmd-trigger span, .sidebar-footer kbd { display: none; }
   .sidebar-footer .cmd-trigger { justify-content: center; min-height: 48px; }
   .sidebar-footer .cmd-trigger::after { content: "⌕"; font-size: 18px; }
