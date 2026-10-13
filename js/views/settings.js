@@ -17,12 +17,18 @@ export function renderSettings(state) {
   
   const el = document.createElement('div');
   el.innerHTML = `
-    <div class="eyebrow">Konfiguration</div>
+    <div class="eyebrow">Dein Lernbereich</div>
     <h1 class="page-title">Einstellungen</h1>
-    <p class="page-lede">${m ? `Modul ${escapeHtml(m.code)} · ${escapeHtml(m.title)}` : 'Kein Modul ausgewählt'}</p>
+    <p class="page-lede settings-intro">Passe Study Hub an deinen Lernalltag an. Module, Darstellung, lokale KI und Datensicherung — die wichtigsten Optionen auf einen Blick.</p>
+    <div class="settings-context">
+      <span class="settings-context-item"><span class="settings-context-dot" aria-hidden="true"></span>${m ? `Aktives Modul: <strong>${escapeHtml(m.code)} · ${escapeHtml(m.title)}</strong>` : 'Noch kein Modul ausgewählt'}</span>
+      <span class="settings-context-note">Änderungen werden automatisch gespeichert.</span>
+    </div>
     
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Modul-Einstellungen</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Modul-Einstellungen</span><span class="settings-summary-hint">Zielnote, Titel und Farbe</span></summary>
+      <div class="settings-group-content">
       ${m ? `
         <div class="field-row">
           <label>Zielnote (1.0 – 6.0)</label>
@@ -42,11 +48,15 @@ export function renderSettings(state) {
         </div>
       ` : '<p style="color: var(--ink-2);">Wähle ein Modul in der Sidebar, um dessen Einstellungen zu bearbeiten.</p>'}
     </div>
+      </details>
+    </div>
     
     <hr class="rule">
     
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">App-Einstellungen</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>App-Einstellungen</span><span class="settings-summary-hint">Theme und Darstellung</span></summary>
+      <div class="settings-group-content">
       <div class="field-row">
         <label>Theme</label>
         <select id="set-theme" style="max-width: 200px;">
@@ -54,6 +64,8 @@ export function renderSettings(state) {
           <option value="dark" ${state.settings.theme === 'dark' ? 'selected' : ''}>Dunkel</option>
         </select>
       </div>
+    </div>
+      </details>
     </div>
     
     <hr class="rule">
@@ -107,15 +119,21 @@ export function renderSettings(state) {
 
     <hr class="rule">
 
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Konto / Supabase</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Konto / Supabase</span><span class="settings-summary-hint">Anmeldung und Cloud</span></summary>
+      <div class="settings-group-content">
       <div id="supabase-auth-panel"></div>
+    </div>
+      </details>
     </div>
 
     <hr class="rule">
     
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Modul-Verwaltung</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Modul-Verwaltung</span><span class="settings-summary-hint">Module erstellen und bearbeiten</span></summary>
+      <div class="settings-group-content">
       <div class="mt-2" style="display: flex; gap: 12px; flex-wrap: wrap;">
         <button class="btn primary" id="create-module">＋ Neues Modul erstellen</button>
         <button class="btn" id="create-module-pdf">Modul aus PDF (lokale KI)</button>
@@ -136,11 +154,15 @@ export function renderSettings(state) {
         </div>
       ` : ''}
     </div>
+      </details>
+    </div>
     
     <hr class="rule">
     
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Daten</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Daten</span><span class="settings-summary-hint">Backup und Zurücksetzen</span></summary>
+      <div class="settings-group-content">
       <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch; margin-bottom: 16px;">
         Alle Daten werden lokal im Browser gespeichert (localStorage). Exportiere regelmäßig Backups.
       </p>
@@ -150,11 +172,15 @@ export function renderSettings(state) {
         <button class="btn danger" id="btn-reset">Alle Daten zurücksetzen</button>
       </div>
     </div>
+      </details>
+    </div>
     
     <hr class="rule">
     
-    <div>
-      <div class="section-label">Info</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Info</span><span class="settings-summary-hint">Version und Datenmodell</span></summary>
+      <div class="settings-group-content">
       <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch;">
         EMVS Study Hub v1.0 — Local-first Lernmanagement.<br>
         Datenmodell: Module, Lernziele, Ressourcen, Sitzungen, Prüfungen, Plan, Erfassungen, Wochenreviews.
@@ -331,6 +357,8 @@ export function openModuleModal(module = null) {
           <label>Zielnote</label>
           <input type="number" name="targetGrade" value="${m.targetGrade ?? 5.0}" step="0.1" min="1" max="6" style="max-width: 120px;">
         </div>
+      </details>
+    </div>
       </form>
     `,
     footer: `
