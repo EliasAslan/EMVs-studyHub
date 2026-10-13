@@ -6,10 +6,14 @@ import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal, confirmDialog } from '../components/modal.js';
 import { generateId, exportData, importData, clearAll, clearStorageError } from '../services/store.js';
 import { renderAuthPanel } from '../services/auth.js';
+import { getLocalAISettings, checkConnection, describeLocalAIError } from '../services/localAI.js';
+import { openPdfImport } from './pdf-import.js';
 
 export function renderSettings(state) {
   const moduleId = state.settings.currentModuleId;
   const m = state.modules.find(x => x.id === moduleId);
+  const ai = getLocalAISettings(state);
+  const siteOrigin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://deine-app.vercel.app';
   
   const el = document.createElement('div');
   el.innerHTML = `
@@ -55,6 +59,41 @@ export function renderSettings(state) {
     <hr class="rule">
 
     <div style="margin-bottom: 32px;">
+      <div class="section-label">Lokale KI (Ollama, optional)</div>
+      <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch; margin-bottom: 12px;">
+        Module aus PDFs erzeugen — mit deinem eigenen Ollama auf diesem Rechner. PDF-Text und Anfragen gehen nur an <span class="mono">localhost</span>, nie ins Netz.
+      </p>
+      <div class="ai-status" id="ai-status">
+        <span class="ai-dot" id="ai-dot" aria-hidden="true"></span>
+        <span id="ai-status-text">Noch nicht geprüft</span>
+        <button class="btn" id="ai-test" style="font-size: 12px;">Verbindung testen</button>
+      </div>
+      <div class="field-row">
+        <label for="ai-model">Modell</label>
+        <input type="text" id="ai-model" list="ai-model-list" value="${escapeHtml(ai.model)}" style="max-width: 240px;" placeholder="z.B. qwen3:8b">
+        <datalist id="ai-model-list"></datalist>
+      </div>
+      <div class="field-row">
+        <label for="ai-baseurl">Ollama-Adresse</label>
+        <input type="text" id="ai-baseurl" value="${escapeHtml(ai.baseUrl)}" style="max-width: 280px;" inputmode="url" placeholder="http://localhost:11434">
+      </div>
+      <details class="ai-setup">
+        <summary>Einrichtung (einmalig, ca. 2 Minuten)</summary>
+        <ol>
+          <li>Ollama installieren und starten, Modell laden: <span class="mono">ollama pull qwen3:8b</span></li>
+          <li>Dieser Website Zugriff erlauben (einmalig):
+            <div class="mono" id="ai-origins-cmd">setx OLLAMA_ORIGINS "${escapeHtml(siteOrigin)},http://localhost:*,http://127.0.0.1:*"</div>
+            <button class="btn ghost" id="ai-copy-origins" style="font-size: 12px;">Befehl kopieren</button>
+          </li>
+          <li>Ollama neu starten, dann oben auf „Verbindung testen“ klicken.</li>
+        </ol>
+        <p class="muted" style="font-size: 12.5px;">Hinweis: Nur exakt diese Adresse ist freigegeben. Vorschau-Deployments haben eigene Adressen und funktionieren mit der KI nicht.</p>
+      </details>
+    </div>
+
+    <hr class="rule">
+
+    <div style="margin-bottom: 32px;">
       <div class="section-label">Konto / Supabase</div>
       <div id="supabase-auth-panel"></div>
     </div>
@@ -63,8 +102,9 @@ export function renderSettings(state) {
     
     <div style="margin-bottom: 32px;">
       <div class="section-label">Modul-Verwaltung</div>
-      <div class="mt-2">
+      <div class="mt-2" style="display: flex; gap: 12px; flex-wrap: wrap;">
         <button class="btn primary" id="create-module">＋ Neues Modul erstellen</button>
+        <button class="btn" id="create-module-pdf">Modul aus PDF (lokale KI)</button>
       </div>
       ${state.modules.length ? `
         <div class="mt-3" style="display: flex; flex-direction: column; gap: 8px;">
@@ -142,8 +182,56 @@ export function renderSettings(state) {
     document.documentElement.dataset.theme = state.settings.theme;
     window.EMVS.save();
   });
+
+  // Local AI (Ollama) settings
+  const saveLocalAI = () => {
+    state.settings.localAI = {
+      model: el.querySelector('#ai-model')?.value.trim() || 'qwen3:8b',
+      baseUrl: el.querySelector('#ai-baseurl')?.value.trim() || 'http://localhost:11434',
+      numCtx: state.settings.localAI?.numCtx || 8192,
+    };
+    window.EMVS.save();
+  };
+  el.querySelector('#ai-model')?.addEventListener('change', saveLocalAI);
+  el.querySelector('#ai-baseurl')?.addEventListener('change', saveLocalAI);
+  el.querySelector('#ai-copy-origins')?.addEventListener('click', async (e) => {
+    const cmd = el.querySelector('#ai-origins-cmd')?.textContent.trim() || '';
+    try {
+      await navigator.clipboard.writeText(cmd);
+      window.EMVS.toast?.show('Befehl kopiert — in PowerShell ausführen, dann Ollama neu starten');
+    } catch {
+      window.EMVS.toast?.show('Kopieren fehlgeschlagen — Befehl manuell übernehmen');
+    }
+  });
+  el.querySelector('#ai-test')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const dot = el.querySelector('#ai-dot');
+    const label = el.querySelector('#ai-status-text');
+    btn.setAttribute('aria-busy', 'true');
+    btn.disabled = true;
+    if (label) label.textContent = 'Prüfe…';
+    try {
+      saveLocalAI();
+      const current = getLocalAISettings(window.EMVS.getState());
+      const conn = await checkConnection({ baseUrl: current.baseUrl });
+      const list = el.querySelector('#ai-model-list');
+      if (list && conn.models.length) {
+        list.innerHTML = conn.models.map(n => `<option value="${escapeHtml(n)}">`).join('');
+      }
+      if (dot) dot.dataset.state = conn.ok ? 'ok' : 'fail';
+      if (label) {
+        label.textContent = conn.ok
+          ? (conn.models.length ? `Verbunden — ${conn.models.length} Modell${conn.models.length !== 1 ? 'e' : ''} gefunden` : 'Verbunden — keine Modelle gefunden (ollama pull …)')
+          : describeLocalAIError(conn.error);
+      }
+    } finally {
+      btn.removeAttribute('aria-busy');
+      btn.disabled = false;
+    }
+  });
   
   el.querySelector('#create-module')?.addEventListener('click', () => openModuleModal());
+  el.querySelector('#create-module-pdf')?.addEventListener('click', () => openPdfImport());
   el.querySelector('#btn-export')?.addEventListener('click', () => window.EMVS.exportData());
   el.querySelector('#btn-import')?.addEventListener('click', () => importBackup());
   el.querySelector('#btn-reset')?.addEventListener('click', async () => {

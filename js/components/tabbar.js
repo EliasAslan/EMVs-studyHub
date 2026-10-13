@@ -74,6 +74,7 @@ function setBadge(tabBadge, railBadge, n, label) {
     b.hidden = n === 0;
     b.textContent = n > 9 ? '9+' : String(n);
     b.setAttribute('aria-label', label);
+    b.setAttribute('title', label);
   }
 }
 
