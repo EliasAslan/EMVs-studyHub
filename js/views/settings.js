@@ -170,7 +170,7 @@ export function renderSettings(state) {
       <summary class="settings-group-summary"><span>Daten</span><span class="settings-summary-hint">Backup und Zurücksetzen</span></summary>
       <div class="settings-group-content">
       <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch; margin-bottom: 16px;">
-        Alle Daten werden lokal im Browser gespeichert (localStorage). Exportiere regelmäßig Backups.
+        Study Hub speichert Daten standardmäßig lokal im Browser. Supabase-Sync erfolgt manuell im Konto-Bereich; exportiere regelmäßig Backups.
       </p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap;">
         <button class="btn primary" id="btn-export">Backup exportieren (JSON)</button>
