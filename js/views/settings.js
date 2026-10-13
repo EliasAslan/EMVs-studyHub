@@ -77,17 +77,31 @@ export function renderSettings(state) {
         <label for="ai-baseurl">Ollama-Adresse</label>
         <input type="text" id="ai-baseurl" value="${escapeHtml(ai.baseUrl)}" style="max-width: 280px;" inputmode="url" placeholder="http://localhost:11434">
       </div>
-      <details class="ai-setup">
-        <summary>Einrichtung (einmalig, ca. 2 Minuten)</summary>
+      <details class="ai-setup" id="ai-setup">
+        <summary>Schritt-für-Schritt-Anleitung (einmalig, ca. 5 Minuten)</summary>
         <ol>
-          <li>Ollama installieren und starten, Modell laden: <span class="mono">ollama pull qwen3:8b</span></li>
-          <li>Dieser Website Zugriff erlauben (einmalig):
+          <li><strong>Ollama installieren &amp; prüfen.</strong> Von <span class="mono">ollama.com</span> installieren, dann in PowerShell:
+            <span class="mono">ollama --version</span>
+            <span class="mono">ollama list</span>
+            Dein Modell (z.&nbsp;B. <span class="mono">qwen3:8b</span>) muss dort stehen. Falls nicht:
+            <span class="mono">ollama pull qwen3:8b</span>
+          </li>
+          <li><strong>Dieser Website Zugriff erlauben.</strong> Folgenden Befehl in PowerShell ausführen (einmalig):
             <div class="mono" id="ai-origins-cmd">setx OLLAMA_ORIGINS "${escapeHtml(siteOrigin)},http://localhost:*,http://127.0.0.1:*"</div>
             <button class="btn ghost" id="ai-copy-origins" style="font-size: 12px;">Befehl kopieren</button>
           </li>
-          <li>Ollama neu starten, dann oben auf „Verbindung testen“ klicken.</li>
+          <li><strong>Ollama neu starten.</strong> Wichtig — sonst gilt die Freigabe nicht: Tray-Icon (unten rechts) → <em>Quit Ollama</em> → Ollama neu öffnen. Alternativ in PowerShell: <span class="mono">ollama serve</span></li>
+          <li><strong>Verbindung testen.</strong> Oben auf „Verbindung testen“ klicken. Bei Erfolg steht dort „Verbunden“ plus die gefundenen Modelle — diese erscheinen dann auch als Vorschläge im Modell-Feld.</li>
+          <li><strong>PDF importieren.</strong> Unter Übersicht (leerer Start) oder hier in der Modul-Verwaltung auf <strong>„Modul aus PDF“</strong> klicken, Datei wählen, Entwurf prüfen, übernehmen.</li>
         </ol>
-        <p class="muted" style="font-size: 12.5px;">Hinweis: Nur exakt diese Adresse ist freigegeben. Vorschau-Deployments haben eigene Adressen und funktionieren mit der KI nicht.</p>
+        <div class="section-label" style="margin-top: 12px;">Wenn etwas nicht klappt</div>
+        <ul class="ai-trouble">
+          <li><span class="mono">nicht erreichbar</span> — Ollama läuft nicht auf diesem Rechner. <span class="mono">ollama serve</span> starten.</li>
+          <li><span class="mono">antwortet nicht</span> — Ollama läuft, aber kein Modell geladen. <span class="mono">ollama list</span> prüfen.</li>
+          <li><span class="mono">CORS / blockt</span> — Schritt 2+3 wiederholen: exakte Adresse oben kopieren, neues PowerShell-Fenster, Ollama wirklich beenden und neu starten.</li>
+          <li><span class="mono">Modell nicht installiert</span> — Modellname im Feld prüfen oder per <span class="mono">ollama pull &lt;name&gt;</span> laden.</li>
+        </ul>
+        <p class="muted" style="font-size: 12.5px;">Jeder Rechner braucht diese Einrichtung einmal — dann nutzt jede Person ihr eigenes lokales Modell. Vorschau-Deployments haben eigene Adressen und funktionieren mit der KI nicht; nutze die finale Domain.</p>
       </details>
     </div>
 
@@ -203,12 +217,12 @@ export function renderSettings(state) {
       window.EMVS.toast?.show('Kopieren fehlgeschlagen — Befehl manuell übernehmen');
     }
   });
-  el.querySelector('#ai-test')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
+  const runAiTest = async () => {
+    const btn = el.querySelector('#ai-test');
     const dot = el.querySelector('#ai-dot');
     const label = el.querySelector('#ai-status-text');
-    btn.setAttribute('aria-busy', 'true');
-    btn.disabled = true;
+    btn?.setAttribute('aria-busy', 'true');
+    if (btn) btn.disabled = true;
     if (label) label.textContent = 'Prüfe…';
     try {
       saveLocalAI();
@@ -224,11 +238,16 @@ export function renderSettings(state) {
           ? (conn.models.length ? `Verbunden — ${conn.models.length} Modell${conn.models.length !== 1 ? 'e' : ''} gefunden` : 'Verbunden — keine Modelle gefunden (ollama pull …)')
           : describeLocalAIError(conn.error);
       }
+      // Auto-open the guide when the check fails, so the fix is one click away.
+      if (!conn.ok) el.querySelector('#ai-setup')?.setAttribute('open', '');
     } finally {
-      btn.removeAttribute('aria-busy');
-      btn.disabled = false;
+      btn?.removeAttribute('aria-busy');
+      if (btn) btn.disabled = false;
     }
-  });
+  };
+  el.querySelector('#ai-test')?.addEventListener('click', runAiTest);
+  // Live status on open — no stale "not checked yet".
+  runAiTest();
   
   el.querySelector('#create-module')?.addEventListener('click', () => openModuleModal());
   el.querySelector('#create-module-pdf')?.addEventListener('click', () => openPdfImport());

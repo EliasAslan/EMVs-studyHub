@@ -1138,6 +1138,8 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 }
 .ai-setup summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ai-setup ol { margin: 8px 0 8px 20px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ai-trouble { margin: 8px 0 8px 20px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ai-trouble .mono { background: var(--bg); border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px; }
 .ai-setup .mono {
   display: block; margin-top: 6px; padding: 8px 10px;
   background: var(--bg); border: 1px solid var(--rule); border-radius: 4px;
