@@ -70,8 +70,10 @@ export function renderSettings(state) {
     
     <hr class="rule">
 
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Lokale KI (Ollama, optional)</div>
+    <div class="settings-section">
+      <details class="settings-group" open>
+        <summary class="settings-group-summary"><span>Lokale KI (Ollama, optional)</span><span class="settings-summary-hint">PDF-Import mit Qwen</span></summary>
+        <div class="settings-group-content">
       <p class="settings-ai-intro">
         Erstelle Lernziele und Ressourcen aus einem PDF mit <strong>Qwen auf deinem eigenen PC</strong>. Die KI ist optional; deine normale Lernplanung funktioniert auch ohne sie.
       </p>
@@ -116,6 +118,8 @@ export function renderSettings(state) {
           </ul>
         </details>
         <p class="muted settings-guide-footnote">Der Befehl wird für die aktuell geöffnete Website erzeugt. Nutze am besten die feste Adresse <span class="mono">em-vs-study-hub.vercel.app</span>, damit du die Freigabe nicht für wechselnde Vorschau-URLs wiederholen musst. Nach dem Ausführen des Befehls Ollama vollständig beenden und erneut öffnen.</p>
+      </details>
+        </div>
       </details>
     </div>
 
