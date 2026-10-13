@@ -101,7 +101,7 @@ export function renderSettings(state) {
           <li><span class="mono">CORS / blockt</span> — Schritt 2+3 wiederholen: exakte Adresse oben kopieren, neues PowerShell-Fenster, Ollama wirklich beenden und neu starten.</li>
           <li><span class="mono">Modell nicht installiert</span> — Modellname im Feld prüfen oder per <span class="mono">ollama pull &lt;name&gt;</span> laden.</li>
         </ul>
-        <p class="muted" style="font-size: 12.5px;">Jeder Rechner braucht diese Einrichtung einmal — dann nutzt jede Person ihr eigenes lokales Modell. Vorschau-Deployments haben eigene Adressen und funktionieren mit der KI nicht; nutze die finale Domain.</p>
+        <p class="muted" style="font-size: 12.5px;">Jeder Rechner braucht diese Einrichtung einmal pro Website-Adresse. Der Befehl oben wird automatisch aus der aktuell geöffneten Website erzeugt. Auch Vorschau-Deployments funktionieren, wenn du den Befehl für genau diese Adresse ausführst und Ollama neu startest. Ändert sich die Vorschau-Adresse, wiederhole diesen Schritt. Die feste finale Domain ist bequemer, weil ihre Adresse gleich bleibt.</p>
       </details>
     </div>
 
