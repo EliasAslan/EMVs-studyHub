@@ -1,12 +1,22 @@
 /**
  * Sidebar Component
- * Renders module navigation and global navigation
+ * Compact icon rail (default) with an expandable label view.
+ * Global destinations stay static in index.html; the module section
+ * (current module Home + 4 tabs, module switcher) renders here.
  */
 
-import { navigate, getCurrentView } from '../views/router.js';
-import { generateId } from '../services/store.js';
+import { navigate, getCurrentView, getCurrentParams } from '../views/router.js';
+import { MODULE_TABS, getNavState } from '../utils/navigation.js';
 
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+
+const MTAB_META = {
+  home: { ico: '⌂', tip: 'Modul-Home — Übersicht' },
+  ziele: { ico: '◎', tip: 'Lernziele' },
+  plan: { ico: '≡', tip: 'Plan' },
+  sessions: { ico: '▶', tip: 'Sitzungen' },
+  material: { ico: '▤', tip: 'Material und Prüfungen' },
+};
 
 function hexToRgb(hex) {
   const value = String(hex || '#b45309').replace('#', '');
@@ -44,113 +54,114 @@ function applyCurrentModuleAccent() {
   root.style.setProperty('--on-accent', getReadableTextColor(accent));
 }
 
+export function isSidebarExpanded() {
+  try {
+    return !!window.EMVS.getState().settings.sidebarExpanded;
+  } catch {
+    return false;
+  }
+}
+
+export function setSidebarExpanded(expanded) {
+  const state = window.EMVS.getState();
+  state.settings.sidebarExpanded = !!expanded;
+  window.EMVS.save();
+  renderSidebar();
+}
+
+function goModule(id, tab) {
+  const state = window.EMVS.getState();
+  state.settings.currentModuleId = id;
+  window.EMVS.save();
+  renderSidebar();
+  navigate('module', { id, tab });
+}
+
 export function renderSidebar() {
   const state = window.EMVS.getState();
   const currentView = getCurrentView();
+  const params = getCurrentParams();
+  const nav = getNavState(currentView, params, state.settings.currentModuleId);
+  const sidebarEl = document.getElementById('sidebar');
   const container = document.getElementById('nav-modules');
-  if (!container) return;
+  if (!container || !sidebarEl) return;
   applyCurrentModuleAccent();
-  
-  container.innerHTML = state.modules.map((m, i) => `
-    <div class="chapter ${m.id === state.settings.currentModuleId ? 'expanded' : ''}" data-module="${m.id}">
-      <div class="chapter-header ${m.id === state.settings.currentModuleId ? 'active' : ''}">
-        <span class="chapter-num">${ROMAN[i] || (i + 1)}</span>
-        <span class="chapter-title">Modul ${escapeHtml(m.code)}</span>
-      </div>
-      <div class="chapter-sub">${escapeHtml(m.title)}</div>
-      <nav class="chapter-nav">
-        <div class="toc-item" data-view="module-home">Home</div>
-        <div class="toc-item" data-view="module-objectives">Ziele</div>
-        <div class="toc-item" data-view="module-resources">Ressourcen</div>
-        <div class="toc-item" data-view="module-sessions">Sitzungen</div>
-        <div class="toc-item" data-view="module-exams">Prüfungen</div>
-        <div class="toc-item" data-view="module-plan">Plan</div>
-      </nav>
-    </div>
-  `).join('');
 
-  // Module headers - click to switch module
-  container.querySelectorAll('.chapter-header').forEach(h => {
-    h.setAttribute('tabindex', '0');
-    h.setAttribute('role', 'button');
-    const activate = () => {
-      const id = h.closest('.chapter').dataset.module;
-      state.settings.currentModuleId = id;
-      window.EMVS.save();
-      renderSidebar();
-      navigate('module', { id, tab: 'ziele' });
-    };
-    h.addEventListener('click', activate);
-    h.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+  const expanded = isSidebarExpanded();
+  sidebarEl.classList.toggle('expanded', expanded);
+  const toggle = document.getElementById('railToggle');
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.setAttribute('aria-label', expanded ? 'Seitenleiste einklappen' : 'Seitenleiste erweitern');
+    toggle.setAttribute('title', expanded ? 'Seitenleiste einklappen' : 'Seitenleiste erweitern');
+    toggle.querySelector('.rail-toggle-ico')?.replaceChildren(document.createTextNode(expanded ? '«' : '»'));
+    if (!toggle.dataset.wired) {
+      toggle.dataset.wired = '1';
+      toggle.addEventListener('click', () => setSidebarExpanded(!isSidebarExpanded()));
+    }
+  }
+
+  const cur = state.modules.find(m => m.id === nav.moduleId) || null;
+
+  // Module section: current module (Home + 4 tabs) + compact switcher.
+  let html = '';
+  if (cur) {
+    html += `
+      <div class="mod-current" data-module="${cur.id}">
+        <button class="mod-current-head${nav.moduleTab === 'home' && currentView === 'module' ? ' active' : ''}" data-mtab-go="home" data-module="${cur.id}"
+          title="Modul-Home — ${escapeHtml(cur.title)}" aria-label="Modul-Home — Modul ${escapeHtml(cur.code)}">
+          <span class="toc-ico mod-home-ico" aria-hidden="true">⌂</span>
+          <span class="rail-mod-dot" aria-hidden="true" style="background: var(--accent);"></span>
+          <span class="mod-current-code">Modul ${escapeHtml(cur.code)}</span>
+        </button>
+        <nav class="modtabs" data-module="${cur.id}" aria-label="Modulbereiche">
+          ${MODULE_TABS.map(t => `
+            <button class="toc-item" data-mtab="${t.key}" data-module="${cur.id}" role="listitem"
+              title="${MTAB_META[t.key].tip}" aria-label="${MTAB_META[t.key].tip} — Modul ${escapeHtml(cur.code)}">
+              <span class="toc-ico" aria-hidden="true">${MTAB_META[t.key].ico}</span><span class="toc-lb">${t.label}</span>
+            </button>`).join('')}
+        </nav>
+      </div>`;
+  }
+  if (state.modules.length > 1) {
+    html += `
+      <div class="toc-label">Alle Module</div>
+      <div class="mod-switcher-list" role="list">
+        ${state.modules.map((m, i) => `
+          <button class="mod-pick${m.id === nav.moduleId ? ' active' : ''}" data-module-pick="${m.id}" role="listitem"
+            title="Zu Modul ${escapeHtml(m.code)} wechseln" aria-label="Zu Modul ${escapeHtml(m.code)} — ${escapeHtml(m.title)} wechseln"
+            ${m.id === nav.moduleId ? 'aria-current="page"' : ''}>
+            <span class="toc-num" aria-hidden="true">${ROMAN[i] || (i + 1)}</span>
+            <span class="toc-lb">Modul ${escapeHtml(m.code)} — ${escapeHtml(m.title.slice(0, 24))}</span>
+          </button>`).join('')}
+      </div>`;
+  } else if (!cur) {
+    html = `<p class="sidebar-empty">Noch keine Module — lege oben dein erstes an.</p>`;
+  }
+  container.innerHTML = html;
+
+  // Module tab buttons: Home + 4 tabs keep module context.
+  container.querySelectorAll('[data-mtab]').forEach(btn => {
+    btn.setAttribute('tabindex', '0');
+    const go = () => goModule(btn.dataset.module, btn.dataset.mtab);
+    btn.addEventListener('click', go);
+    btn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
     });
   });
-
-  container.querySelectorAll('.chapter').forEach(ch => {
-    const nav = ch.querySelector('.chapter-nav');
-    const items = [...nav.querySelectorAll('.toc-item')];
-    const visible = ['module-home', 'module-objectives', 'module-sessions'];
-    const overflowItems = items.filter(item => !visible.includes(item.dataset.view));
-    const useOverflow = overflowItems.length > 1;
-    const mainItems = useOverflow
-      ? items.filter(item => visible.includes(item.dataset.view))
-      : items;
-
-    if (useOverflow) {
-      overflowItems.forEach(item => item.remove());
-      const wrap = document.createElement('div');
-      wrap.className = 'chapter-overflow';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'overflow-toggle';
-      btn.innerHTML = 'Mehr <span>▾</span>';
-      const menu = document.createElement('div');
-      menu.className = 'overflow-menu';
-      overflowItems.forEach(item => {
-        menu.appendChild(item);
-        item.classList.add('overflow-item');
-      });
-      wrap.appendChild(btn);
-      wrap.appendChild(menu);
-      nav.appendChild(wrap);
-      btn.onclick = e => {
-        e.stopPropagation();
-        const isOpen = wrap.classList.toggle('open');
-        menu.hidden = !isOpen;
-      };
-      menu.hidden = true;
-      if (overflowItems.some(item => item.dataset.view === currentView)) {
-        btn.classList.add('has-active');
-        btn.firstChild.textContent = 'Mehr · aktiv ';
-      }
-
-      overflowItems.forEach(item => {
-        const nv = item.dataset.view;
-        item.classList.toggle('active', nv === currentView && ch.dataset.module === state.settings.currentModuleId);
-        item.onclick = e => {
-          e.stopPropagation();
-          wrap.classList.remove('open');
-          menu.hidden = true;
-          state.settings.currentModuleId = ch.dataset.module;
-          window.EMVS.save();
-          navigate('module', { id: ch.dataset.module, tab: moduleTabFor(nv) });
-        };
-      });
-    }
-
-    mainItems.forEach(item => {
-      const nv = item.dataset.view;
-      item.classList.toggle('active', nv === currentView && ch.dataset.module === state.settings.currentModuleId);
-      item.setAttribute('tabindex', '0');
-      item.setAttribute('role', 'link');
-      const go = e => {
-        e?.stopPropagation?.();
-        state.settings.currentModuleId = ch.dataset.module;
-        window.EMVS.save();
-        navigate('module', { id: ch.dataset.module, tab: moduleTabFor(nv) });
-      };
-      item.onclick = go;
-      item.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } };
+  container.querySelectorAll('[data-mtab-go]').forEach(btn => {
+    btn.setAttribute('tabindex', '0');
+    const go = () => goModule(btn.dataset.module, btn.dataset.mtabGo);
+    btn.addEventListener('click', go);
+    btn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+    });
+  });
+  container.querySelectorAll('[data-module-pick]').forEach(btn => {
+    const go = () => goModule(btn.dataset.modulePick, 'home');
+    btn.addEventListener('click', go);
+    btn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
     });
   });
 
@@ -189,16 +200,18 @@ export function renderSidebar() {
     }
 
     visibleItems.forEach(n => {
-      n.classList.toggle('active', n.dataset.view === currentView);
+      n.classList.toggle('active', n.dataset.view === nav.global);
       n.setAttribute('tabindex', '0');
       n.setAttribute('role', 'link');
+      if (n.dataset.view === nav.global) n.setAttribute('aria-current', 'page');
+      else n.removeAttribute('aria-current');
       const go = () => navigate(n.dataset.view);
       n.onclick = go;
       n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
     });
 
     overflowMenu.querySelectorAll('.toc-item').forEach(n => {
-      n.classList.toggle('active', n.dataset.view === currentView);
+      n.classList.toggle('active', n.dataset.view === nav.global);
       n.setAttribute('tabindex', '0');
       n.setAttribute('role', 'link');
       const go = () => navigate(n.dataset.view);
@@ -208,11 +221,11 @@ export function renderSidebar() {
 
     overflowWrap.hidden = !useOverflow;
     if (useOverflow) {
-      const toggle = overflowWrap.querySelector('.overflow-toggle');
-      const activeHiddenItem = hiddenItems.find(item => item.dataset.view === currentView);
-      toggle.classList.toggle('has-active', Boolean(activeHiddenItem));
-      toggle.firstChild.textContent = activeHiddenItem ? 'Mehr · aktiv ' : 'Mehr ';
-      toggle.onclick = e => {
+      const toggle2 = overflowWrap.querySelector('.overflow-toggle');
+      const activeHiddenItem = hiddenItems.find(item => item.dataset.view === nav.global);
+      toggle2.classList.toggle('has-active', Boolean(activeHiddenItem));
+      toggle2.firstChild.textContent = activeHiddenItem ? 'Mehr · aktiv ' : 'Mehr ';
+      toggle2.onclick = e => {
         e.stopPropagation();
         const isOpen = overflowWrap.classList.toggle('open');
         overflowMenu.hidden = !isOpen;
@@ -224,7 +237,6 @@ export function renderSidebar() {
   // Current-module presence chip in the rail
   const railMod = document.getElementById('railMod');
   if (railMod) {
-    const cur = state.modules.find(m => m.id === state.settings.currentModuleId) || null;
     railMod.hidden = !cur;
     if (cur) {
       railMod.querySelector('.rail-mod-code').textContent = cur.code;
@@ -232,14 +244,6 @@ export function renderSidebar() {
       railMod.querySelector('.rail-mod-dot').style.background = 'var(--accent)';
     }
   }
-}
-
-function moduleTabFor(view) {
-  if (view === 'module-objectives') return 'ziele';
-  if (view === 'module-plan') return 'plan';
-  if (view === 'module-sessions') return 'sessions';
-  if (view === 'module-resources' || view === 'module-exams') return 'material';
-  return 'ziele';
 }
 
 function escapeHtml(s) {

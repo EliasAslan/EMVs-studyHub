@@ -1,29 +1,24 @@
 /**
- * Module detail — one page with 4 sub-tabs (Ziele | Plan | Sessions | Material).
+ * Module detail — Home dashboard plus 4 sub-tabs (Ziele | Plan | Sessions | Material).
  * Material merges Ressourcen + Modul-Prüfungen (display-only).
  */
 import { escapeHtml } from '../utils/helpers.js';
+import { MODULE_TABS, resolveModuleTab } from '../utils/navigation.js';
 import { navigate } from './router.js';
 import { renderModuleObjectives } from './module-objectives.js';
 import { renderModulePlan } from './module-plan.js';
 import { renderModuleSessions } from './module-sessions.js';
 import { renderModuleResources } from './module-resources.js';
 import { renderModuleExams } from './module-exams.js';
+import { renderModuleHomeSection } from './module-home.js';
 import { renderToday } from './today.js';
-
-const TABS = [
-  { key: 'ziele', label: 'Ziele' },
-  { key: 'plan', label: 'Plan' },
-  { key: 'sessions', label: 'Sessions' },
-  { key: 'material', label: 'Material' },
-];
 
 export function renderModule(state, params = {}) {
   const m = state.modules.find(x => x.id === params.id)
     || state.modules.find(x => x.id === state.settings.currentModuleId)
     || state.modules[0];
   if (!m) return renderToday(state);
-  const tab = TABS.some(t => t.key === params.tab) ? params.tab : 'ziele';
+  const tab = resolveModuleTab(params.tab);
 
   const el = document.createElement('div');
   el.innerHTML = `
@@ -36,7 +31,7 @@ export function renderModule(state, params = {}) {
     <div class="eyebrow">Modul ${escapeHtml(m.code)}</div>
     <h1 class="page-title mod-title">${escapeHtml(m.title)}</h1>
     <div class="subtabs" role="tablist" aria-label="Modulbereiche">
-      ${TABS.map(t => `<button class="subtab ${t.key === tab ? 'active' : ''}" role="tab" aria-selected="${t.key === tab}" data-tab="${t.key}">${t.label}</button>`).join('')}
+      ${MODULE_TABS.map(t => `<button class="subtab ${t.key === tab ? 'active' : ''}" role="tab" aria-selected="${t.key === tab}" data-tab="${t.key}">${t.label}</button>`).join('')}
     </div>
     <div class="mod-body" id="mod-body" role="tabpanel"></div>
   `;
@@ -50,7 +45,8 @@ export function renderModule(state, params = {}) {
 
   const host = el.querySelector('#mod-body');
   try {
-    if (tab === 'ziele') host.appendChild(renderModuleObjectives(state));
+    if (tab === 'home') host.appendChild(renderModuleHomeSection(state, m));
+    else if (tab === 'ziele') host.appendChild(renderModuleObjectives(state));
     else if (tab === 'plan') host.appendChild(renderModulePlan(state));
     else if (tab === 'sessions') host.appendChild(renderModuleSessions(state));
     else if (tab === 'material') {

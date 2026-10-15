@@ -5,9 +5,9 @@
  * via navigate(view) for backward compatibility.
  */
 
-import { stopHomeTimerDisplay } from './module-home.js';
 import { stopSessionsTimerDisplay } from './module-sessions.js';
 import { stopMockExamDisplay } from './mock-exam.js';
+import { resolveModuleTab, getNavState, LEGACY_VIEW_TO_TAB } from '../utils/navigation.js';
 
 export const VIEWS = {};
 let currentView = 'today';
@@ -105,7 +105,7 @@ export function navigate(view, params = {}) {
   // New-style: navigate('module', { id, tab })
   if (view === 'module' && (params.id || params.tab)) {
     const id = params.id || window.EMVS?.getState()?.settings?.currentModuleId || '';
-    const tab = params.tab || 'ziele';
+    const tab = resolveModuleTab(params.tab);
     setHash(`#/modul/${id}/${tab}`);
     return;
   }
@@ -156,7 +156,7 @@ export function routeFromHash() {
   if (segs[0] === 'modul') {
     const st = window.EMVS?.getState?.();
     let id = segs[1] || st?.settings?.currentModuleId || st?.modules?.[0]?.id || '';
-    const tab = segs[2] || 'ziele';
+    const tab = resolveModuleTab(segs[2]);
     if (st && id && st.settings) {
       st.settings.currentModuleId = id;
       try { window.EMVS.save(); } catch {}
@@ -209,9 +209,6 @@ function render() {
   const state = window.EMVS.getState();
 
   // Cleanup previous view-specific intervals
-  if (previousView === 'module-home' || previousView === 'module') {
-    stopHomeTimerDisplay();
-  }
   if (previousView === 'module-sessions') {
     stopSessionsTimerDisplay();
   }
@@ -219,23 +216,30 @@ function render() {
     stopMockExamDisplay();
   }
 
+  // Active states derive from one nav model (utils/navigation.js) so the
+  // sidebar, tabbar and module tabs can never disagree about the route.
+  const nav = getNavState(currentView, currentParams, state.settings.currentModuleId);
+
   // Update global nav active state
   document.querySelectorAll('#nav-global .toc-item').forEach(n => {
-    const on = n.dataset.view === currentView;
+    const on = n.dataset.view === nav.global;
     n.classList.toggle('active', on);
     if (on) n.setAttribute('aria-current', 'page');
     else n.removeAttribute('aria-current');
   });
 
-  // Update module nav active state
-  document.querySelectorAll('.chapter-nav .toc-item').forEach(n => {
-    const on = n.dataset.view === currentView;
+  // Update module nav active state: item matches when its tab AND its
+  // module match the route (legacy data-view names are mapped too).
+  document.querySelectorAll('.chapter-nav .toc-item, .modtabs .toc-item, .mod-current-head').forEach(n => {
+    const tab = n.dataset.mtab || n.dataset.mtabGo || LEGACY_VIEW_TO_TAB[n.dataset.view];
+    const mod = n.closest('.chapter, .modtabs, .mod-current')?.dataset.module || nav.moduleId;
+    const on = !!tab && tab === nav.moduleTab && !!mod && mod === nav.moduleId;
     n.classList.toggle('active', on);
     if (on) n.setAttribute('aria-current', 'page');
     else n.removeAttribute('aria-current');
   });
   document.querySelectorAll('.chapter').forEach(ch => {
-    const isCurrent = ch.dataset.module === state.settings.currentModuleId;
+    const isCurrent = !!nav.moduleId && ch.dataset.module === nav.moduleId;
     ch.classList.toggle('expanded', isCurrent);
     ch.querySelector('.chapter-header')?.classList.toggle('active', isCurrent);
   });

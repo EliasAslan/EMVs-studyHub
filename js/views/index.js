@@ -5,7 +5,6 @@
 import { registerView, navigate, getCurrentView } from './router.js';
 import { renderToday } from './today.js';
 import { renderOverview } from './overview.js';
-import { renderModuleHome } from './module-home.js';
 import { renderModuleObjectives } from './module-objectives.js';
 import { renderModuleResources } from './module-resources.js';
 import { renderModuleSessions } from './module-sessions.js';
@@ -24,12 +23,11 @@ import { renderModule } from './module.js';
 
 // Register all views
 // "today" is the default landing; "overview" is the module grid;
-// "module" is the consolidated module detail (Ziele/Plan/Sessions/Material).
+// "module" is the consolidated module detail (Home + Ziele/Plan/Sessions/Material).
 // Legacy module-* views stay registered for back-compat.
 registerView('today', renderToday);
 registerView('overview', renderOverview);
 registerView('module', renderModule);
-registerView('module-home', renderModuleHome);
 registerView('module-objectives', renderModuleObjectives);
 registerView('module-resources', renderModuleResources);
 registerView('module-sessions', renderModuleSessions);

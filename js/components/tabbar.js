@@ -3,7 +3,7 @@
  * Tabs: Heute / Module / + Erfassen (FAB) / Schwach / Prüfungen
  * Secondary views live in the More sheet + header.
  */
-import { navigate } from '../views/router.js';
+import { navigate, getCurrentView } from '../views/router.js';
 import { openQuickCapture } from '../views/captures.js';
 import { trapFocus, releaseTrap } from './focusTrap.js';
 import { getDueObjectives } from '../utils/helpers.js';
@@ -82,6 +82,14 @@ function openMore() {
   const ov = document.getElementById('more-overlay');
   if (!ov || ov.classList.contains('open')) return;
   moreTrigger = document.activeElement;
+  // Current destination stays recognizable inside the sheet.
+  try {
+    const cur = getCurrentView();
+    ov.querySelectorAll('#more-sheet [data-route]').forEach(b => {
+      if (b.dataset.route === cur) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    });
+  } catch {}
   ov.classList.add('open');
   ov.setAttribute('aria-hidden', 'false');
   document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'true');

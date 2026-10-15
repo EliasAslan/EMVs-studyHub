@@ -5,10 +5,12 @@
  */
 
 import { escapeHtml, daysUntil, getNextExam, getWeakestObjective, getMostOverdueObjective, getRiskiestObjective, riskReasons, getRecentSessions, relativeDay, getDailyPrompt, getDueObjectives, rhythmOf, getCurrentWeekNumber, hasWeeklyReview } from '../utils/helpers.js';
+import { getOpenPlanItems, getRecentCaptures } from '../utils/navigation.js';
 import { navigate } from './router.js';
 import { openSessionModal } from './module-sessions.js';
 import { openModuleModal } from './settings.js';
 import { openObjectiveModal, openObjectiveHistory } from './module-objectives.js';
+import { openCaptureModal } from './captures.js';
 
 export function renderToday(state) {
   const now = new Date();
@@ -24,6 +26,8 @@ export function renderToday(state) {
   const prompt = getDailyPrompt(now);
   const due = getDueObjectives(state).slice(0, 5);
   const dueCount = getDueObjectives(state).length;
+  const todos = getOpenPlanItems(state, { limit: 5 });
+  const notes = getRecentCaptures(state, { limit: 3 });
   const reviewWeek = getCurrentWeekNumber(now);
   const reviewDue = state.modules.length > 0 &&
     !hasWeeklyReview(state, reviewWeek, now.getFullYear(), state.settings.currentModuleId);
@@ -60,6 +64,16 @@ export function renderToday(state) {
 
     <div class="section-label">Zuletzt aktiv</div>
     ${renderRecent(recent, state)}
+
+    ${todos.length ? `
+      <div class="section-label" style="margin-top: 28px;">To-do · ${todos.length}</div>
+      <div class="today-todos">${todos.map(p => renderTodoRow(p, state)).join('')}</div>
+    ` : ''}
+
+    ${notes.length ? `
+      <div class="section-label" style="margin-top: 28px;">Notizen</div>
+      <div class="today-notes">${notes.map(c => renderNoteRow(c, state)).join('')}</div>
+    ` : ''}
 
     <hr class="rule today-rule">
 
@@ -133,6 +147,51 @@ export function renderToday(state) {
       if (obj) startSessionFor(obj);
     })
   );
+
+  // To-do rows: toggle in place, row opens the module plan.
+  el.querySelectorAll('[data-todo-toggle]').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const st = window.EMVS.getState();
+      const item = st.planItems.find(p => p.id === btn.dataset.todoToggle);
+      if (!item) return;
+      item.done = !item.done;
+      window.EMVS.save();
+      btn.classList.toggle('done', item.done);
+      btn.setAttribute('aria-checked', item.done ? 'true' : 'false');
+      btn.closest('.today-todo')?.classList.toggle('is-done', item.done);
+      window.EMVS.toast?.show(item.done ? 'Festgehalten' : 'Wieder offen');
+    }));
+  el.querySelectorAll('.today-todo').forEach(row => {
+    const open = () => {
+      const st = window.EMVS.getState();
+      if (row.dataset.todoModule) {
+        st.settings.currentModuleId = row.dataset.todoModule;
+        window.EMVS.save();
+        window.EMVS.renderSidebar();
+      }
+      navigate('module', { id: row.dataset.todoModule || st.settings.currentModuleId, tab: 'plan' });
+    };
+    row.addEventListener('click', e => {
+      if (e.target.closest('[data-todo-toggle]')) return;
+      open();
+    });
+    row.addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-todo-toggle]')) { e.preventDefault(); open(); }
+    });
+  });
+
+  // Notes rows open the capture editor.
+  el.querySelectorAll('.today-note').forEach(row => {
+    const open = () => {
+      const c = window.EMVS.getState().captures.find(x => x.id === row.dataset.capture);
+      if (c) openCaptureModal(c);
+    };
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+  });
 
   // Review prompt link
   el.querySelector('#today-review-link')?.addEventListener('click', e => {
@@ -349,6 +408,27 @@ function renderRecent(recent, state) {
             ${s.note ? `<span class="today-session-note">${escapeHtml(s.note.slice(0, 80))}${s.note.length > 80 ? '…' : ''}</span>` : ''}
           </div>`;
       }).join('')}
+    </div>`;
+}
+
+function renderTodoRow(p, state) {
+  const m = moduleOf(state, p.moduleId);
+  return `
+    <div class="today-session today-todo" role="link" tabindex="0" data-todo-module="${p.moduleId || ''}">
+      <button class="todo-check" data-todo-toggle="${p.id}" role="checkbox" aria-checked="false"
+        aria-label="Aufgabe abhaken: ${escapeHtml(p.text.slice(0, 60))}">✓</button>
+      <span class="today-session-note" style="flex-basis: auto; flex: 1;">${escapeHtml(p.text)}</span>
+      <span class="today-session-objs">W${escapeHtml(String(p.week ?? '–'))}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
+    </div>`;
+}
+
+function renderNoteRow(c, state) {
+  const m = moduleOf(state, c.moduleId);
+  return `
+    <div class="today-session today-note" role="link" tabindex="0" data-capture="${c.id}">
+      <span class="today-session-when">${escapeHtml(relativeDay(c.timestamp || c.createdAt))}</span>
+      <span class="today-session-note" style="flex-basis:100%;">${escapeHtml(String(c.content || '').slice(0, 120))}${String(c.content || '').length > 120 ? '…' : ''}</span>
+      <span class="today-session-objs">${escapeHtml(c.type || '')}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
     </div>`;
 }
 

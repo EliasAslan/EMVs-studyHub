@@ -1,231 +1,271 @@
 /**
- * Module Home View - Dashboard for a single module
+ * Module Home — dashboard section for one module.
+ *
+ * Rendered as the 'home' tab inside views/module.js (which owns the page
+ * header + subtab bar, so this section renders no duplicate headings).
+ * Every section derives from real state; empty sections collapse to a
+ * single actionable line instead of filler widgets.
  */
 
-import { escapeHtml, formatDate, getExamGrade, calculateProjection, getWeakestObjective, getNextExam, getModuleStats } from '../utils/helpers.js';
+import {
+  escapeHtml, formatDate, getNextExam, getWeakestObjective, getModuleStats,
+  calculateProjection, getWeakSpots, getRecentSessions, relativeDay,
+} from '../utils/helpers.js';
+import { formatCountdown, getOpenPlanItems, getRecentCaptures } from '../utils/navigation.js';
 import { navigate } from './router.js';
-import { loadTimerState } from '../services/store.js';
+import { openSessionModal } from './module-sessions.js';
+import { openObjectiveHistory } from './module-objectives.js';
+import { openCaptureModal } from './captures.js';
 import { renderToday } from './today.js';
 
-export function renderModuleHome(state) {
-  const moduleId = state.settings.currentModuleId;
-  const m = state.modules.find(x => x.id === moduleId);
+export function renderModuleHomeSection(state, m) {
   if (!m) return renderToday(state);
-  
-  const exam = getNextExam(state, moduleId);
-  const cd = exam ? countdownParts(exam.date) : null;
-  const weak = getWeakestObjective(state, moduleId);
-  const stats = getModuleStats(state, moduleId);
-  const projection = calculateProjection(state, moduleId, m.targetGrade);
-  
-  // Check for running timer
-  const timerState = loadTimerState();
-  const isTimerRunning = timerState && timerState.moduleId === moduleId && timerState.running;
-  const timerElapsed = isTimerRunning ? Math.floor((Date.now() - timerState.startTime) / 1000) : 0;
-  const timerPaused = timerState && timerState.moduleId === moduleId && !timerState.running && timerState.pausedTime > 0;
-  
-  const el = document.createElement('div');
-  const links = [
-    { num: '01', label: 'Modul-Heft', target: `https://www.unormal.org/bfo/current/Inf1-Md${m.code}/` },
-    { num: '02', label: 'Lernziele', view: 'module-objectives' },
-    { num: '03', label: 'Ressourcen', view: 'module-resources' },
-    { num: '04', label: 'Sitzungen', view: 'module-sessions' },
-    { num: '05', label: 'Prüfungen', view: 'module-exams' },
-    { num: '06', label: 'Plan', view: 'module-plan' },
-  ];
-  
-  el.innerHTML = `
-    <div class="eyebrow">Modul ${escapeHtml(m.code)}</div>
-    <h1 class="page-title">${escapeHtml(m.title)}</h1>
-    
-    <hr class="rule">
-    
-    <div class="section-label">Nächster Schritt</div>
 
-    <hr class="rule">
-    
-    <div class="section-label">Nächster Schritt</div>
-    ${weak ? `
-      <div class="up-next" style="padding: 20px 0 20px 20px; border-left: 2px solid var(--accent); margin-bottom: 8px;">
-        <div class="up-next-text">${escapeHtml(weak.title)}</div>
-        <div class="up-next-meta">Lernziel ${weak.number} · Confidence ${weak.confidence} / 5</div>
-      </div>
-    ` : `
-      <div class="up-next" style="padding: 20px 0 20px 20px; border-left: 2px solid var(--accent); margin-bottom: 8px;">
-        <div class="up-next-text">Alle Lernziele gemeistert.</div>
-        <div class="up-next-meta">Zeit für eine Mock-Prüfung.</div>
-      </div>
-    `}
-    
-    <hr class="rule">
-    
-    <div class="section-label">Fortschritt</div>
+  const exam = getNextExam(state, m.id);
+  const weak = getWeakestObjective(state, m.id);
+  const stats = getModuleStats(state, m.id);
+  const projection = calculateProjection(state, m.id, m.targetGrade ?? 5.0);
+  const lastSession = getRecentSessions(state, 50).find(s => s.moduleId === m.id) || null;
+  const spots = getWeakSpots(state, { moduleId: m.id, limit: 2 });
+  const notes = getRecentCaptures(state, { limit: 3 }).filter(c => !c.moduleId || c.moduleId === m.id);
+  const todos = getOpenPlanItems(state, { moduleId: m.id, limit: 3 });
+
+  const el = document.createElement('div');
+  el.className = 'mod-home';
+  el.innerHTML = `
+    ${renderExamSection(state, m, exam)}
+    <div class="section-label" style="margin-top: 24px;">Weiterlernen</div>
+    ${renderContinue(m, weak)}
+    <div class="section-label" style="margin-top: 24px;">Fortschritt</div>
     <div class="stat-list">
       <div class="stat-row">
         <span class="stat-label">Lernziele gemeistert</span>
         <span class="stat-value">${stats.objectivesDone} <span class="muted">/ ${stats.objectivesTotal}</span></span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">Ressourcen abgeschlossen</span>
+        <span class="stat-label">Ressourcen verstanden</span>
         <span class="stat-value">${stats.resourcesDone} <span class="muted">/ ${stats.resourcesTotal}</span></span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">Gesamte Lernzeit</span>
-        <span class="stat-value">${stats.totalStudyTime} <span class="muted">Minuten</span></span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Diese Woche</span>
+        <span class="stat-label">Diese Woche gelernt</span>
         <span class="stat-value">${stats.sessionsThisWeek} <span class="muted">Minuten</span></span>
       </div>
     </div>
-    
     ${projection ? `
-      <hr class="rule">
-      <div class="section-label">Prognose</div>
-      <div class="projection" style="padding: 24px 0; font-size: 15px; color: var(--ink-2); line-height: 1.55; max-width: 60ch;">
-        ${renderProjectionText(projection, m.targetGrade)}
-      </div>
+      <div class="section-label" style="margin-top: 24px;">Prognose</div>
+      <div class="projection">${renderProjectionText(projection, m.targetGrade ?? 5.0)}</div>
     ` : ''}
-    
-    <hr class="rule">
-    
-    <div class="section-label">Schnellzugriff</div>
-    <div class="link-list">
-      ${links.map(l => `
-        <div class="link-row" role="link" tabindex="0" ${l.target ? `data-target="${escapeHtml(l.target)}"` : `data-view="${l.view}"`} style="display: grid; grid-template-columns: 28px 1fr auto; align-items: baseline; gap: 12px; padding: 12px 8px; border-radius: 4px; cursor: pointer; transition: background 0.15s;">
-          <span class="link-num" style="font-family: var(--mono); font-size: 11px; color: var(--ink-3);">${l.num}</span>
-          <span class="link-label" style="font-size: 14.5px; color: var(--ink);">${escapeHtml(l.label)}</span>
-          <span class="link-hint" style="font-family: var(--mono); font-size: 11px; color: var(--ink-3);">${l.target ? '↗' : '→'}</span>
-        </div>
-      `).join('')}
-    </div>
+    ${renderLastSession(state, m, lastSession)}
+    ${spots.length ? renderSpots(state, m, spots) : ''}
+    ${notes.length ? renderNotes(state, notes) : ''}
+    ${todos.length ? renderTodos(state, m, todos) : ''}
   `;
-  
-  // Countdown timer
-  if (cd && !cd.past) {
-    if (homeCountdownInterval) clearInterval(homeCountdownInterval);
-    homeCountdownInterval = setInterval(() => {
-      const target = new Date(exam.date + 'T08:00:00');
-      const diff = target - new Date();
-      const el2 = document.getElementById('countdown');
-      if (!el2) { clearInterval(homeCountdownInterval); homeCountdownInterval = null; return; }
-      if (diff <= 0) { el2.innerHTML = '0<small></small>'; clearInterval(homeCountdownInterval); homeCountdownInterval = null; return; }
-      const d = Math.floor(diff / 86400000);
-      el2.innerHTML = `${d}<small>${d === 1 ? 'Tag' : 'Tage'}</small>`;
-    }, 60000);
-  }
-  
-  // Link clicks (+ keyboard: Enter/Space activates focused row)
-  el.querySelectorAll('.link-row').forEach(c => {
-    const activate = () => {
-      if (c.dataset.view) navigate(c.dataset.view);
-      else if (c.dataset.target && c.dataset.target !== '#') window.open(c.dataset.target, '_blank', 'noopener');
-    };
-    c.addEventListener('click', activate);
-    c.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
-    });
-  });
 
-  // Timer card link (anchor) — prevent default jump and navigate in-app
-  el.querySelectorAll('[data-view]').forEach(a => {
-    if (a.classList.contains('link-row')) return;
-    a.addEventListener('click', e => {
-      e.preventDefault();
-      navigate(a.dataset.view);
-    });
-  });
-  
-  // Start timer display update if timer is running for this module
-  if (isTimerRunning) {
-    startHomeTimerDisplay(moduleId);
-  }
-  
+  wireModuleHome(el, state, m);
   return el;
 }
 
+function goTab(m, tab) {
+  navigate('module', { id: m.id, tab });
+}
+
+function renderExamSection(state, m, exam) {
+  if (!exam) {
+    return `
+      <div class="section-label">Nächste Prüfung</div>
+      <p class="today-empty-line">Keine Prüfung eingetragen.</p>
+      <div class="btn-row" style="margin-top: 12px;">
+        <button class="btn" data-goto="material">Prüfung eintragen</button>
+      </div>`;
+  }
+  const cd = formatCountdown(exam.date);
+  return `
+    <div class="section-label">Nächste Prüfung</div>
+    <div class="mod-exam">
+      <div class="mod-exam-name">${escapeHtml(exam.name)}</div>
+      <div class="mod-exam-meta">${escapeHtml(formatDate(exam.date))}${exam.weight ? ` · ${escapeHtml(String(exam.weight))} %` : ''}
+        ${cd ? `<span class="badge ${cd.urgent ? 'in-progress' : 'todo'} mod-exam-cd">${escapeHtml(cd.text)}</span>` : ''}
+      </div>
+      <div class="btn-row" style="margin-top: 12px;">
+        <button class="btn" data-goto="material">Zu den Prüfungen</button>
+      </div>
+    </div>`;
+}
+
+function renderContinue(m, weak) {
+  if (!weak) {
+    return `
+      <div class="today-focus">
+        <div class="today-focus-label">Bereit</div>
+        <div class="today-focus-title">Alles im Rhythmus.</div>
+        <div class="today-focus-context">Kein offenes Lernziel — vertiefe einen Verlauf oder protokolliere eine freie Sitzung.</div>
+        <div class="timer-actions" style="margin-top: 16px;">
+          <button class="btn primary" data-goto="sessions">Sitzung protokollieren</button>
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="today-focus">
+      <div class="today-focus-label">Schwächstes Lernziel · Modul ${escapeHtml(m.code)}</div>
+      <div class="today-focus-title">${escapeHtml(weak.title)}</div>
+      <div class="today-focus-context">Lernziel ${weak.number ?? '–'} · Confidence ${weak.confidence ?? 0}/5</div>
+      <div class="timer-actions" style="margin-top: 16px;">
+        <button class="btn primary" data-start-session="${weak.id}">▶ Session starten</button>
+        <button class="btn" data-open-history="${weak.id}">Verlauf</button>
+      </div>
+    </div>`;
+}
+
+function renderLastSession(state, m, s) {
+  if (!s) return '';
+  const linked = (s.linkedObjectiveIds || [])
+    .map(id => state.learningObjectives.find(o => o.id === id)?.number)
+    .filter(n => n !== undefined && n !== null);
+  return `
+    <div class="section-label" style="margin-top: 24px;">Letzte Sitzung</div>
+    <div class="today-session" role="link" tabindex="0" data-goto-session>
+      <span class="today-session-when">${escapeHtml(relativeDay(s.startTime))}</span>
+      <span class="today-session-dur">${escapeHtml(String(s.duration ?? 0))} Min</span>
+      <span class="today-session-objs">${linked.length ? `LZ ${linked.join(', ')}` : 'freie Sitzung'}</span>
+      ${s.note ? `<span class="today-session-note">${escapeHtml(s.note.slice(0, 80))}${s.note.length > 80 ? '…' : ''}</span>` : ''}
+    </div>`;
+}
+
+function renderSpots(state, m, spots) {
+  return `
+    <div class="section-label" style="margin-top: 24px;">Braucht Aufmerksamkeit</div>
+    <div class="list">
+      ${spots.map(({ objective: o, breakdown: b }) => `
+        <div class="list-item mod-spot" role="link" tabindex="0" data-open-history="${o.id}">
+          <div style="flex: 1; min-width: 0;">
+            <div class="mod-spot-title">${escapeHtml(o.title)}</div>
+            <div class="mod-spot-meta">LZ ${o.number ?? '–'} · ${escapeHtml(b.signals.slice(0, 2).map(s => s.label).join(' · ') || b.level)}</div>
+          </div>
+          <span class="badge ${b.level === 'hoch' ? 'in-progress' : 'todo'}">${escapeHtml(b.level)}</span>
+        </div>`).join('')}
+    </div>
+    <a href="#/schwach?module=${encodeURIComponent(m.id)}" class="today-prompt-link" data-weak-all>Alle Schwachstellen →</a>`;
+}
+
+function renderNotes(state, notes) {
+  return `
+    <div class="section-label" style="margin-top: 24px;">Notizen</div>
+    <div class="list">
+      ${notes.map(c => `
+        <div class="list-item mod-note" role="link" tabindex="0" data-open-capture="${c.id}">
+          <div style="flex: 1; min-width: 0;">
+            <div class="mod-note-text">${escapeHtml(String(c.content || '').slice(0, 120))}${String(c.content || '').length > 120 ? '…' : ''}</div>
+            <div class="mod-note-meta">${escapeHtml(relativeDay(c.timestamp || c.createdAt))}${c.type ? ` · ${escapeHtml(c.type)}` : ''}</div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderTodos(state, m, todos) {
+  return `
+    <div class="section-label" style="margin-top: 24px;">To-do</div>
+    <div class="list">
+      ${todos.map(p => `
+        <div class="list-item mod-todo" data-todo="${p.id}">
+          <button class="todo-check${p.done ? ' done' : ''}" data-todo-toggle="${p.id}" role="checkbox"
+            aria-checked="${p.done ? 'true' : 'false'}" aria-label="Aufgabe abhaken: ${escapeHtml(p.text.slice(0, 60))}">✓</button>
+          <div style="flex: 1; min-width: 0;">
+            <div class="mod-todo-text">${escapeHtml(p.text)}</div>
+            <div class="mod-todo-meta">Woche ${escapeHtml(String(p.week ?? '–'))}${p.dueDate ? ` · ${escapeHtml(formatDate(p.dueDate))}` : ''}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <a href="#/modul/${encodeURIComponent(m.id)}/plan" class="today-prompt-link" data-goto-plan>Zum Plan →</a>`;
+}
+
 function renderProjectionText(projection, target) {
+  const t = Number(target ?? 5.0);
   const n = projection.needed;
+  const fmt = v => Number(v).toFixed(2);
   if (!projection.reachable || n > 6) {
-    return `Für Zielnote <span class="mono-strong" style="font-family: var(--mono); color: var(--accent-ink); font-weight: 500;">${target.toFixed(2)}</span> müsstest du in den verbleibenden <span class="mono-strong" style="font-family: var(--mono); color: var(--accent-ink); font-weight: 500;">${projection.remainingWeight}%</span> eine <span class="mono-strong" style="font-family: var(--mono); color: var(--accent-ink); font-weight: 500;">${n.toFixed(2)}</span> erreichen — nicht erreichbar.`;
+    return `Für Zielnote <strong>${fmt(t)}</strong> müsstest du in den verbleibenden <strong>${projection.remainingWeight}%</strong> eine <strong>${fmt(n)}</strong> erreichen — nicht erreichbar.`;
   }
   if (n < 1) {
-    return `Zielnote <span class="mono-strong" style="font-family: var(--mono); color: var(--accent-ink); font-weight: 500;">${target.toFixed(2)}</span> ist gesichert.`;
+    return `Zielnote <strong>${fmt(t)}</strong> ist gesichert.`;
   }
-  return `Für Zielnote <span class="mono-strong" style="font-family: var(--mono); color: var(--accent-ink); font-weight: 500;">${target.toFixed(2)}</span> brauchst du mindestens <span class="mono-strong" style="font-family: var(--mono); color: var(--accent-ink); font-weight: 500;">${n.toFixed(2)}</span> in den verbleibenden <span class="mono-strong" style="font-family: var(--mono); color: var(--accent-ink); font-weight: 500;">${projection.remainingWeight}%</span>.`;
+  return `Für Zielnote <strong>${fmt(t)}</strong> brauchst du mindestens <strong>${fmt(n)}</strong> in den verbleibenden <strong>${projection.remainingWeight}%</strong>.`;
 }
 
-function renderTimerStatus(isRunning, elapsedSeconds, isPaused, plannedMinutes) {
-  const elapsed = isRunning || isPaused ? elapsedSeconds : 0;
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
-  const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  
-  if (isRunning) {
-    return `
-      <div class="card" style="margin-bottom: 16px; border-color: var(--accent); background: var(--accent-soft);" id="timer-status-card">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 16px;">
-            <span style="font-family: var(--mono); font-size: 28px; color: var(--accent); font-variant-numeric: tabular-nums;" id="home-timer-display">${timeStr}</span>
-            <span style="color: var(--ink-2); font-size: 14px;">Timer läuft ${plannedMinutes ? `· geplant: ${plannedMinutes} Min` : ''}</span>
-          </div>
-          <a href="#" data-view="module-sessions" class="btn solid-accent" style="text-decoration: none;">Zu Sitzungen →</a>
-        </div>
-      </div>
-    `;
-  }
-  
-  if (isPaused) {
-    return `
-      <div class="card" style="margin-bottom: 16px; border-color: var(--blue); background: var(--blue-soft);" id="timer-status-card">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 16px;">
-            <span style="font-family: var(--mono); font-size: 28px; color: var(--blue); font-variant-numeric: tabular-nums;" id="home-timer-display">${timeStr}</span>
-            <span style="color: var(--ink-2); font-size: 14px;">Timer pausiert ${plannedMinutes ? `· geplant: ${plannedMinutes} Min` : ''}</span>
-          </div>
-          <a href="#" data-view="module-sessions" class="btn solid-blue" style="text-decoration: none;">Fortsetzen →</a>
-        </div>
-      </div>
-    `;
-  }
-  
-  return '';
+function setCurrentModule(id) {
+  const st = window.EMVS.getState();
+  st.settings.currentModuleId = id;
+  window.EMVS.save();
+  window.EMVS.renderSidebar();
 }
 
-// Timer display update for home view
-let homeTimerInterval = null;
-let homeCountdownInterval = null;
+function startSessionFor(moduleId, objectiveId) {
+  const st = window.EMVS.getState();
+  const obj = st.learningObjectives.find(o => o.id === objectiveId);
+  if (!obj) return;
+  st.settings.currentModuleId = obj.moduleId;
+  window.EMVS.save();
+  window.EMVS.renderSidebar();
+  openSessionModal(null, obj.moduleId, { linkedObjectiveIds: [obj.id], duration: 25 });
+}
 
-export function startHomeTimerDisplay(moduleId) {
-  stopHomeTimerDisplay();
-  
-  homeTimerInterval = setInterval(() => {
-    const timerState = loadTimerState();
-    if (!timerState || timerState.moduleId !== moduleId || !timerState.running) {
-      stopHomeTimerDisplay();
-      // Re-render to update UI
-      navigate('module-home');
+function wireModuleHome(el, state, m) {
+  el.querySelectorAll('[data-goto]').forEach(b =>
+    b.addEventListener('click', () => goTab(m, b.dataset.goto)));
+  el.querySelector('[data-goto-session]')?.addEventListener('click', () => goTab(m, 'sessions'));
+  el.querySelector('[data-goto-session]')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTab(m, 'sessions'); }
+  });
+  el.querySelector('[data-goto-plan]')?.addEventListener('click', e => {
+    e.preventDefault();
+    goTab(m, 'plan');
+  });
+  el.querySelector('[data-weak-all]')?.addEventListener('click', e => {
+    e.preventDefault();
+    navigate('weak-spots', { qs: `?module=${encodeURIComponent(m.id)}` });
+  });
+  el.querySelectorAll('[data-start-session]').forEach(b =>
+    b.addEventListener('click', () => startSessionFor(m.id, b.dataset.startSession)));
+  const openHistory = (id) => {
+    setCurrentModule(m.id);
+    openObjectiveHistory(id);
+  };
+  el.querySelectorAll('[data-open-history]').forEach(node => {
+    const open = () => openHistory(node.dataset.openHistory);
+    if (node.tagName === 'BUTTON') {
+      node.addEventListener('click', open);
       return;
     }
-    
-    const elapsedMs = timerState.pausedTime + Date.now() - timerState.startTime;
-    const elapsed = Math.floor(elapsedMs / 1000);
-    const mins = Math.floor(elapsed / 60);
-    const secs = elapsed % 60;
-    const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    
-    const display = document.getElementById('home-timer-display');
-    if (display) display.textContent = timeStr;
-  }, 1000);
-}
-
-export function stopHomeTimerDisplay() {
-  if (homeTimerInterval) {
-    clearInterval(homeTimerInterval);
-    homeTimerInterval = null;
-  }
-  if (homeCountdownInterval) {
-    clearInterval(homeCountdownInterval);
-    homeCountdownInterval = null;
-  }
+    node.addEventListener('click', e => {
+      if (e.target.closest('button')) return;
+      open();
+    });
+    node.addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')) {
+        e.preventDefault();
+        open();
+      }
+    });
+  });
+  el.querySelectorAll('[data-open-capture]').forEach(row => {
+    const open = () => {
+      const c = window.EMVS.getState().captures.find(x => x.id === row.dataset.openCapture);
+      if (c) openCaptureModal(c);
+    };
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+  });
+  el.querySelectorAll('[data-todo-toggle]').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const st = window.EMVS.getState();
+      const item = st.planItems.find(p => p.id === btn.dataset.todoToggle);
+      if (!item) return;
+      item.done = !item.done;
+      window.EMVS.save();
+      btn.classList.toggle('done', item.done);
+      btn.setAttribute('aria-checked', item.done ? 'true' : 'false');
+      window.EMVS.toast?.show(item.done ? 'Festgehalten' : 'Wieder offen');
+    }));
 }
