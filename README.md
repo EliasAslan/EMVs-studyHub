@@ -38,6 +38,8 @@ package/build step is needed. Authentication requires an internet connection.
   the email before signing in.
 - Auth sessions are stored separately by the Supabase client. Study data stays
   in the existing EMVS localStorage keys.
-- This is not cloud sync. Do not treat login as a backup. Manual upload/download,
-  account-mismatch safeguards, and cloud data mapping are separate later phases.
+- Signing in alone does not sync study data. Manual upload/download is available under **Einstellungen → Konto / Supabase** after signing in.
+- Upload upserts the signed-in user's rows, verifies uploaded values by reading them back, and never deletes cloud rows. Demo-seed records are excluded unless required as parents of real records.
+- Download replaces the current local dataset after confirmation when data could be lost; export a JSON backup first. There is no automatic sync or merge.
+- Account-mismatch safeguards, row mapping, and sync status/error guidance are implemented in the manual workflow.
 

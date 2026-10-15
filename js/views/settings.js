@@ -13,16 +13,22 @@ export function renderSettings(state) {
   const moduleId = state.settings.currentModuleId;
   const m = state.modules.find(x => x.id === moduleId);
   const ai = getLocalAISettings(state);
-  const siteOrigin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://deine-app.vercel.app';
+  const siteOrigin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://em-vs-study-hub.vercel.app';
   
   const el = document.createElement('div');
   el.innerHTML = `
-    <div class="eyebrow">Konfiguration</div>
+    <div class="eyebrow">Dein Lernbereich</div>
     <h1 class="page-title">Einstellungen</h1>
-    <p class="page-lede">${m ? `Modul ${escapeHtml(m.code)} · ${escapeHtml(m.title)}` : 'Kein Modul ausgewählt'}</p>
+    <p class="page-lede settings-intro">Passe Study Hub an deinen Lernalltag an. Module, Darstellung, lokale KI und Datensicherung — die wichtigsten Optionen auf einen Blick.</p>
+    <div class="settings-context">
+      <span class="settings-context-item"><span class="settings-context-dot" aria-hidden="true"></span>${m ? `Aktives Modul: <strong>${escapeHtml(m.code)} · ${escapeHtml(m.title)}</strong>` : 'Noch kein Modul ausgewählt'}</span>
+      <span class="settings-context-note">Änderungen werden automatisch gespeichert.</span>
+    </div>
     
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Modul-Einstellungen</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Modul-Einstellungen</span><span class="settings-summary-hint">Zielnote, Titel und Farbe</span></summary>
+      <div class="settings-group-content">
       ${m ? `
         <div class="field-row">
           <label>Zielnote (1.0 – 6.0)</label>
@@ -42,11 +48,15 @@ export function renderSettings(state) {
         </div>
       ` : '<p style="color: var(--ink-2);">Wähle ein Modul in der Sidebar, um dessen Einstellungen zu bearbeiten.</p>'}
     </div>
+      </details>
+    </div>
     
     <hr class="rule">
     
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">App-Einstellungen</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>App-Einstellungen</span><span class="settings-summary-hint">Theme und Darstellung</span></summary>
+      <div class="settings-group-content">
       <div class="field-row">
         <label>Theme</label>
         <select id="set-theme" style="max-width: 200px;">
@@ -55,14 +65,25 @@ export function renderSettings(state) {
         </select>
       </div>
     </div>
+      </details>
+    </div>
     
     <hr class="rule">
 
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Lokale KI (Ollama, optional)</div>
-      <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch; margin-bottom: 12px;">
-        Module aus PDFs erzeugen — mit deinem eigenen Ollama auf diesem Rechner. PDF-Text und Anfragen gehen nur an <span class="mono">localhost</span>, nie ins Netz.
+    <div class="settings-section">
+      <details class="settings-group" open>
+        <summary class="settings-group-summary"><span>Lokale KI (Ollama, optional)</span><span class="settings-summary-hint">PDF-Import mit Qwen</span></summary>
+        <div class="settings-group-content">
+      <p class="settings-ai-intro">
+        Erstelle Lernziele und Ressourcen aus einem PDF mit <strong>Qwen auf deinem eigenen PC</strong>. Die KI ist optional; deine normale Lernplanung funktioniert auch ohne sie.
       </p>
+      <div class="ai-action-card">
+        <div class="ai-action-copy">
+          <strong>Was möchtest du mit der KI machen?</strong>
+          <span>PDF hochladen, Lernziele und Ressourcen erkennen lassen und den Entwurf prüfen.</span>
+        </div>
+        <button class="btn primary ai-import-cta" id="ai-import-pdf">PDF auswählen →</button>
+      </div>
       <div class="ai-status" id="ai-status">
         <span class="ai-dot" id="ai-dot" aria-hidden="true"></span>
         <span id="ai-status-text">Noch nicht geprüft</span>
@@ -78,13 +99,13 @@ export function renderSettings(state) {
         <input type="text" id="ai-baseurl" value="${escapeHtml(ai.baseUrl)}" style="max-width: 280px;" inputmode="url" placeholder="http://localhost:11434">
       </div>
       <details class="ai-setup" id="ai-setup">
-        <summary>Schritt-für-Schritt-Anleitung (einmalig, ca. 5 Minuten)</summary>
+        <summary>Einrichtung für diese Website <span class="settings-guide-meta">· einmalig pro Website-Adresse</span></summary>
+        <p class="settings-guide-lede">Ollama und <span class="mono">qwen3:8b</span> sind bereits installiert? Dann brauchst du nur den Website-Zugriff freizugeben und Ollama neu zu starten.</p>
         <ol>
-          <li><strong>Ollama installieren &amp; prüfen.</strong> Von <span class="mono">ollama.com</span> installieren, dann in PowerShell:
+          <li><strong>Ollama und das Modell prüfen.</strong> Öffne PowerShell und führe aus:
             <span class="mono">ollama --version</span>
             <span class="mono">ollama list</span>
-            Dein Modell (z.&nbsp;B. <span class="mono">qwen3:8b</span>) muss dort stehen. Falls nicht:
-            <span class="mono">ollama pull qwen3:8b</span>
+            Wenn <span class="mono">qwen3:8b</span> fehlt, lade es mit <span class="mono">ollama pull qwen3:8b</span>.
           </li>
           <li><strong>Dieser Website Zugriff erlauben.</strong> Folgenden Befehl in PowerShell ausführen (einmalig):
             <div class="mono" id="ai-origins-cmd">setx OLLAMA_ORIGINS "${escapeHtml(siteOrigin)},http://localhost:*,http://127.0.0.1:*"</div>
@@ -94,28 +115,38 @@ export function renderSettings(state) {
           <li><strong>Verbindung testen.</strong> Oben auf „Verbindung testen“ klicken. Bei Erfolg steht dort „Verbunden“ plus die gefundenen Modelle — diese erscheinen dann auch als Vorschläge im Modell-Feld.</li>
           <li><strong>PDF importieren.</strong> Unter Übersicht (leerer Start) oder hier in der Modul-Verwaltung auf <strong>„Modul aus PDF“</strong> klicken, Datei wählen, Entwurf prüfen, übernehmen.</li>
         </ol>
-        <div class="section-label" style="margin-top: 12px;">Wenn etwas nicht klappt</div>
-        <ul class="ai-trouble">
+        <details class="ai-troubleshooting">
+          <summary>Wenn etwas nicht klappt</summary>
+          <ul class="ai-trouble">
           <li><span class="mono">nicht erreichbar</span> — Ollama läuft nicht auf diesem Rechner. <span class="mono">ollama serve</span> starten.</li>
           <li><span class="mono">antwortet nicht</span> — Ollama läuft, aber kein Modell geladen. <span class="mono">ollama list</span> prüfen.</li>
           <li><span class="mono">CORS / blockt</span> — Schritt 2+3 wiederholen: exakte Adresse oben kopieren, neues PowerShell-Fenster, Ollama wirklich beenden und neu starten.</li>
           <li><span class="mono">Modell nicht installiert</span> — Modellname im Feld prüfen oder per <span class="mono">ollama pull &lt;name&gt;</span> laden.</li>
-        </ul>
-        <p class="muted" style="font-size: 12.5px;">Jeder Rechner braucht diese Einrichtung einmal — dann nutzt jede Person ihr eigenes lokales Modell. Vorschau-Deployments haben eigene Adressen und funktionieren mit der KI nicht; nutze die finale Domain.</p>
+          </ul>
+        </details>
+        <p class="muted settings-guide-footnote">Der Befehl wird für die aktuell geöffnete Website erzeugt. Nutze am besten die feste Adresse <span class="mono">em-vs-study-hub.vercel.app</span>, damit du die Freigabe nicht für wechselnde Vorschau-URLs wiederholen musst. Nach dem Ausführen des Befehls Ollama vollständig beenden und erneut öffnen.</p>
+      </details>
+        </div>
       </details>
     </div>
 
     <hr class="rule">
 
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Konto / Supabase</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Konto / Supabase</span><span class="settings-summary-hint">Anmeldung und Cloud</span></summary>
+      <div class="settings-group-content">
       <div id="supabase-auth-panel"></div>
+    </div>
+      </details>
     </div>
 
     <hr class="rule">
     
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Modul-Verwaltung</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Modul-Verwaltung</span><span class="settings-summary-hint">Module erstellen und bearbeiten</span></summary>
+      <div class="settings-group-content">
       <div class="mt-2" style="display: flex; gap: 12px; flex-wrap: wrap;">
         <button class="btn primary" id="create-module">＋ Neues Modul erstellen</button>
         <button class="btn" id="create-module-pdf">Modul aus PDF (lokale KI)</button>
@@ -136,13 +167,17 @@ export function renderSettings(state) {
         </div>
       ` : ''}
     </div>
+      </details>
+    </div>
     
     <hr class="rule">
     
-    <div style="margin-bottom: 32px;">
-      <div class="section-label">Daten</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Daten</span><span class="settings-summary-hint">Backup und Zurücksetzen</span></summary>
+      <div class="settings-group-content">
       <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch; margin-bottom: 16px;">
-        Alle Daten werden lokal im Browser gespeichert (localStorage). Exportiere regelmäßig Backups.
+        Study Hub speichert Daten standardmäßig lokal im Browser. Supabase-Sync erfolgt manuell im Konto-Bereich; exportiere regelmäßig Backups.
       </p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap;">
         <button class="btn primary" id="btn-export">Backup exportieren (JSON)</button>
@@ -150,11 +185,15 @@ export function renderSettings(state) {
         <button class="btn danger" id="btn-reset">Alle Daten zurücksetzen</button>
       </div>
     </div>
+      </details>
+    </div>
     
     <hr class="rule">
     
-    <div>
-      <div class="section-label">Info</div>
+    <div class="settings-section">
+      <details class="settings-group">
+      <summary class="settings-group-summary"><span>Info</span><span class="settings-summary-hint">Version und Datenmodell</span></summary>
+      <div class="settings-group-content">
       <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch;">
         EMVS Study Hub v1.0 — Local-first Lernmanagement.<br>
         Datenmodell: Module, Lernziele, Ressourcen, Sitzungen, Prüfungen, Plan, Erfassungen, Wochenreviews.
@@ -251,6 +290,7 @@ export function renderSettings(state) {
   
   el.querySelector('#create-module')?.addEventListener('click', () => openModuleModal());
   el.querySelector('#create-module-pdf')?.addEventListener('click', () => openPdfImport());
+  el.querySelector('#ai-import-pdf')?.addEventListener('click', () => openPdfImport());
   el.querySelector('#btn-export')?.addEventListener('click', () => window.EMVS.exportData());
   el.querySelector('#btn-import')?.addEventListener('click', () => importBackup());
   el.querySelector('#btn-reset')?.addEventListener('click', async () => {
@@ -331,6 +371,8 @@ export function openModuleModal(module = null) {
           <label>Zielnote</label>
           <input type="number" name="targetGrade" value="${m.targetGrade ?? 5.0}" step="0.1" min="1" max="6" style="max-width: 120px;">
         </div>
+      </details>
+    </div>
       </form>
     `,
     footer: `
