@@ -77,6 +77,13 @@ export function renderSettings(state) {
       <p class="settings-ai-intro">
         Erstelle Lernziele und Ressourcen aus einem PDF mit <strong>Qwen auf deinem eigenen PC</strong>. Die KI ist optional; deine normale Lernplanung funktioniert auch ohne sie.
       </p>
+      <div class="ai-action-card">
+        <div class="ai-action-copy">
+          <strong>Was möchtest du mit der KI machen?</strong>
+          <span>PDF hochladen, Lernziele und Ressourcen erkennen lassen und den Entwurf prüfen.</span>
+        </div>
+        <button class="btn primary ai-import-cta" id="ai-import-pdf">PDF auswählen →</button>
+      </div>
       <div class="ai-status" id="ai-status">
         <span class="ai-dot" id="ai-dot" aria-hidden="true"></span>
         <span id="ai-status-text">Noch nicht geprüft</span>
@@ -283,6 +290,7 @@ export function renderSettings(state) {
   
   el.querySelector('#create-module')?.addEventListener('click', () => openModuleModal());
   el.querySelector('#create-module-pdf')?.addEventListener('click', () => openPdfImport());
+  el.querySelector('#ai-import-pdf')?.addEventListener('click', () => openPdfImport());
   el.querySelector('#btn-export')?.addEventListener('click', () => window.EMVS.exportData());
   el.querySelector('#btn-import')?.addEventListener('click', () => importBackup());
   el.querySelector('#btn-reset')?.addEventListener('click', async () => {
