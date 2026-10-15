@@ -8,6 +8,7 @@ import { renderSidebar } from './components/sidebar.js';
 import { initPalette } from './components/palette.js';
 import { initModal } from './components/modal.js';
 import { initToast } from './components/toast.js';
+import { initTaskPanel } from './components/taskPanel.js';
 import { initTabbar } from './components/tabbar.js';
 import { navigate, VIEWS, getCurrentView, routeFromHash } from './views/router.js';
 import { openQuickCapture } from './views/captures.js';
@@ -50,6 +51,7 @@ function init() {
   // Initialize components
   initModal();
   initToast();
+  initTaskPanel();
   initPalette();
   initTabbar();
 

@@ -1,25 +1,55 @@
 /**
  * PDF Import — "PDF → neues Modul" via the user's local Ollama.
  *
- * Flow: file picker → meta (code/title) → progress (extract → chunks →
- * merge, cancellable) → draft review (checkboxes + editable fields) →
- * commit. The AI never writes directly; commit only creates what the user
- * checked. Existing data is never touched (new module + new entities only).
+ * Non-blocking flow: file picker → meta (code/title) → the analysis runs
+ * as a background task (services/pdfTasks.js) rendered by the floating
+ * task panel — the user keeps using the app meanwhile. When done, the
+ * panel offers "results review": this modal, whose edits live-sync back
+ * into the task draft so they survive closing/reopening. Commit only
+ * creates what the user checked; existing data is never touched.
  */
 
 import { escapeHtml } from '../utils/helpers.js';
-import { openModal, closeModal } from '../components/modal.js';
-import { generateId, ensureObjectiveFields } from '../services/store.js';
-import { extractPdfText, describePdfError } from '../services/pdfExtract.js';
+import { openModal, closeModal, confirmDialog } from '../components/modal.js';
+import { getLocalAISettings, checkConnection, describeLocalAIError } from '../services/localAI.js';
 import {
-  getLocalAISettings,
-  checkConnection,
-  extractObjectivesFromText,
-  describeLocalAIError,
-} from '../services/localAI.js';
+  describeStartBlock,
+  createTask,
+  runTask,
+  dismissTask,
+  markCommitted,
+  updateDraft,
+  buildModuleEntities,
+  getTask,
+} from '../services/pdfTasks.js';
+import { setReviewOpener, focusTaskPanel } from '../components/taskPanel.js';
 import { navigate } from './router.js';
 
 export function openPdfImport() {
+  const block = describeStartBlock();
+  if (block === 'active') {
+    window.EMVS?.toast?.show('Analyse läuft bereits — siehe Aufgabenpanel');
+    focusTaskPanel();
+    return;
+  }
+  if (block === 'unreviewed') {
+    confirmDialog(
+      'Es liegt noch ein ungeprüftes Ergebnis vor. Neue Analyse starten und das alte Ergebnis verwerfen?',
+      'Analyse ersetzen',
+    ).then((yes) => {
+      if (yes) {
+        dismissTask();
+        pickPdfFile();
+      } else {
+        focusTaskPanel();
+      }
+    }).catch(() => {});
+    return;
+  }
+  pickPdfFile();
+}
+
+function pickPdfFile() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.pdf,application/pdf';
@@ -38,7 +68,7 @@ function openPdfMetaStep(file) {
   openModal({
     title: 'Modul aus PDF',
     body: `
-      <p class="pdf-note">Die Analyse läuft lokal: PDF-Text und Anfragen verlassen diesen Rechner nicht — sie gehen nur an dein eigenes Ollama.</p>
+      <p class="pdf-note">Die Analyse läuft lokal und im Hintergrund: PDF-Text und Anfragen verlassen diesen Rechner nicht — sie gehen nur an dein eigenes Ollama. Du kannst die App währenddessen weiter nutzen.</p>
       <div class="field-row">
         <label for="pdf-file-name">Datei</label>
         <input type="text" id="pdf-file-name" value="${escapeHtml(file.name)}" disabled style="max-width: 100%;">
@@ -55,7 +85,7 @@ function openPdfMetaStep(file) {
     `,
     footer: `
       <button class="btn" data-action="cancel">Abbrechen</button>
-      <button class="btn primary" data-action="analyze">Analysieren</button>
+      <button class="btn primary" data-action="analyze">Analyse starten</button>
     `,
     onClose: () => {},
   });
@@ -87,7 +117,11 @@ function openPdfMetaStep(file) {
           }
           return;
         }
-        runPdfAnalysis(file, { code, title, ai, fileRef: file });
+        // Hand off to the background task; the modal closes, the panel takes over.
+        const task = createTask({ file, code, title, ai });
+        closeModal();
+        window.EMVS?.toast?.show('Analyse läuft im Hintergrund — du kannst weiterarbeiten');
+        runTask(task).catch(() => {});
       } finally {
         btn.removeAttribute('aria-busy');
         btn.disabled = false;
@@ -96,87 +130,12 @@ function openPdfMetaStep(file) {
   }, 50);
 }
 
-function setModal(title, bodyHtml, footerHtml) {
-  document.getElementById('modal-title').textContent = title;
-  document.getElementById('modal-body').innerHTML = bodyHtml;
-  document.getElementById('modal-footer').innerHTML = footerHtml || '';
-}
-
-function showProgress(meta, statusText, phase = null) {
-  const bar = statusText
-    ? `<div class="pdf-progress"><div class="pdf-progress-fill" style="width: ${phase?.total ? Math.round((phase.done / phase.total) * 100) : 0}%"></div></div>
-       <p class="pdf-status" role="status">${escapeHtml(statusText)}</p>`
-    : '';
-  setModal(
-    `Modul aus PDF — ${escapeHtml(meta.title)}`,
-    `<p class="pdf-note">Analyse läuft lokal über <span class="mono">${escapeHtml(meta.ai.model)}</span>. Das kann bei langen PDFs einige Minuten dauern.</p>${bar}<div class="pdf-error" id="pdf-error" role="alert" hidden></div>`,
-    `<button class="btn" data-action="cancel">Abbrechen</button>`,
-  );
-  document.querySelector('#modal-footer [data-action="cancel"]')?.addEventListener('click', () => {
-    meta.abort.abort();
-    closeModal();
-  });
-}
-
-async function runPdfAnalysis(file, meta) {
-  meta.abort = new AbortController();
-  const { signal } = meta;
-  showProgress(meta, 'Text wird extrahiert…');
-
-  let extracted;
-  try {
-    extracted = await extractPdfText(file, {
-      signal,
-      onProgress: ({ done, total }) => showProgress(meta, `Text wird extrahiert… Seite ${done}/${total}`, { done, total }),
-    });
-  } catch (e) {
-    if (e?.code === 'aborted') return;
-    return showPdfError(meta, describePdfError(e?.code));
-  }
-
-  showProgress(meta, 'Lernziele werden extrahiert…', { done: 0, total: 1 });
-  let result;
-  try {
-    result = await extractObjectivesFromText(extracted.text, {
-      model: meta.ai.model,
-      baseUrl: meta.ai.baseUrl,
-      numCtx: meta.ai.numCtx,
-      moduleTitle: meta.title,
-      signal,
-      onProgress: (p) => {
-        if (p.phase === 'chunks') showProgress(meta, `Lernziele werden extrahiert… Abschnitt ${Math.min(p.done + 1, p.total)}/${p.total}`, p);
-        else showProgress(meta, 'Ergebnisse werden zusammengeführt…', { done: 1, total: 1 });
-      },
-    });
-  } catch (e) {
-    if (e?.code === 'aborted' || signal.aborted) return;
-    return showPdfError(meta, describeLocalAIError(e?.code));
-  }
-
-  if (!result.objectives.length && !result.resources.length) {
-    return showPdfError(meta, 'Keine Lernziele gefunden. Das PDF enthält evtl. zu wenig Fliesstext — Titel ggf. manuell anlegen.');
-  }
-  openPdfReviewStep(meta, result);
-}
-
-function showPdfError(meta, message) {
-  showProgress(meta, null);
-  const box = document.getElementById('pdf-error');
-  if (box) { box.hidden = false; box.textContent = message; }
-  document.getElementById('modal-footer').innerHTML = `
-    <button class="btn" data-action="close">Schliessen</button>
-    <button class="btn" data-action="retry">Erneut versuchen</button>
-  `;
-  document.querySelector('#modal-footer [data-action="close"]')?.addEventListener('click', () => closeModal());
-  document.querySelector('#modal-footer [data-action="retry"]')?.addEventListener('click', () => openPdfMetaStep(meta.fileRef || { name: '' }));
-}
-
 function draftItemHtml(kind, item, i) {
-  const id = `pdf-${kind}-${i}`;
+  const checked = item.checked !== false ? 'checked' : '';
   if (kind === 'obj') {
     return `
       <li class="pdf-draft-item" data-kind="obj" data-idx="${i}">
-        <label class="pdf-check"><input type="checkbox" data-check checked><span class="sr-only">Lernziel ${i + 1} übernehmen</span></label>
+        <label class="pdf-check"><input type="checkbox" data-check ${checked}><span class="sr-only">Lernziel ${i + 1} übernehmen</span></label>
         <div class="pdf-draft-main">
           <input type="text" data-title value="${escapeHtml(item.title)}" aria-label="Lernziel ${i + 1} Titel" maxlength="300">
           <textarea data-desc rows="2" aria-label="Lernziel ${i + 1} Beschreibung" maxlength="800" placeholder="Beschreibung (optional)">${escapeHtml(item.description || '')}</textarea>
@@ -185,7 +144,7 @@ function draftItemHtml(kind, item, i) {
   }
   return `
     <li class="pdf-draft-item" data-kind="res" data-idx="${i}">
-      <label class="pdf-check"><input type="checkbox" data-check checked><span class="sr-only">Ressource übernehmen: ${escapeHtml(item.name)}</span></label>
+      <label class="pdf-check"><input type="checkbox" data-check ${checked}><span class="sr-only">Ressource übernehmen: ${escapeHtml(item.name)}</span></label>
       <div class="pdf-draft-main">
         <div class="pdf-res-name">${escapeHtml(item.name)}</div>
         ${item.note ? `<div class="pdf-res-note">${escapeHtml(item.note)}</div>` : ''}
@@ -193,13 +152,17 @@ function draftItemHtml(kind, item, i) {
     </li>`;
 }
 
-function openPdfReviewStep(meta, result) {
-  const objs = result.objectives;
-  const ress = result.resources;
-  setModal(
-    `Entwurf prüfen — ${escapeHtml(meta.title)}`,
-    `
-    <p class="pdf-note">${objs.length} Lernziel${objs.length !== 1 ? 'e' : ''}${ress.length ? `, ${ress.length} Ressource${ress.length !== 1 ? 'n' : ''}` : ''} aus dem PDF vorgeschlagen. Abgewähltes wird nicht übernommen — nichts wird automatisch gespeichert.</p>
+/** Review (and edit) a finished task result. Edits sync into the task draft. */
+export function openPdfReview(task) {
+  const t = task || getTask();
+  if (!t || t.status !== 'done' || !t.result) return;
+  const objs = t.result.objectives || [];
+  const ress = t.result.resources || [];
+
+  openModal({
+    title: `Entwurf prüfen — ${t.title}`,
+    body: `
+    <p class="pdf-note">${objs.length} Lernziel${objs.length !== 1 ? 'e' : ''}${ress.length ? `, ${ress.length} Ressource${ress.length !== 1 ? 'n' : ''}` : ''} aus dem PDF vorgeschlagen. Abgewähltes wird nicht übernommen — nichts wird automatisch gespeichert. Änderungen bleiben erhalten, auch wenn du zwischendurch woanders weiterarbeitest.</p>
     <div class="section-label">Lernziele</div>
     <ul class="pdf-draft-list" id="pdf-obj-list">
       ${objs.map((o, i) => draftItemHtml('obj', o, i)).join('')}
@@ -210,106 +173,79 @@ function openPdfReviewStep(meta, result) {
         ${ress.map((r, i) => draftItemHtml('res', r, i)).join('')}
       </ul>` : ''}
     `,
-    `
-    <button class="btn" data-action="cancel">Verwerfen</button>
+    footer: `
+    <button class="btn" data-action="later">Später prüfen</button>
     <button class="btn primary" data-action="commit" id="pdf-commit">Modul erstellen</button>
     `,
-  );
+    onClose: () => {},
+  });
 
-  const updateCommitLabel = () => {
-    const n = document.querySelectorAll('#pdf-obj-list [data-check]:checked').length;
+  const syncDraft = () => {
+    const nextObjs = [...document.querySelectorAll('#pdf-obj-list .pdf-draft-item')].map((li) => ({
+      title: li.querySelector('[data-title]')?.value ?? '',
+      description: li.querySelector('[data-desc]')?.value ?? '',
+      checked: !!li.querySelector('[data-check]')?.checked,
+    }));
+    const nextRes = [...document.querySelectorAll('#pdf-res-list .pdf-draft-item')].map((li) => {
+      const prev = (t.result.resources || []).find((r, idx) => String(idx) === li.dataset.idx);
+      return {
+        name: prev?.name || '',
+        note: prev?.note || '',
+        checked: !!li.querySelector('[data-check]')?.checked,
+      };
+    });
+    updateDraft(t, nextObjs, nextRes);
+    const n = nextObjs.filter(o => o.checked && o.title.trim()).length;
     const btn = document.getElementById('pdf-commit');
     if (btn) btn.textContent = `Modul erstellen · ${n} Lernziel${n !== 1 ? 'e' : ''}`;
   };
-  document.querySelectorAll('[data-check]').forEach(c => c.addEventListener('change', updateCommitLabel));
-  updateCommitLabel();
 
-  document.querySelector('#modal-footer [data-action="cancel"]')?.addEventListener('click', () => closeModal());
-  document.querySelector('#modal-footer [data-action="commit"]')?.addEventListener('click', (e) => {
-    const btn = e.currentTarget;
-    btn.setAttribute('aria-busy', 'true');
-    btn.disabled = true;
-    try {
-      commitPdfModule(meta);
-    } finally {
-      btn.removeAttribute('aria-busy');
-    }
-  });
+  setTimeout(() => {
+    document.querySelectorAll('#pdf-obj-list [data-check], #pdf-obj-list [data-title], #pdf-obj-list [data-desc], #pdf-res-list [data-check]')
+      .forEach(c => c.addEventListener('input', syncDraft));
+    document.querySelectorAll('#pdf-obj-list [data-check], #pdf-res-list [data-check]')
+      .forEach(c => c.addEventListener('change', syncDraft));
+    syncDraft();
+    document.querySelector('#modal-footer [data-action="later"]')?.addEventListener('click', () => {
+      syncDraft();
+      closeModal();
+      window.EMVS?.toast?.show('Entwurf gespeichert — über das Aufgabenpanel fortsetzen');
+    });
+    document.querySelector('#modal-footer [data-action="commit"]')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      btn.setAttribute('aria-busy', 'true');
+      btn.disabled = true;
+      try {
+        syncDraft();
+        commitPdfTask(t);
+      } finally {
+        btn.removeAttribute('aria-busy');
+      }
+    });
+  }, 50);
 }
 
-function collectChecked(listId, kind) {
-  const out = [];
-  document.querySelectorAll(`#${listId} .pdf-draft-item`).forEach((li) => {
-    if (!li.querySelector('[data-check]')?.checked) return;
-    if (kind === 'obj') {
-      const title = li.querySelector('[data-title]')?.value.trim() || '';
-      if (!title) return;
-      out.push({ title, description: li.querySelector('[data-desc]')?.value.trim() || '' });
-    } else {
-      out.push({
-        name: li.querySelector('.pdf-res-name')?.textContent.trim() || '',
-        note: li.querySelector('.pdf-res-note')?.textContent.trim() || '',
-      });
-    }
-  });
-  return out.filter(x => (x.title || x.name) && String(x.title || x.name).length >= 3);
-}
-
-function commitPdfModule(meta) {
-  const objectives = collectChecked('pdf-obj-list', 'obj');
-  const resources = collectChecked('pdf-res-list', 'res');
-  if (!objectives.length) {
-    window.EMVS.toast?.show('Mindestens ein Lernziel auswählen — oder verwerfen');
+function commitPdfTask(t) {
+  const draft = t.result || { objectives: [], resources: [] };
+  const objectives = (draft.objectives || []).filter(o => o.checked !== false);
+  const resources = (draft.resources || []).filter(r => r.checked !== false);
+  if (!objectives.filter(o => String(o.title || '').trim().length >= 3).length) {
+    window.EMVS.toast?.show('Mindestens ein Lernziel auswählen — oder später prüfen');
+    return;
+  }
+  const built = buildModuleEntities(
+    { code: t.code, title: t.title },
+    { objectives, resources },
+  );
+  if (!built.objectives.length) {
+    window.EMVS.toast?.show('Mindestens ein gültiges Lernziel auswählen');
     return;
   }
   const state = window.EMVS.getState();
-  const now = Date.now();
-  const moduleId = generateId();
-  state.modules.push({
-    id: moduleId,
-    code: meta.code,
-    title: meta.title,
-    accent: '#b45309',
-    targetGrade: 5.0,
-    createdAt: now,
-    updatedAt: now,
-  });
-  objectives.forEach((o, i) => {
-    state.learningObjectives.push(ensureObjectiveFields({
-      id: generateId(),
-      moduleId,
-      number: i + 1,
-      title: o.title,
-      description: o.description,
-      status: 'todo',
-      confidence: 0,
-      notes: '',
-      confidenceHistory: [],
-      reviewHistory: [],
-      lastTouched: now,
-      lastReviewed: null,
-      totalStudyTime: 0,
-      reviewSchedule: null,
-      sessionHistory: [],
-      createdAt: now,
-      updatedAt: now,
-    }));
-  });
-  resources.forEach((r) => {
-    state.resources.push({
-      id: generateId(),
-      moduleId,
-      name: r.name,
-      type: 'Other',
-      focus: '70',
-      status: 'todo',
-      url: '',
-      linkedObjectiveIds: [],
-      notes: r.note || 'Aus PDF importiert',
-      createdAt: now,
-      updatedAt: now,
-    });
-  });
+  const moduleId = built.module.id;
+  state.modules.push(built.module);
+  built.objectives.forEach(o => state.learningObjectives.push(o));
+  built.resources.forEach(r => state.resources.push(r));
   state.settings.currentModuleId = moduleId;
   if (!window.EMVS.save()) {
     // Roll back in-memory additions so a failed save never leaves ghost data.
@@ -319,8 +255,13 @@ function commitPdfModule(meta) {
     window.EMVS.toast?.show('Speichern fehlgeschlagen — nichts wurde übernommen');
     return;
   }
+  markCommitted(t);
+  dismissTask();
   closeModal(true);
   window.EMVS.renderSidebar();
   navigate('module', { id: moduleId, tab: 'ziele' });
-  window.EMVS.toast?.show(`Modul ${meta.code} erstellt · ${objectives.length} Lernziele übernommen`);
+  window.EMVS.toast?.show(`Modul ${built.module.code} erstellt · ${built.objectives.length} Lernziele übernommen`);
 }
+
+// Panel → review wiring (registered on import; no import cycle).
+setReviewOpener(openPdfReview);

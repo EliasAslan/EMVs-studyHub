@@ -702,6 +702,7 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   .main { scroll-behavior: auto; }
   .page, .modal, .palette, .sheet, .tabbar { animation: none; }
   .ov-progress-fill, .btn[aria-busy="true"]::before { animation: none; }
+  .task-panel.flash, .task-dot.run, .task-progress-fill { animation: none; }
   .mock-timebar-fill, .exam-strip { scroll-behavior: auto; }
   * { transition-duration: 0.01ms !important; }
 }
@@ -1181,3 +1182,65 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 .pdf-draft-main textarea { resize: vertical; min-height: 44px; font-size: 13px; color: var(--ink-2); }
 .pdf-res-name { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
 .pdf-res-note { font-size: 12.5px; color: var(--ink-3); }
+
+/* ============ FLOATING PDF TASK PANEL ============ */
+/* Body-mounted (outside #view-root) so it survives router navigation.
+   Below modal (200) and toast (300); above content and tabbar. */
+.task-panel {
+  position: fixed; right: 16px; bottom: 16px; z-index: 150;
+  width: min(360px, calc(100vw - 24px));
+  background: var(--paper); border: 1px solid var(--rule-2); border-radius: 12px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.task-panel[hidden] { display: none; }
+.task-panel.flash { animation: task-flash 0.9s ease; }
+@keyframes task-flash {
+  0%, 100% { box-shadow: var(--shadow); }
+  30% { box-shadow: 0 0 0 3px var(--focus), var(--shadow); }
+}
+.task-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 8px 10px 14px; cursor: grab; user-select: none;
+  touch-action: none;
+  border-bottom: 1px solid var(--rule);
+}
+.task-head:active { cursor: grabbing; }
+.task-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rule-2); flex-shrink: 0; }
+.task-dot.run { background: var(--accent); animation: task-pulse 1.2s ease-in-out infinite; }
+.task-dot.ok { background: var(--green); }
+.task-dot.fail { background: var(--red); }
+@keyframes task-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.task-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.task-title { font-family: var(--serif); font-size: 16px; color: var(--ink); line-height: 1.2; }
+.task-title:focus { outline: none; }
+.task-sub {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.task-min {
+  min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--ink-2); border-radius: 8px; flex-shrink: 0;
+}
+.task-min:hover { background: var(--bg); color: var(--ink); }
+.task-body { padding: 12px 14px 14px; }
+.task-panel.min .task-body { display: none; }
+.task-panel.min .task-head { border-bottom: none; }
+.task-progress {
+  height: 6px; background: var(--bg); border: 1px solid var(--rule);
+  border-radius: 99px; overflow: hidden; margin: 2px 0 8px;
+}
+.task-progress-fill { height: 100%; background: var(--accent); transition: width 0.2s ease; }
+@keyframes task-slide { 0% { margin-left: -40%; width: 40%; } 100% { margin-left: 100%; width: 40%; } }
+.task-status { font-size: 13px; color: var(--ink-2); font-family: var(--mono); }
+.task-status.task-error { color: var(--red); font-family: var(--sans); }
+.task-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.task-actions .btn { min-height: 44px; flex: 1 1 auto; font-size: 13px; }
+
+/* Mobile: docked bottom sheet above the tabbar, no dragging. */
+@media (max-width: 780px) {
+  .task-panel {
+    left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom));
+    width: auto;
+  }
+  .task-head { cursor: default; touch-action: manipulation; }
+}
