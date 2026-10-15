@@ -120,7 +120,7 @@ function showProgress(meta, statusText, phase = null) {
 
 async function runPdfAnalysis(file, meta) {
   meta.abort = new AbortController();
-  const { signal } = meta;
+  const { signal } = meta.abort;
   showProgress(meta, 'Text wird extrahiert…');
 
   let extracted;
