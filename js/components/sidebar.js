@@ -1,12 +1,15 @@
 /**
  * Sidebar Component
- * Compact icon rail (default) with an expandable label view.
- * Global destinations stay static in index.html; the module section
- * (current module Home + 4 tabs, module switcher) renders here.
+ * Three desktop layouts (full / rail / workspace), selected in Settings
+ * and persisted in settings.navLayout. Global destinations stay static in
+ * index.html; the module section (current module Home + tabs, switcher)
+ * renders here and — in workspace layout — also into the secondary panel.
  */
 
 import { navigate, getCurrentView, getCurrentParams } from '../views/router.js';
 import { MODULE_TABS, getNavState } from '../utils/navigation.js';
+import { getNavLayout, setNavLayoutSetting } from '../utils/navLayout.js';
+import { objectiveProgressPercent } from '../utils/dashboard.js';
 
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 
@@ -56,17 +59,26 @@ function applyCurrentModuleAccent() {
 
 export function isSidebarExpanded() {
   try {
-    return !!window.EMVS.getState().settings.sidebarExpanded;
+    return getNavLayout(window.EMVS.getState()) === 'full';
   } catch {
     return false;
   }
 }
 
 export function setSidebarExpanded(expanded) {
+  setNavLayout(expanded ? 'full' : 'rail');
+}
+
+/**
+ * Persist a layout choice and apply it immediately (no reload).
+ * Unknown ids are ignored.
+ */
+export function setNavLayout(layout) {
   const state = window.EMVS.getState();
-  state.settings.sidebarExpanded = !!expanded;
+  if (!setNavLayoutSetting(state, layout)) return false;
   window.EMVS.save();
   renderSidebar();
+  return true;
 }
 
 function goModule(id, tab) {
@@ -77,33 +89,45 @@ function goModule(id, tab) {
   navigate('module', { id, tab });
 }
 
-export function renderSidebar() {
-  const state = window.EMVS.getState();
-  const currentView = getCurrentView();
-  const params = getCurrentParams();
-  const nav = getNavState(currentView, params, state.settings.currentModuleId);
+/**
+ * Apply the active layout to the shell: body hook for CSS, the legacy
+ * `expanded` rail class for 'full' (all existing expanded styles reuse),
+ * rail toggle state, and the workspace panel visibility.
+ */
+function applyNavLayout(layout) {
+  try {
+    document.body.dataset.navlayout = layout;
+  } catch {}
   const sidebarEl = document.getElementById('sidebar');
-  const container = document.getElementById('nav-modules');
-  if (!container || !sidebarEl) return;
-  applyCurrentModuleAccent();
-
-  const expanded = isSidebarExpanded();
-  sidebarEl.classList.toggle('expanded', expanded);
+  sidebarEl?.classList.toggle('expanded', layout === 'full');
   const toggle = document.getElementById('railToggle');
   if (toggle) {
+    const expanded = layout === 'full';
     toggle.setAttribute('aria-expanded', String(expanded));
     toggle.setAttribute('aria-label', expanded ? 'Seitenleiste einklappen' : 'Seitenleiste erweitern');
     toggle.setAttribute('title', expanded ? 'Seitenleiste einklappen' : 'Seitenleiste erweitern');
     toggle.querySelector('.rail-toggle-ico')?.replaceChildren(document.createTextNode(expanded ? '«' : '»'));
     if (!toggle.dataset.wired) {
       toggle.dataset.wired = '1';
-      toggle.addEventListener('click', () => setSidebarExpanded(!isSidebarExpanded()));
+      toggle.addEventListener('click', () => setNavLayout(getNavLayout(window.EMVS.getState()) === 'full' ? 'rail' : 'full'));
     }
   }
+  const panel = document.getElementById('workspace-panel');
+  if (panel && layout !== 'workspace') panel.hidden = true;
+}
 
-  const cur = state.modules.find(m => m.id === nav.moduleId) || null;
+/** Share of mastered objectives for the workspace panel header. */
+function moduleProgress(state, moduleId) {
+  const objs = (state.learningObjectives || []).filter(o => o.moduleId === moduleId);
+  const done = objs.filter(o => o.status === 'done').length;
+  return { done, total: objs.length, pct: objectiveProgressPercent(done, objs.length) };
+}
 
-  // Module section: current module (Home + 4 tabs) + compact switcher.
+/**
+ * Module section markup shared by the sidebar and the workspace panel:
+ * current-module Home shortcut + tab rows, then the module switcher.
+ */
+function moduleSectionHtml(state, nav, cur, currentView) {
   let html = '';
   if (cur) {
     html += `
@@ -138,8 +162,11 @@ export function renderSidebar() {
   } else if (!cur) {
     html = `<p class="sidebar-empty">Noch keine Module — lege oben dein erstes an.</p>`;
   }
-  container.innerHTML = html;
+  return html;
+}
 
+/** Bind one rendered module section (sidebar copy or panel copy). */
+function bindModuleSection(container) {
   // Module tab buttons: Home + 4 tabs keep module context.
   container.querySelectorAll('[data-mtab]').forEach(btn => {
     btn.setAttribute('tabindex', '0');
@@ -164,6 +191,68 @@ export function renderSidebar() {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
     });
   });
+}
+
+/**
+ * Secondary workspace panel: current-module header with live progress,
+ * then the shared module section. Router active states apply
+ * document-wide, so panel and sidebar can never disagree.
+ */
+function renderWorkspacePanel(state, nav, cur, currentView) {
+  const panel = document.getElementById('workspace-panel');
+  if (!panel) return;
+  panel.hidden = false;
+  panel.setAttribute('aria-label', 'Modulnavigation');
+  const prog = cur ? moduleProgress(state, cur.id) : null;
+  panel.innerHTML = `
+    <div class="ws-head">
+      <div class="ws-head-text">
+        <span class="eyebrow">Aktuelles Modul</span>
+        ${cur
+          ? `<h2 class="ws-title">Modul ${escapeHtml(cur.code)}</h2><p class="ws-sub">${escapeHtml(cur.title)}</p>`
+          : `<h2 class="ws-title">Kein Modul</h2><p class="ws-sub">Lege ein Modul an, um zu starten.</p>`}
+      </div>
+      <button class="ws-close" id="ws-close" aria-label="Modul-Panel schließen" title="Modul-Panel schließen">×</button>
+    </div>
+    ${prog ? `
+      <div class="ws-progress" role="img" aria-label="${prog.done} von ${prog.total} Lernzielen gemeistert">
+        <div class="ws-progress-meta"><span>Modulfortschritt</span><strong>${prog.pct}%</strong></div>
+        <div class="ws-progress-line"><span style="width: ${prog.pct}%"></span></div>
+      </div>` : ''}
+    <div class="ws-body" id="workspace-panel-body"></div>`;
+  const body = panel.querySelector('#workspace-panel-body');
+  if (body) {
+    body.innerHTML = moduleSectionHtml(state, nav, cur, currentView);
+    bindModuleSection(body);
+  }
+  panel.querySelector('#ws-close')?.addEventListener('click', () => setNavLayout('rail'));
+}
+
+export function renderSidebar() {
+  const state = window.EMVS.getState();
+  const currentView = getCurrentView();
+  const params = getCurrentParams();
+  const nav = getNavState(currentView, params, state.settings.currentModuleId);
+  const sidebarEl = document.getElementById('sidebar');
+  const container = document.getElementById('nav-modules');
+  if (!container || !sidebarEl) return;
+  applyCurrentModuleAccent();
+
+  const layout = getNavLayout(state);
+  applyNavLayout(layout);
+
+  const cur = state.modules.find(m => m.id === nav.moduleId) || null;
+
+  // Module section renders into the sidebar in full/rail layouts and into
+  // the secondary panel in workspace layout (same markup, same handlers —
+  // the router's document-wide active-state updater keeps both in sync).
+  if (container) {
+    container.innerHTML = moduleSectionHtml(state, nav, cur, currentView);
+    bindModuleSection(container);
+  }
+  if (layout === 'workspace') {
+    renderWorkspacePanel(state, nav, cur, currentView);
+  }
 
   // Global nav items (re-bind every render; no {once:true} so nav keeps working)
   const globalNav = document.getElementById('nav-global');
@@ -243,6 +332,16 @@ export function renderSidebar() {
       railMod.title = `Aktuelles Modul ${cur.code} — Module wählen`;
       railMod.querySelector('.rail-mod-dot').style.background = 'var(--accent)';
     }
+  }
+
+  // Current-module chip in the topbar (same data, same destination model)
+  const topbarMod = document.getElementById('topbarMod');
+  if (topbarMod) {
+    topbarMod.textContent = cur ? `Modul ${cur.code}` : 'Module';
+    topbarMod.setAttribute('aria-label', cur
+      ? `Aktuelles Modul ${cur.code} öffnen`
+      : 'Kein Modul ausgewählt — Module öffnen');
+    topbarMod.title = cur ? `Modul ${cur.code} — ${cur.title}` : 'Module öffnen';
   }
 }
 

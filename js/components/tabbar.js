@@ -15,8 +15,13 @@ export function initTabbar() {
   document.querySelectorAll('#tabbar .tab[data-route]').forEach(t => {
     t.addEventListener('click', () => navigate(t.dataset.route));
   });
+  document.querySelectorAll('#topbar [data-route], #dock [data-route]').forEach(t => {
+    t.addEventListener('click', () => navigate(t.dataset.route));
+  });
   document.getElementById('tabCapture')?.addEventListener('click', quickCapture);
   document.getElementById('railCapture')?.addEventListener('click', quickCapture);
+  document.getElementById('topbarCapture')?.addEventListener('click', quickCapture);
+  document.getElementById('dockCapture')?.addEventListener('click', quickCapture);
 
   document.querySelectorAll('#more-sheet [data-route]').forEach(b => {
     b.addEventListener('click', () => {
@@ -26,7 +31,15 @@ export function initTabbar() {
   });
   document.getElementById('moreBtn')?.addEventListener('click', openMore);
   document.getElementById('railMore')?.addEventListener('click', openMore);
+  document.getElementById('topbarMore')?.addEventListener('click', openMore);
+  document.getElementById('dockMore')?.addEventListener('click', openMore);
   document.getElementById('railMod')?.addEventListener('click', () => navigate('overview'));
+  document.getElementById('topbarMod')?.addEventListener('click', () => {
+    const st = window.EMVS.getState();
+    const cur = st.settings.currentModuleId;
+    if (cur) navigate('module', { id: cur, tab: 'home' });
+    else navigate('overview');
+  });
   document.getElementById('more-close')?.addEventListener('click', closeMore);
   document.getElementById('more-overlay')?.addEventListener('click', e => {
     if (e.target.id === 'more-overlay') closeMore();
@@ -58,24 +71,27 @@ export function updateBadges() {
   try {
     const st = window.EMVS.getState();
     const due = getDueObjectives(st).length;
-    setBadge(document.getElementById('badgeWeak'), document.getElementById('railBadgeWeak'), due, `${due} fällige Wiederholungen`);
+    setBadge('weak', due, `${due} fällige Wiederholungen`);
     const soon = (st.exams || []).filter(e => {
       if (!e.date) return false;
       const d = Math.ceil((new Date(e.date + 'T08:00:00') - Date.now()) / 86400000);
       return d >= 0 && d <= 14;
     }).length;
-    setBadge(document.getElementById('badgeExam'), document.getElementById('railBadgeExam'), soon, `${soon} Prüfungen in den nächsten 14 Tagen`);
+    setBadge('exam', soon, `${soon} Prüfungen in den nächsten 14 Tagen`);
   } catch {}
 }
 
-function setBadge(tabBadge, railBadge, n, label) {
-  for (const b of [tabBadge, railBadge]) {
-    if (!b) continue;
+/**
+ * Sync every badge for one kind (tabbar, rail, topbar, dock share the
+ * data-badge hook, so all layouts stay synchronized).
+ */
+function setBadge(kind, n, label) {
+  document.querySelectorAll(`[data-badge="${kind}"]`).forEach(b => {
     b.hidden = n === 0;
     b.textContent = n > 9 ? '9+' : String(n);
     b.setAttribute('aria-label', label);
     b.setAttribute('title', label);
-  }
+  });
 }
 
 function openMore() {
@@ -94,6 +110,8 @@ function openMore() {
   ov.setAttribute('aria-hidden', 'false');
   document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'true');
   document.getElementById('railMore')?.setAttribute('aria-expanded', 'true');
+  document.getElementById('topbarMore')?.setAttribute('aria-expanded', 'true');
+  document.getElementById('dockMore')?.setAttribute('aria-expanded', 'true');
   moreTrap = trapFocus(document.getElementById('more-sheet'), { onClose: () => {} });
 }
 
@@ -107,6 +125,8 @@ function closeMore() {
     ov?.setAttribute('aria-hidden', 'true');
     document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'false');
     document.getElementById('railMore')?.setAttribute('aria-expanded', 'false');
+    document.getElementById('topbarMore')?.setAttribute('aria-expanded', 'false');
+    document.getElementById('dockMore')?.setAttribute('aria-expanded', 'false');
     (moreTrigger || document.getElementById('railMore') || document.getElementById('moreBtn'))?.focus?.();
     moreTrigger = null;
     return;
@@ -115,4 +135,6 @@ function closeMore() {
   ov?.setAttribute('aria-hidden', 'true');
   document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'false');
   document.getElementById('railMore')?.setAttribute('aria-expanded', 'false');
+  document.getElementById('topbarMore')?.setAttribute('aria-expanded', 'false');
+  document.getElementById('dockMore')?.setAttribute('aria-expanded', 'false');
 }

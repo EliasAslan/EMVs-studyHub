@@ -6,6 +6,8 @@ import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal, confirmDialog } from '../components/modal.js';
 import { generateId, exportData, importData, clearAll, clearStorageError } from '../services/store.js';
 import { renderAuthPanel } from '../services/auth.js';
+import { setNavLayout } from '../components/sidebar.js';
+import { NAV_LAYOUTS, getNavLayout } from '../utils/navLayout.js';
 import { getLocalAISettings, checkConnection, describeLocalAIError } from '../services/localAI.js';
 import { openPdfImport } from './pdf-import.js';
 
@@ -14,6 +16,7 @@ export function renderSettings(state) {
   const m = state.modules.find(x => x.id === moduleId);
   const ai = getLocalAISettings(state);
   const siteOrigin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://em-vs-study-hub.vercel.app';
+  const navLayout = getNavLayout(state);
   
   const el = document.createElement('div');
   el.innerHTML = `
@@ -63,6 +66,20 @@ export function renderSettings(state) {
           <option value="light" ${state.settings.theme === 'light' ? 'selected' : ''}>Hell</option>
           <option value="dark" ${state.settings.theme === 'dark' ? 'selected' : ''}>Dunkel</option>
         </select>
+      </div>
+      <div class="field-row">
+        <label id="nav-layout-legend">Navigation</label>
+        <div class="nav-layout-pick" role="radiogroup" aria-labelledby="nav-layout-legend">
+          ${NAV_LAYOUTS.map(l => `
+            <label class="nav-layout-option${navLayout === l.id ? ' selected' : ''}">
+              <input type="radio" name="nav-layout" value="${l.id}"${navLayout === l.id ? ' checked' : ''}>
+              <span class="nl-preview nl-${l.id}" aria-hidden="true">
+                <span class="nl-bar"></span>${l.id === 'workspace' ? '<span class="nl-panel"></span>' : ''}<span class="nl-page"></span>
+              </span>
+              <span class="nl-text"><strong>${escapeHtml(l.label)}</strong><small>${escapeHtml(l.hint)}</small></span>
+            </label>`).join('')}
+        </div>
+        <p class="muted" style="font-size: 12.5px; margin-top: 8px;">Wechselt sofort, ganz ohne Neuladen — die Auswahl bleibt gespeichert.</p>
       </div>
     </div>
       </details>
@@ -234,6 +251,17 @@ export function renderSettings(state) {
     state.settings.theme = e.target.value;
     document.documentElement.dataset.theme = state.settings.theme;
     window.EMVS.save();
+  });
+
+  // Navigation layout: applies immediately, persists via settings.
+  el.querySelectorAll('input[name="nav-layout"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      setNavLayout(radio.value);
+      el.querySelectorAll('.nav-layout-option').forEach(opt => {
+        opt.classList.toggle('selected', opt.querySelector('input')?.checked === true);
+      });
+    });
   });
 
   // Local AI (Ollama) settings

@@ -15,6 +15,21 @@
 <body>
 <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
+<header id="topbar" hidden>
+  <div class="topbar-brand"><span class="brand-mark">EMVS</span></div>
+  <nav class="topbar-nav" aria-label="Hauptnavigation">
+    <button data-route="today" aria-current="false"><span aria-hidden="true">◉</span><span>Heute</span></button>
+    <button data-route="overview" aria-current="false"><span aria-hidden="true">▦</span><span>Module</span></button>
+    <button data-route="weak-spots" aria-current="false"><span aria-hidden="true">△</span><span>Schwach</span><span class="tb-badge" data-badge="weak" role="status" hidden></span></button>
+    <button data-route="exams-global" aria-current="false"><span aria-hidden="true">◷</span><span>Prüfungen</span><span class="tb-badge" data-badge="exam" role="status" hidden></span></button>
+  </nav>
+  <div class="topbar-actions">
+    <button id="topbarMod" aria-label="Aktuelles Modul öffnen">Module</button>
+    <button id="topbarCapture" aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen">+</button>
+    <button id="topbarMore" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
+  </div>
+</header>
+
 <div class="app">
   <header class="mobile-header">
     <span class="mobile-brand">EMVS</span>
@@ -39,8 +54,8 @@
       <div class="toc-item" data-view="overview" role="listitem" title="Module — alle Module im Überblick"><span class="toc-ico" aria-hidden="true">▦</span><span class="toc-num">02</span> <span class="toc-lb">Module</span></div>
       <div class="rail-div" aria-hidden="true"></div>
       <button class="rail-fab" id="railCapture" aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" data-tip="Schnell erfassen: Frage, Fehler oder Gedanke festhalten"><span aria-hidden="true">+</span></button>
-      <div class="toc-item" data-view="weak-spots" role="listitem" title="Schwachstellen"><span class="toc-ico" aria-hidden="true">△</span><span class="toc-num">03</span> <span class="toc-lb">Schwach</span><span class="rail-badge" id="railBadgeWeak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></div>
-      <div class="toc-item" data-view="exams-global" role="listitem" title="Prüfungen — alle Termine"><span class="toc-ico" aria-hidden="true">◷</span><span class="toc-num">04</span> <span class="toc-lb">Prüfungen</span><span class="rail-badge" id="railBadgeExam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></div>
+      <div class="toc-item" data-view="weak-spots" role="listitem" title="Schwachstellen"><span class="toc-ico" aria-hidden="true">△</span><span class="toc-num">03</span> <span class="toc-lb">Schwach</span><span class="rail-badge" id="railBadgeWeak" data-badge="weak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></div>
+      <div class="toc-item" data-view="exams-global" role="listitem" title="Prüfungen — alle Termine"><span class="toc-ico" aria-hidden="true">◷</span><span class="toc-num">04</span> <span class="toc-lb">Prüfungen</span><span class="rail-badge" id="railBadgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></div>
       <div class="rail-div" aria-hidden="true"></div>
       <button class="rail-more" id="railMore" aria-label="Weitere Bereiche öffnen: Review, Werkzeuge, Prüfungsvorbereitung, Einstellungen" title="Weitere Bereiche: Review, Werkzeuge, Prüfungsvorbereitung, Einstellungen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
       <button class="rail-mod" id="railMod" hidden><span class="rail-mod-dot" aria-hidden="true"></span><span class="rail-mod-code"></span></button>
@@ -61,6 +76,8 @@
     </div>
   </aside>
 
+  <div id="workspace-panel" hidden></div>
+
   <main class="main" id="main" role="main" tabindex="-1">
     <div class="page" id="view-root"></div>
   </main>
@@ -69,8 +86,8 @@
     <button class="tab" data-route="today" aria-current="false"><span class="tab-ico" aria-hidden="true">◉</span><span class="tab-lb">Heute</span></button>
     <button class="tab" data-route="overview" aria-current="false"><span class="tab-ico" aria-hidden="true">▦</span><span class="tab-lb">Module</span></button>
     <button class="tab fab" id="tabCapture" aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen"><span class="tab-fab-plus" aria-hidden="true">+</span></button>
-    <button class="tab" data-route="weak-spots" aria-current="false"><span class="tab-ico" aria-hidden="true">△</span><span class="tab-lb">Schwach</span><span class="tab-badge" id="badgeWeak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></button>
-    <button class="tab" data-route="exams-global" aria-current="false"><span class="tab-ico" aria-hidden="true">◷</span><span class="tab-lb">Prüfungen</span><span class="tab-badge" id="badgeExam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></button>
+    <button class="tab" data-route="weak-spots" aria-current="false"><span class="tab-ico" aria-hidden="true">△</span><span class="tab-lb">Schwach</span><span class="tab-badge" id="badgeWeak" data-badge="weak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></button>
+    <button class="tab" data-route="exams-global" aria-current="false"><span class="tab-ico" aria-hidden="true">◷</span><span class="tab-lb">Prüfungen</span><span class="tab-badge" id="badgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></button>
   </nav>
 
   <div class="sheet-overlay" id="more-overlay" aria-hidden="true">
@@ -89,6 +106,15 @@
     </div>
   </div>
 </div>
+
+<nav id="dock" aria-label="Hauptnavigation" hidden>
+  <button data-route="today" aria-current="false" aria-label="Heute"><span aria-hidden="true">◉</span></button>
+  <button data-route="overview" aria-current="false" aria-label="Module"><span aria-hidden="true">▦</span></button>
+  <button id="dockCapture" aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen">+</button>
+  <button data-route="weak-spots" aria-current="false" aria-label="Schwachstellen"><span aria-hidden="true">△</span><span class="tb-badge" data-badge="weak" role="status" hidden></span></button>
+  <button data-route="exams-global" aria-current="false" aria-label="Prüfungen"><span aria-hidden="true">◷</span><span class="tb-badge" data-badge="exam" role="status" hidden></span></button>
+  <button id="dockMore" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
+</nav>
 
 <!-- Modal Overlay -->
 <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title">

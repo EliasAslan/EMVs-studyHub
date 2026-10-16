@@ -244,12 +244,13 @@ function render() {
     ch.querySelector('.chapter-header')?.classList.toggle('active', isCurrent);
   });
 
-  // Bottom tabbar state (module detail counts as overview)
+  // Bottom tabbar state (module detail counts as overview).
+  // Topbar and dock share the same destinations and stay in sync.
   const tabFor = currentView === 'module' ? 'overview'
     : currentView === 'today' ? 'today'
     : currentView === 'weak-spots' ? 'weak-spots'
     : currentView === 'exams-global' ? 'exams-global' : '';
-  document.querySelectorAll('#tabbar .tab[data-route]').forEach(t => {
+  document.querySelectorAll('#tabbar .tab[data-route], #topbar [data-route], #dock [data-route]').forEach(t => {
     const on = t.dataset.route === tabFor;
     t.classList.toggle('active', on);
     t.setAttribute('aria-current', on ? 'page' : 'false');
