@@ -710,7 +710,11 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   .main { padding-top: calc(56px + env(safe-area-inset-top)); }
   .page { padding: 28px 20px calc(120px + env(safe-area-inset-bottom)); }
   .tabbar { display: grid; }
-  .menu-btn { display: none; }
+  /* Drawer toggle stays visible: the drawer is the mobile module picker
+     (full labeled nav incl. module Home, tabs and switcher). */
+  .menu-btn { display: inline-flex; }
+  /* In-page module tabs stick below the fixed mobile header, not under it */
+  .subtabs { top: calc(56px + env(safe-area-inset-top)); }
   .page-title { font-size: clamp(30px, 8.5vw, 34px); line-height: 1.08; }
   .today-title { font-size: clamp(28px, 8vw, 32px); }
   .hero-count { font-size: clamp(44px, 13vw, 56px); }
