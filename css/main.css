@@ -700,11 +700,14 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 @media (max-width: 780px) {
   .mobile-header { display: flex; }
   .sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0;
+    position: fixed; top: 0; right: 0; bottom: 0;
     width: min(84vw, 320px);
     padding-top: calc(20px + env(safe-area-inset-top));
-    transform: translateX(-100%);
-    box-shadow: 10px 0 40px rgba(0,0,0,0.1);
+    padding-right: calc(20px + env(safe-area-inset-right));
+    transform: translateX(100%);
+    box-shadow: -10px 0 40px rgba(0,0,0,0.1);
+    border-right: none;
+    border-left: 1px solid var(--rule);
   }
   .sidebar.open { transform: translateX(0); }
   .main { padding-top: calc(56px + env(safe-area-inset-top)); }

@@ -93,6 +93,16 @@ await test('safe-area insets, touch targets and sticky offsets', async () => {
   assert.ok(css.includes('.modal-overlay { align-items: flex-end'), 'dialogs become bottom sheets');
 });
 
+await test('drawer slides in from the right', async () => {
+  const m = mobileBlock();
+  const drawer = m.match(/\.sidebar\s*\{([^}]*)\}/);
+  assert.ok(drawer, 'drawer rule exists in mobile block');
+  assert.ok(/right:\s*0/.test(drawer[1]), 'drawer anchored to the right edge');
+  assert.ok(!/(^|;\s*)left:\s*0/.test(drawer[1]), 'drawer not anchored left');
+  assert.ok(/translateX\(100%\)/.test(drawer[1]), 'drawer hides off-canvas to the right');
+  assert.ok(/\.sidebar\.open\s*\{\s*transform:\s*translateX\(0\)/.test(m), 'open drawer slides into view');
+});
+
 await test('no horizontal overflow or content hidden behind the bar', async () => {
   assert.ok(/body\s*\{[^}]*overflow-x:\s*hidden/.test(css), 'body clips horizontal overflow');
   assert.ok(/\.main\s*\{[^}]*overflow-x:\s*hidden/.test(css), 'main clips horizontal overflow');
