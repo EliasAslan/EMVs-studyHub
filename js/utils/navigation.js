@@ -19,6 +19,34 @@ export const MODULE_TABS = [
 export const DEFAULT_MODULE_TAB = 'home';
 
 /** Top-level destinations in the sidebar rail / tabbar. */
+/**
+ * Context navigation grouping by student intention.
+ * "Learn" → modules, topics, learning objectives and resources.
+ * "Practice" → exercises, quizzes and exam simulations.
+ * "Plan" → planner, deadlines, tasks and study sessions.
+ * "Review" → progress, weak topics, completed objectives and revision.
+ */
+export const CONTEXT_GROUPS = [
+  { id: 'learn', label: 'Lernen', icon: '📚',
+    views: ['overview', 'module-homepage', 'module-ziele', 'module-plan', 'module-sessions', 'module-material'] },
+  { id: 'practice', label: 'Üben', icon: '✏️',
+    views: ['weekly-review', 'tools', 'module-homepage', 'module-ziele', 'module-plan', 'module-sessions', 'module-material'] },
+  { id: 'plan', label: 'Planen', icon: '📅',
+    views: ['today', 'weak-spots', 'weekly-review', 'tools'] },
+  { id: 'review', label: 'Wiederholen', icon: '📈',
+    views: ['weak-spots', 'exams-global', 'weekly-review', 'tools'] },
+];
+
+/**
+ * Global views mapped to their primary context group for the Context layout.
+ */
+export const GLOBAL_TO_CONTEXT = {
+  'today': 'plan',
+  'overview': 'learn',
+  'weak-spots': 'review',
+  'exams-global': 'review',
+};
+
 export const GLOBAL_VIEWS = ['today', 'overview', 'weak-spots', 'exams-global'];
 
 /** Legacy per-module view names (sidebar chapters, palette, deep links) → tab keys. */

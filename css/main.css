@@ -578,6 +578,57 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 #workspace-panel { display: none; }
 #workspace-panel[hidden] { display: none !important; }
 
+/* Context layout: grouped destinations by student intention */
+body[data-navlayout="context"] #nav-global { display: block; }
+body[data-navlayout="context"] .context-section {
+  border-bottom: 1px solid var(--rule-2);
+  padding: 8px 0;
+}
+body[data-navlayout="context"] .context-section:first-child { padding-top: 0; }
+body[data-navlayout="context"] .context-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+body[data-navlayout="context"] .context-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+body[data-navlayout="context"] .context-section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+body[data-navlayout="context"] .context-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: 24px;
+}
+body[data-navlayout="context"] .context-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+body[data-navlayout="context"] .context-item:hover {
+  background: var(--bg);
+}
+body[data-navlayout="context"] .context-item .toc-lb {
+  font-size: 14px;
+}
+body[data-navlayout="context"] .toc-item.active {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
 /* Upper navigation + floating dock (desktop layouts, enabled per layout) */
 #topbar, #dock { display: none; }
 .ws-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }

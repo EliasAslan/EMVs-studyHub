@@ -33,8 +33,8 @@ async function test(name, fn) {
   }
 }
 
-await test('registry holds the five layouts in selector order', async () => {
-  assert.deepEqual(NAV_LAYOUTS.map(l => l.id), ['full', 'rail', 'workspace', 'topbar', 'dock']);
+await test('registry holds the six layouts in selector order', async () => {
+  assert.deepEqual(NAV_LAYOUTS.map(l => l.id), ['full', 'rail', 'workspace', 'topbar', 'dock', 'context']);
   assert.equal(DEFAULT_NAV_LAYOUT, 'rail');
   const ids = NAV_LAYOUTS.map(l => l.id);
   assert.equal(new Set(ids).size, ids.length, 'ids unique');
@@ -57,6 +57,7 @@ await test('isNavLayoutId accepts only known ids', async () => {
   assert.equal(isNavLayoutId('workspace'), true);
   assert.equal(isNavLayoutId('topbar'), true);
   assert.equal(isNavLayoutId('dock'), true);
+  assert.equal(isNavLayoutId('context'), true);
   assert.equal(isNavLayoutId(''), false);
   assert.equal(isNavLayoutId(null), false);
   assert.equal(isNavLayoutId(undefined), false);

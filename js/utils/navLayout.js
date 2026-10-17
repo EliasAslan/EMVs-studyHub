@@ -19,6 +19,7 @@ export const NAV_LAYOUTS = [
   { id: 'workspace', group: 'sidebar', label: 'Arbeitsbereich', hint: 'Icon-Leiste plus Modul-Panel' },
   { id: 'topbar', group: 'bar', label: 'Obere Navigation', hint: 'Horizontale Leiste am oberen Rand' },
   { id: 'dock', group: 'bar', label: 'Schwebendes Dock', hint: 'Pillendock mit Hauptaktionen' },
+  { id: 'context', group: 'bar', label: 'Kontext-Ansicht', hint: 'Nach Absicht gruppiert: Lernen, Üben, Planen, Wiederholen' },
 ];
 
 /** Selector groups in Settings: sidebar styles, then the other layouts. */

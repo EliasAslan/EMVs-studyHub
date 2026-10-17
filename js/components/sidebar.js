@@ -118,12 +118,132 @@ function applyNavLayout(layout) {
   if (panel && layout !== 'workspace') panel.hidden = true;
 }
 
+/**
+ * Render the Context layout's sidebar navigation.
+ * Groups global view buttons into 4 sections (Lernen/Üben/Planen/Wiederholen).
+ * All buttons keep their existing data-view attribute and href, so active-state
+ * and router logic remain unchanged.
+ */
+function renderContextNav(state, nav, cur) {
+  const globalNav = document.getElementById('nav-global');
+  const overflowWrap = document.getElementById('sidebar-overflow');
+  const overflowMenu = document.getElementById('overflow-menu');
+
+  if (!globalNav || !overflowWrap || !overflowMenu) return;
+
+  // Define the four context sections with their destinations
+  const SECTIONS = [
+    { id: 'learn', label: 'Lernen', views: ['overview', 'weak-spots', 'exams-global'] },
+    { id: 'practice', label: 'Üben', views: ['exams-global', 'weak-spots'] },
+    { id: 'plan', label: 'Planen', views: ['today', 'overview'] },
+    { id: 'review', label: 'Wiederholen', views: ['overview', 'today'] },
+  ];
+
+  // Build all items in the current order, each with its section
+  const allItems = [
+    ...SECTIONS[0].views,
+    ...SECTIONS[1].views,
+    ...SECTIONS[2].views,
+    ...SECTIONS[3].views,
+  ];
+  const viewToSection = {};
+  SECTIONS.forEach(s => s.views.forEach(v => viewToSection[v] = s.id));
+
+  // Preserve canonical order for overflow: learn → practice → plan → review
+  const ORDER = ['today', 'overview', 'weak-spots', 'exams-global'];
+  const visibleViews = ['today', 'overview', 'weak-spots', 'exams-global'];
+  const hiddenItems = allItems.filter(item => !visibleViews.includes(item));
+  const useOverflow = hiddenItems.length > 1;
+  const visibleItems = useOverflow
+    ? allItems.filter(item => visibleViews.includes(item))
+    : allItems;
+
+  // Reorder to match canonical ORDER
+  const orderedItems = visibleItems.sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+
+  // Wrap items into sections
+  let sectionHtml = '';
+  SECTIONS.forEach(section => {
+    const sectionViews = orderedItems.filter(v => viewToSection[v] === section.id);
+    if (sectionViews.length === 0) return;
+    sectionHtml += `
+      <div class="context-section" aria-label="${escapeHtml(section.label)}">
+        <div class="context-section-header">
+          <span class="context-section-title">${escapeHtml(section.label)}</span>
+        </div>
+        <nav class="context-toc" role="list">${sectionViews.map(v => `
+          <div class="toc-item context-item" data-view="${v}" role="listitem"
+            title="${escapeHtml(v)}" aria-label="${escapeHtml(v)}">
+            <span class="toc-ico" aria-hidden="true">${ICONS[v] || '◉'}</span>
+            <span class="toc-lb">${v}</span>
+          </div>`).join('')}
+        </nav>
+      </div>`;
+  });
+
+  globalNav.innerHTML = sectionHtml;
+
+  // Overflow logic (same as other layouts)
+  const allGlobalItems = [...globalNav.querySelectorAll('.toc-item')];
+  const hiddenItems2 = allGlobalItems.filter(item => !visibleViews.includes(item.dataset.view));
+  const useOverflow2 = hiddenItems2.length > 1;
+  const visibleItems2 = useOverflow2
+    ? allGlobalItems.filter(item => visibleViews.includes(item.dataset.view))
+    : allGlobalItems;
+
+  if (useOverflow2) {
+    hiddenItems2.forEach(item => {
+      item.remove();
+      item.classList.add('overflow-item');
+      overflowMenu.appendChild(item);
+    });
+  }
+
+  visibleItems2.forEach(n => {
+    n.classList.toggle('active', n.dataset.view === nav.global);
+    n.setAttribute('tabindex', '0');
+    n.setAttribute('role', 'link');
+    if (n.dataset.view === nav.global) n.setAttribute('aria-current', 'page');
+    else n.removeAttribute('aria-current');
+    const go = () => navigate(n.dataset.view);
+    n.onclick = go;
+    n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
+
+  overflowMenu.querySelectorAll('.toc-item').forEach(n => {
+    n.classList.toggle('active', n.dataset.view === nav.global);
+    n.setAttribute('tabindex', '0');
+    n.setAttribute('role', 'link');
+    const go = () => navigate(n.dataset.view);
+    n.onclick = go;
+    n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
+
+  overflowWrap.hidden = !useOverflow2;
+  if (useOverflow2) {
+    const toggle2 = overflowWrap.querySelector('.overflow-toggle');
+    const activeHiddenItem = hiddenItems2.find(item => item.dataset.view === nav.global);
+    toggle2.classList.toggle('has-active', Boolean(activeHiddenItem));
+    toggle2.firstChild.textContent = activeHiddenItem ? 'Mehr · aktiv ' : 'Mehr ';
+    toggle2.onclick = e => {
+      e.stopPropagation();
+      const isOpen = overflowWrap.classList.toggle('open');
+      overflowMenu.hidden = !isOpen;
+    };
+    overflowMenu.hidden = true;
+  }
+}
+
+/** Context view icons, indexed by data-view id. */
+const ICONS = {
+  'today': '◉',
+  'overview': '▦',
+  'weak-spots': '△',
+  'exams-global': '◷',
+};
+
 /** Share of mastered objectives for the workspace panel header. */
 function moduleProgress(state, moduleId) {
-  const objs = (state.learningObjectives || []).filter(o => o.moduleId === moduleId);
-  const done = objs.filter(o => o.status === 'done').length;
-  return { done, total: objs.length, pct: objectiveProgressPercent(done, objs.length) };
-}
 
 /**
  * Module section markup shared by the sidebar and the workspace panel:
@@ -254,6 +374,10 @@ export function renderSidebar() {
   }
   if (layout === 'workspace') {
     renderWorkspacePanel(state, nav, cur, currentView);
+  }
+
+  if (layout === 'context') {
+    renderContextNav(state, nav, cur);
   }
 
   // Global nav items (re-bind every render; no {once:true} so nav keeps working)
