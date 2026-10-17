@@ -103,6 +103,23 @@ await test('drawer slides in from the right', async () => {
   assert.ok(/\.sidebar\.open\s*\{\s*transform:\s*translateX\(0\)/.test(m), 'open drawer slides into view');
 });
 
+await test('mobile back button exists and is wired', async () => {
+  assert.ok(html.includes('id="mobileBack"'), 'back button exists');
+  assert.ok(/id="mobileBack"[^>]*aria-label="[^"]+"/.test(html), 'back button labeled');
+  assert.ok(css.includes('#mobileBack[hidden]'), 'hidden back button stays hidden');
+  const router = readFileSync(new URL('../js/views/router.js', import.meta.url), 'utf8');
+  assert.ok(router.includes('mobileBack'), 'router toggles back-button visibility per route');
+  const tabbar = readFileSync(new URL('../js/components/tabbar.js', import.meta.url), 'utf8');
+  assert.ok(tabbar.includes('mobileBack') && tabbar.includes('history.back()'), 'back button uses browser history');
+});
+
+await test('topbar stays usable on narrow desktop widths', async () => {
+  assert.ok(/max-width:\s*1020px/.test(css), 'narrow-desktop topbar rule exists');
+  for (const label of ['Heute', 'Module', 'Schwachstellen', 'Prüfungen']) {
+    assert.ok(html.includes(`aria-label="${label}"`), `topbar destination "${label}" keeps its name when collapsed`);
+  }
+});
+
 await test('no horizontal overflow or content hidden behind the bar', async () => {
   assert.ok(/body\s*\{[^}]*overflow-x:\s*hidden/.test(css), 'body clips horizontal overflow');
   assert.ok(/\.main\s*\{[^}]*overflow-x:\s*hidden/.test(css), 'main clips horizontal overflow');

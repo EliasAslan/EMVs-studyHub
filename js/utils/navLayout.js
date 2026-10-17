@@ -14,11 +14,17 @@
  */
 
 export const NAV_LAYOUTS = [
-  { id: 'full', label: 'Volle Seitenleiste', hint: 'Labels, Module und Aktionen' },
-  { id: 'rail', label: 'Kompakte Icon-Leiste', hint: 'Nur Icons mit Tooltips' },
-  { id: 'workspace', label: 'Arbeitsbereich', hint: 'Icon-Leiste plus Modul-Panel' },
-  { id: 'topbar', label: 'Obere Navigation', hint: 'Horizontale Leiste am oberen Rand' },
-  { id: 'dock', label: 'Schwebendes Dock', hint: 'Pillendock mit Hauptaktionen' },
+  { id: 'full', group: 'sidebar', label: 'Volle Seitenleiste', hint: 'Labels, Module und Aktionen' },
+  { id: 'rail', group: 'sidebar', label: 'Kompakte Icon-Leiste', hint: 'Nur Icons mit Tooltips' },
+  { id: 'workspace', group: 'sidebar', label: 'Arbeitsbereich', hint: 'Icon-Leiste plus Modul-Panel' },
+  { id: 'topbar', group: 'bar', label: 'Obere Navigation', hint: 'Horizontale Leiste am oberen Rand' },
+  { id: 'dock', group: 'bar', label: 'Schwebendes Dock', hint: 'Pillendock mit Hauptaktionen' },
+];
+
+/** Selector groups in Settings: sidebar styles, then the other layouts. */
+export const NAV_LAYOUT_GROUPS = [
+  { id: 'sidebar', label: 'Seitenleisten' },
+  { id: 'bar', label: 'Weitere Layouts' },
 ];
 
 /** Default preserves the long-standing compact rail behaviour. */

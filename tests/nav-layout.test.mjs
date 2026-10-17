@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import {
   NAV_LAYOUTS,
+  NAV_LAYOUT_GROUPS,
   DEFAULT_NAV_LAYOUT,
   isNavLayoutId,
   resolveNavLayout,
@@ -37,10 +38,17 @@ await test('registry holds the five layouts in selector order', async () => {
   assert.equal(DEFAULT_NAV_LAYOUT, 'rail');
   const ids = NAV_LAYOUTS.map(l => l.id);
   assert.equal(new Set(ids).size, ids.length, 'ids unique');
+  const groupIds = NAV_LAYOUT_GROUPS.map(g => g.id);
+  assert.deepEqual(groupIds, ['sidebar', 'bar']);
   for (const l of NAV_LAYOUTS) {
     assert.ok(l.label && l.label.length > 0, `${l.id} needs a label`);
     assert.ok(l.hint && l.hint.length > 0, `${l.id} needs a hint`);
+    assert.ok(groupIds.includes(l.group), `${l.id} needs a known selector group`);
   }
+  assert.deepEqual(
+    NAV_LAYOUTS.filter(l => l.group === 'sidebar').map(l => l.id),
+    ['full', 'rail', 'workspace'],
+    'sidebar group holds the three sidebar styles');
 });
 
 await test('isNavLayoutId accepts only known ids', async () => {

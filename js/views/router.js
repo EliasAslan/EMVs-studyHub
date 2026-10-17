@@ -255,6 +255,10 @@ function render() {
     t.classList.toggle('active', on);
     t.setAttribute('aria-current', on ? 'page' : 'false');
   });
+  // Mobile back control: only off the four primary tab destinations.
+  // history.back() preserves browser history instead of inventing a parent.
+  const backBtn = document.getElementById('mobileBack');
+  if (backBtn) backBtn.hidden = tabFor !== '';
   window.EMVS?.tabbar?.updateBadges?.();
 
   const fn = VIEWS[currentView] || VIEWS['today'] || VIEWS['overview'];

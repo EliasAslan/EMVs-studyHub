@@ -18,10 +18,10 @@
 <header id="topbar" hidden>
   <div class="topbar-brand"><span class="brand-mark">EMVS</span></div>
   <nav class="topbar-nav" aria-label="Hauptnavigation">
-    <button data-route="today" aria-current="false"><span aria-hidden="true">◉</span><span>Heute</span></button>
-    <button data-route="overview" aria-current="false"><span aria-hidden="true">▦</span><span>Module</span></button>
-    <button data-route="weak-spots" aria-current="false"><span aria-hidden="true">△</span><span>Schwach</span><span class="tb-badge" data-badge="weak" role="status" hidden></span></button>
-    <button data-route="exams-global" aria-current="false"><span aria-hidden="true">◷</span><span>Prüfungen</span><span class="tb-badge" data-badge="exam" role="status" hidden></span></button>
+    <button data-route="today" aria-current="false" aria-label="Heute"><span aria-hidden="true">◉</span><span>Heute</span></button>
+    <button data-route="overview" aria-current="false" aria-label="Module"><span aria-hidden="true">▦</span><span>Module</span></button>
+    <button data-route="weak-spots" aria-current="false" aria-label="Schwachstellen"><span aria-hidden="true">△</span><span>Schwach</span><span class="tb-badge" data-badge="weak" role="status" hidden></span></button>
+    <button data-route="exams-global" aria-current="false" aria-label="Prüfungen"><span aria-hidden="true">◷</span><span>Prüfungen</span><span class="tb-badge" data-badge="exam" role="status" hidden></span></button>
   </nav>
   <div class="topbar-actions">
     <button id="topbarMod" aria-label="Aktuelles Modul öffnen">Module</button>
@@ -32,6 +32,7 @@
 
 <div class="app">
   <header class="mobile-header">
+    <button class="icon-btn" id="mobileBack" aria-label="Zurück" hidden>‹</button>
     <span class="mobile-brand">EMVS</span>
     <div class="mobile-actions">
       <button class="icon-btn" id="searchBtn" aria-label="Suchen und Befehle (Strg+K)">⌕</button>

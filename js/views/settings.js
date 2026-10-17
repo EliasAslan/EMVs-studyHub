@@ -7,7 +7,7 @@ import { openModal, closeModal, confirmDialog } from '../components/modal.js';
 import { generateId, exportData, importData, clearAll, clearStorageError } from '../services/store.js';
 import { renderAuthPanel } from '../services/auth.js';
 import { setNavLayout } from '../components/sidebar.js';
-import { NAV_LAYOUTS, getNavLayout } from '../utils/navLayout.js';
+import { NAV_LAYOUTS, NAV_LAYOUT_GROUPS, getNavLayout } from '../utils/navLayout.js';
 import { getLocalAISettings, checkConnection, describeLocalAIError } from '../services/localAI.js';
 import { openPdfImport } from './pdf-import.js';
 
@@ -68,18 +68,21 @@ export function renderSettings(state) {
         </select>
       </div>
       <div class="field-row">
-        <label id="nav-layout-legend">Navigation</label>
-        <div class="nav-layout-pick" role="radiogroup" aria-labelledby="nav-layout-legend">
-          ${NAV_LAYOUTS.map(l => `
-            <label class="nav-layout-option${navLayout === l.id ? ' selected' : ''}">
-              <input type="radio" name="nav-layout" value="${l.id}"${navLayout === l.id ? ' checked' : ''}>
-              <span class="nl-preview nl-${l.id}" aria-hidden="true">
-                <span class="nl-bar"></span>${l.id === 'workspace' ? '<span class="nl-panel"></span>' : ''}<span class="nl-page"></span>
-              </span>
-              <span class="nl-text"><strong>${escapeHtml(l.label)}</strong><small>${escapeHtml(l.hint)}</small></span>
-            </label>`).join('')}
+        <div class="nav-layout-pick" role="radiogroup" aria-label="Navigation">
+          ${NAV_LAYOUT_GROUPS.map(g => `
+            <fieldset class="nav-layout-group">
+              <legend>${escapeHtml(g.label)}</legend>
+              ${NAV_LAYOUTS.filter(l => l.group === g.id).map(l => `
+                <label class="nav-layout-option${navLayout === l.id ? ' selected' : ''}">
+                  <input type="radio" name="nav-layout" value="${l.id}"${navLayout === l.id ? ' checked' : ''}>
+                  <span class="nl-preview nl-${l.id}" aria-hidden="true">
+                    <span class="nl-bar"></span>${l.id === 'workspace' ? '<span class="nl-panel"></span>' : ''}<span class="nl-page"></span>
+                  </span>
+                  <span class="nl-text"><strong>${escapeHtml(l.label)}</strong><small>${escapeHtml(l.hint)}</small></span>
+                </label>`).join('')}
+            </fieldset>`).join('')}
         </div>
-        <p class="muted" style="font-size: 12.5px; margin-top: 8px;">Wechselt sofort, ganz ohne Neuladen — die Auswahl bleibt gespeichert.</p>
+        <p class="muted" style="font-size: 12.5px; margin-top: 8px;">Wechselt sofort, ganz ohne Neuladen — die Auswahl bleibt gespeichert. Auf schmalen Bildschirmen nutzt Study Hub automatisch die mobile Navigation; die Desktop-Auswahl bleibt dabei erhalten.</p>
       </div>
     </div>
       </details>

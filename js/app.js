@@ -90,6 +90,7 @@ function init() {
     if (e.key === 'Escape') {
       window.EMVS.modal?.close();
       window.EMVS.palette?.close();
+      window.EMVS.tabbar?.closeMore?.();
       document.getElementById('sidebar')?.classList.remove('open');
       document.getElementById('sidebarOverlay')?.classList.remove('open');
       document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');

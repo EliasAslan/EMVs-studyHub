@@ -45,6 +45,7 @@ export function initTabbar() {
     if (e.target.id === 'more-overlay') closeMore();
   });
   document.getElementById('searchBtn')?.addEventListener('click', () => window.EMVS.palette?.open());
+  document.getElementById('mobileBack')?.addEventListener('click', () => window.history.back());
 
   // Hide tabbar on scroll down, show on scroll up (more reading room)
   const main = document.getElementById('main');
@@ -58,7 +59,7 @@ export function initTabbar() {
     lastY = y;
   }, { passive: true });
 
-  window.EMVS.tabbar = { updateBadges, openMore };
+  window.EMVS.tabbar = { updateBadges, openMore, closeMore };
   updateBadges();
 }
 
@@ -115,8 +116,7 @@ function openMore() {
   moreTrap = trapFocus(document.getElementById('more-sheet'), { onClose: () => {} });
 }
 
-function closeMore() {
-  const ov = document.getElementById('more-overlay');
+export function closeMore() {  const ov = document.getElementById('more-overlay');
   if (moreTrap) {
     const t = moreTrap;
     moreTrap = null;

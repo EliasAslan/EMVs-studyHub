@@ -10,6 +10,7 @@ import { navigate, getCurrentView, getCurrentParams } from '../views/router.js';
 import { MODULE_TABS, getNavState } from '../utils/navigation.js';
 import { getNavLayout, setNavLayoutSetting } from '../utils/navLayout.js';
 import { objectiveProgressPercent } from '../utils/dashboard.js';
+import { closeMore } from './tabbar.js';
 
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 
@@ -77,6 +78,7 @@ export function setNavLayout(layout) {
   const state = window.EMVS.getState();
   if (!setNavLayoutSetting(state, layout)) return false;
   window.EMVS.save();
+  try { closeMore(); } catch {}
   renderSidebar();
   return true;
 }
