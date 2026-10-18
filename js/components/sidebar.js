@@ -131,40 +131,27 @@ function renderContextNav(state, nav, cur) {
 
   if (!globalNav || !overflowWrap || !overflowMenu) return;
 
-  // Define the four context sections with their destinations
+  // View → human-readable label
+  const VIEW_LABELS = {
+    'today': 'Heute',
+    'overview': 'Module',
+    'weak-spots': 'Schwach',
+    'exams-global': 'Prüfungen',
+  };
+
+  // Each view belongs to exactly ONE intention group.
   const SECTIONS = [
-    { id: 'learn', label: 'Lernen', views: ['overview', 'weak-spots', 'exams-global'] },
+    { id: 'learn', label: 'Lernen', views: ['overview'] },
     { id: 'practice', label: 'Üben', views: ['exams-global', 'weak-spots'] },
-    { id: 'plan', label: 'Planen', views: ['today', 'overview'] },
-    { id: 'review', label: 'Wiederholen', views: ['overview', 'today'] },
+    { id: 'plan', label: 'Planen', views: ['today'] },
   ];
 
-  // Build all items in the current order, each with its section
-  const allItems = [
-    ...SECTIONS[0].views,
-    ...SECTIONS[1].views,
-    ...SECTIONS[2].views,
-    ...SECTIONS[3].views,
-  ];
-  const viewToSection = {};
-  SECTIONS.forEach(s => s.views.forEach(v => viewToSection[v] = s.id));
-
-  // Preserve canonical order for overflow: learn → practice → plan → review
-  const ORDER = ['today', 'overview', 'weak-spots', 'exams-global'];
   const visibleViews = ['today', 'overview', 'weak-spots', 'exams-global'];
-  const hiddenItems = allItems.filter(item => !visibleViews.includes(item));
-  const useOverflow = hiddenItems.length > 1;
-  const visibleItems = useOverflow
-    ? allItems.filter(item => visibleViews.includes(item))
-    : allItems;
-
-  // Reorder to match canonical ORDER
-  const orderedItems = visibleItems.sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
 
   // Wrap items into sections
   let sectionHtml = '';
   SECTIONS.forEach(section => {
-    const sectionViews = orderedItems.filter(v => viewToSection[v] === section.id);
+    const sectionViews = section.views.filter(v => visibleViews.includes(v));
     if (sectionViews.length === 0) return;
     sectionHtml += `
       <div class="context-section" aria-label="${escapeHtml(section.label)}">
@@ -173,9 +160,9 @@ function renderContextNav(state, nav, cur) {
         </div>
         <nav class="context-toc" role="list">${sectionViews.map(v => `
           <div class="toc-item context-item" data-view="${v}" role="listitem"
-            title="${escapeHtml(v)}" aria-label="${escapeHtml(v)}">
+            title="${escapeHtml(VIEW_LABELS[v] || v)}" aria-label="${escapeHtml(VIEW_LABELS[v] || v)}">
             <span class="toc-ico" aria-hidden="true">${ICONS[v] || '◉'}</span>
-            <span class="toc-lb">${v}</span>
+            <span class="toc-lb">${escapeHtml(VIEW_LABELS[v] || v)}</span>
           </div>`).join('')}
         </nav>
       </div>`;
@@ -244,6 +231,10 @@ const ICONS = {
 
 /** Share of mastered objectives for the workspace panel header. */
 function moduleProgress(state, moduleId) {
+  const objs = (state.learningObjectives || []).filter(o => o.moduleId === moduleId);
+  const done = objs.filter(o => o.status === 'done').length;
+  return { done, total: objs.length, pct: objectiveProgressPercent(done, objs.length) };
+}
 
 /**
  * Module section markup shared by the sidebar and the workspace panel:

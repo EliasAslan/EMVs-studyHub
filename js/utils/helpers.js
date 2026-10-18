@@ -209,7 +209,7 @@ export function hasWeeklyReview(state, week, year, moduleId = null) {
  */
 export function getReviewAttention(state, { moduleId = null, limit = 5, now = Date.now() } = {}) {
   const allDue = getDueObjectives(state, moduleId, now);
-  const weakSpots = getWeakSpots(state, { moduleId, limit: 3 });
+  const weakSpots = getWeakSpots(state, { moduleId, limit: 3, now });
   const scopes = moduleId ? [moduleId] : (state.modules || []).map(m => m.id);
   const leftovers = scopes
     .flatMap(id => getPlanLeftovers(state, id, new Date(now)))
@@ -607,8 +607,7 @@ export function getObjectiveExamSignal(state, obj) {
  *  - studytime:  high linked exam weight but below-median study time
  *  - mistakes / questions: repeated mistake/question captures
  */
-export function getWeaknessBreakdown(state, obj) {
-  const now = Date.now();
+export function getWeaknessBreakdown(state, obj, now = Date.now()) {
   const day = 86400000;
   const signals = [];
   const stabilizers = [];
@@ -705,10 +704,10 @@ export function getModuleStudyMedian(state, moduleId) {
  * weakness score above zero, highest first. Includes done objectives —
  * verstandene Ziele can be forgotten too.
  */
-export function getWeakSpots(state, { moduleId = null, limit = 20 } = {}) {
+export function getWeakSpots(state, { moduleId = null, limit = 20, now = Date.now() } = {}) {
   return state.learningObjectives
     .filter(o => (moduleId ? o.moduleId === moduleId : true))
-    .map(objective => ({ objective, breakdown: getWeaknessBreakdown(state, objective) }))
+    .map(objective => ({ objective, breakdown: getWeaknessBreakdown(state, objective, now) }))
     .filter(x => x.breakdown.score > 0)
     .sort((a, b) => b.breakdown.score - a.breakdown.score || ((a.objective.number ?? 0) - (b.objective.number ?? 0)))
     .slice(0, limit);
