@@ -10,6 +10,9 @@ import { initModal } from './components/modal.js';
 import { initToast } from './components/toast.js';
 import { initTaskPanel } from './components/taskPanel.js';
 import { initTabbar } from './components/tabbar.js';
+import { initLayoutChrome } from './components/nav/index.js';
+import { goTo, showShortcuts, kbdLabel } from './components/nav/shared.js';
+import { shortcutMap } from './utils/navigation.js';
 import { navigate, VIEWS, getCurrentView, routeFromHash } from './views/router.js';
 import { openQuickCapture } from './views/captures.js';
 import { startTimer } from './views/module-sessions.js';
@@ -54,6 +57,7 @@ function init() {
   initTaskPanel();
   initPalette();
   initTabbar();
+  initLayoutChrome();
 
   // Hash routing (deep-linkable tabs + module sub-tabs)
   window.addEventListener('hashchange', routeFromHash);
@@ -79,7 +83,10 @@ function init() {
   });
   overlayEl?.addEventListener('click', () => setSidebar(false));
   
-  // Keyboard shortcuts
+  // Keyboard shortcuts. Single-key destinations come from the same registry
+  // the navigation layouts render (utils/navigation.js DESTINATIONS), so the
+  // key shown in a menu is always the key that works.
+  const destKeys = shortcutMap();
   document.addEventListener('keydown', (e) => {
     const isMod = e.metaKey || e.ctrlKey;
     if (isMod && e.key.toLowerCase() === 'k') {
@@ -91,49 +98,53 @@ function init() {
       window.EMVS.modal?.close();
       window.EMVS.palette?.close();
       window.EMVS.tabbar?.closeMore?.();
+      window.EMVS.closeNavChrome?.();
       document.getElementById('sidebar')?.classList.remove('open');
       document.getElementById('sidebarOverlay')?.classList.remove('open');
       document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
       return;
     }
     if (window.EMVS.palette?.isOpen()) return;
-    if (!isMod && !e.target.matches('input, textarea, select')) {
-      if (e.key === '1') navigate('today');
-      else if (e.key === '2') navigate('overview');
-      else if (e.key === '3') navigate('weak-spots');
-      else if (e.key === '4') navigate('exams-global');
-      else if (e.key === '5') navigate('weekly-review');
-      else if (e.key === '6') navigate('tools');
-      else if (e.key === '7') navigate('settings');
-      else if (e.key === '8') navigate('exam-prep');
-      else if (e.key.toLowerCase() === 's') {
-        const st = window.EMVS.getState();
-        const moduleId = st.settings.currentModuleId || st.modules[0]?.id;
-        if (moduleId) startTimer(moduleId, 25);
+    if (isMod || e.altKey) return;
+    const target = e.target;
+    if (target.matches?.('input, textarea, select') || target.isContentEditable) return;
+    // Dialogs, the More sheet and the launchpad own the keyboard while open:
+    // otherwise a key typed in a dialog would navigate or start a timer behind it.
+    if (document.querySelector('#modal-overlay.open, #more-overlay.open, #launchpad.open')) return;
+
+    const key = e.key.toLowerCase();
+    if (destKeys[e.key]) { goTo(destKeys[e.key]); return; }
+    if (e.key === '/') { e.preventDefault(); window.EMVS.palette?.open(); return; }
+    if (e.key === '?') { showShortcuts(); return; }
+    if (key === 'g' && window.EMVS.getLayout?.() === 'bento') { window.EMVS.launchpad?.toggle(); return; }
+    if (key === 'm' && window.EMVS.getLayout?.() === 'focus') { window.EMVS.focusMenu?.toggle(); return; }
+    if (key === 's') {
+      const st = window.EMVS.getState();
+      const moduleId = st.settings.currentModuleId || st.modules[0]?.id;
+      if (moduleId) startTimer(moduleId, 25);
+    }
+    else if (key === 'q') {
+      const st = window.EMVS.getState();
+      if (st.modules.length) openQuickCapture({ moduleId: st.settings.currentModuleId || st.modules[0].id });
+    }
+    else if (key === 'f') {
+      const st = window.EMVS.getState();
+      const objective = getMostOverdueObjective(st) || getWeakestObjective(st);
+      if (objective) {
+        st.settings.currentModuleId = objective.moduleId;
+        window.EMVS.save();
+        window.EMVS.renderSidebar();
+        openObjectiveHistory(objective.id);
       }
-      else if (e.key.toLowerCase() === 'q') {
-        const st = window.EMVS.getState();
-        if (st.modules.length) openQuickCapture({ moduleId: st.settings.currentModuleId || st.modules[0].id });
-      }
-      else if (e.key.toLowerCase() === 'f') {
-        const st = window.EMVS.getState();
-        const objective = getMostOverdueObjective(st) || getWeakestObjective(st);
-        if (objective) {
-          st.settings.currentModuleId = objective.moduleId;
-          window.EMVS.save();
-          window.EMVS.renderSidebar();
-          openObjectiveHistory(objective.id);
-        }
-      }
-      else if (e.key.toLowerCase() === 'c') {
-        const st = window.EMVS.getState();
-        if (st.modules.length) openQuickCapture({ moduleId: st.settings.currentModuleId || null });
-      }
+    }
+    else if (key === 'c') {
+      const st = window.EMVS.getState();
+      if (st.modules.length) openQuickCapture({ moduleId: st.settings.currentModuleId || null });
     }
   });
   
   // Set keyboard hint
-  document.getElementById('kbd-hint').textContent = navigator.platform.includes('Mac') ? '⌘K' : 'Ctrl+K';
+  document.getElementById('kbd-hint').textContent = kbdLabel();
   
   console.log('EMVS initialized');
 }

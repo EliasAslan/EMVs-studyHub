@@ -2,6 +2,8 @@
  * Bottom tabbar + More sheet wiring.
  * Tabs: Heute / Module / + Erfassen (FAB) / Schwach / Prüfungen
  * Secondary views live in the More sheet + header.
+ * Capture ([data-capture]) and More ([data-open-more]) triggers are shared
+ * by every navigation layout.
  */
 import { navigate, getCurrentView } from '../views/router.js';
 import { openQuickCapture } from '../views/captures.js';
@@ -12,16 +14,15 @@ let moreTrap = null;
 let moreTrigger = null;
 
 export function initTabbar() {
-  document.querySelectorAll('#tabbar .tab[data-route]').forEach(t => {
+  document.querySelectorAll('#tabbar .tab[data-route], #dock [data-route]').forEach(t => {
     t.addEventListener('click', () => navigate(t.dataset.route));
   });
-  document.querySelectorAll('#topbar [data-route], #dock [data-route]').forEach(t => {
-    t.addEventListener('click', () => navigate(t.dataset.route));
+  // Capture and "more" triggers exist in several layouts and some layouts
+  // re-render their bar, so they are handled by one delegated listener.
+  document.addEventListener('click', e => {
+    if (e.target.closest('[data-capture]')) { quickCapture(); return; }
+    if (e.target.closest('[data-open-more]')) { openMore(); }
   });
-  document.getElementById('tabCapture')?.addEventListener('click', quickCapture);
-  document.getElementById('railCapture')?.addEventListener('click', quickCapture);
-  document.getElementById('topbarCapture')?.addEventListener('click', quickCapture);
-  document.getElementById('dockCapture')?.addEventListener('click', quickCapture);
 
   document.querySelectorAll('#more-sheet [data-route]').forEach(b => {
     b.addEventListener('click', () => {
@@ -29,23 +30,18 @@ export function initTabbar() {
       navigate(b.dataset.route);
     });
   });
-  document.getElementById('moreBtn')?.addEventListener('click', openMore);
-  document.getElementById('railMore')?.addEventListener('click', openMore);
-  document.getElementById('topbarMore')?.addEventListener('click', openMore);
-  document.getElementById('dockMore')?.addEventListener('click', openMore);
   document.getElementById('railMod')?.addEventListener('click', () => navigate('overview'));
-  document.getElementById('topbarMod')?.addEventListener('click', () => {
-    const st = window.EMVS.getState();
-    const cur = st.settings.currentModuleId;
-    if (cur) navigate('module', { id: cur, tab: 'home' });
-    else navigate('overview');
-  });
   document.getElementById('more-close')?.addEventListener('click', closeMore);
   document.getElementById('more-overlay')?.addEventListener('click', e => {
     if (e.target.id === 'more-overlay') closeMore();
   });
   document.getElementById('searchBtn')?.addEventListener('click', () => window.EMVS.palette?.open());
-  document.getElementById('mobileBack')?.addEventListener('click', () => window.history.back());
+  // Back follows browser history; with nothing to go back to (deep link,
+  // fresh tab) it climbs to the parent instead of doing nothing.
+  document.getElementById('mobileBack')?.addEventListener('click', () => {
+    if (window.history.length > 1) window.history.back();
+    else navigate('overview');
+  });
 
   // Hide tabbar on scroll down, show on scroll up (more reading room)
   const main = document.getElementById('main');
@@ -95,6 +91,14 @@ function setBadge(kind, n, label) {
   });
 }
 
+function moreTriggers() {
+  return [...document.querySelectorAll('[data-open-more]')];
+}
+
+function visibleMoreTrigger() {
+  return moreTriggers().find(el => el.offsetParent !== null) || null;
+}
+
 function openMore() {
   const ov = document.getElementById('more-overlay');
   if (!ov || ov.classList.contains('open')) return;
@@ -109,32 +113,27 @@ function openMore() {
   } catch {}
   ov.classList.add('open');
   ov.setAttribute('aria-hidden', 'false');
-  document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'true');
-  document.getElementById('railMore')?.setAttribute('aria-expanded', 'true');
-  document.getElementById('topbarMore')?.setAttribute('aria-expanded', 'true');
-  document.getElementById('dockMore')?.setAttribute('aria-expanded', 'true');
-  moreTrap = trapFocus(document.getElementById('more-sheet'), { onClose: () => {} });
+  moreTriggers().forEach(el => el.setAttribute('aria-expanded', 'true'));
+  // Escape inside the trap must really close the sheet (an empty onClose
+  // would release the trap but leave the sheet open).
+  moreTrap = trapFocus(document.getElementById('more-sheet'), { onClose: () => closeMore(false) });
 }
 
-export function closeMore() {  const ov = document.getElementById('more-overlay');
+export function closeMore(restoreFocus = true) {
+  const ov = document.getElementById('more-overlay');
+  const wasTrapped = !!moreTrap;
   if (moreTrap) {
     const t = moreTrap;
     moreTrap = null;
     releaseTrap(t);
-    ov?.classList.remove('open');
-    ov?.setAttribute('aria-hidden', 'true');
-    document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'false');
-    document.getElementById('railMore')?.setAttribute('aria-expanded', 'false');
-    document.getElementById('topbarMore')?.setAttribute('aria-expanded', 'false');
-    document.getElementById('dockMore')?.setAttribute('aria-expanded', 'false');
-    (moreTrigger || document.getElementById('railMore') || document.getElementById('moreBtn'))?.focus?.();
-    moreTrigger = null;
-    return;
   }
   ov?.classList.remove('open');
   ov?.setAttribute('aria-hidden', 'true');
-  document.getElementById('moreBtn')?.setAttribute('aria-expanded', 'false');
-  document.getElementById('railMore')?.setAttribute('aria-expanded', 'false');
-  document.getElementById('topbarMore')?.setAttribute('aria-expanded', 'false');
-  document.getElementById('dockMore')?.setAttribute('aria-expanded', 'false');
+  moreTriggers().forEach(el => el.setAttribute('aria-expanded', 'false'));
+  if (wasTrapped && restoreFocus) {
+    // The trigger may have been re-rendered while the sheet was open.
+    const target = moreTrigger && moreTrigger.isConnected ? moreTrigger : visibleMoreTrigger();
+    target?.focus?.();
+  }
+  moreTrigger = null;
 }

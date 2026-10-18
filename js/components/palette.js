@@ -11,6 +11,10 @@ import { openCaptureModal as openCaptureSheet, openQuickCapture as openQuickCapt
 import { openReviewModal as openWeeklyReviewSheet } from '../views/weekly-review.js';
 import { openObjectiveHistory } from '../views/module-objectives.js';
 import { getDueObjectives, getMostOverdueObjective, getWeakestObjective } from '../utils/helpers.js';
+import { DESTINATIONS } from '../utils/navigation.js';
+import { NAV_LAYOUTS } from '../utils/navLayout.js';
+import { setNavLayout } from './sidebar.js';
+import { goTo, goModule, showShortcuts } from './nav/shared.js';
 
 export function initPalette() {
   const overlay = document.getElementById('palette-overlay');
@@ -41,16 +45,25 @@ export function initPalette() {
       action(moduleId);
     };
     
-    // Global navigation
-    add({ label: 'Heute', aliases: ['start', 'übersicht', 'fokus'], group: 'navigation', action: () => navigate('today'), shortcut: '1' });
-    add({ label: 'Schwachstellen', aliases: ['schwach', 'probleme', 'fällig', 'wiederholen'], group: 'navigation', action: () => navigate('weak-spots'), shortcut: '2' });
-    add({ label: 'Prüfungen', aliases: ['prüfung', 'examen'], group: 'navigation', action: () => navigate('exams-global') });
+    // Global navigation — labels and shortcut keys come from the shared
+    // destination registry, so the palette can never advertise a wrong key.
+    const NAV_ALIASES = {
+      'today': ['start', 'übersicht', 'fokus'],
+      'overview': ['module', 'fächer', 'alle module'],
+      'weak-spots': ['schwach', 'probleme', 'fällig', 'wiederholen'],
+      'exams-global': ['prüfung', 'examen', 'termine'],
+      'weekly-review': ['wochenreview', 'reflexion', 'rückblick'],
+      'tools': ['links', 'ressourcen', 'tools'],
+      'exam-prep': ['vorbereitung', 'mock'],
+      'settings': ['setup', 'konfiguration', 'navigation'],
+      'captures': ['notizen', 'alle erfassungen', 'fragen', 'fehler', 'gedanken'],
+    };
+    Object.keys(NAV_ALIASES).forEach(id => {
+      const d = DESTINATIONS[id];
+      add({ label: d.label, aliases: NAV_ALIASES[id], group: 'navigation', action: () => goTo(id), shortcut: d.key });
+    });
     add({ label: 'Erfassen', aliases: ['capture', 'notiz', 'frage', 'fehler', 'gedanke'], group: 'navigation', action: () => openQuickCapture() });
-    add({ label: 'Review', aliases: ['wochenreview', 'reflexion'], group: 'navigation', action: () => navigate('weekly-review') });
-    add({ label: 'Werkzeuge', aliases: ['links', 'ressourcen', 'tools'], group: 'navigation', action: () => navigate('tools') });
-    add({ label: 'Prüfungsvorbereitung', aliases: ['vorbereitung', 'mock'], group: 'navigation', action: () => navigate('exam-prep') });
-    add({ label: 'Einstellungen', aliases: ['setup', 'konfiguration'], group: 'navigation', action: () => navigate('settings') });
-    
+
     // Module-specific
     state.modules.forEach(m => {
       ['Home', 'Lernziele', 'Ressourcen', 'Sitzungen', 'Prüfungen', 'Plan'].forEach(sub => {
@@ -93,25 +106,49 @@ export function initPalette() {
     add({ label: 'Backup importieren', aliases: ['wiederherstellen'], group: 'verwalten', action: () => importBackup() });
     add({ label: 'Theme: Hell', aliases: ['hell', 'licht'], group: 'ansicht', action: () => setTheme('light') });
     add({ label: 'Theme: Dunkel', aliases: ['dunkel', 'dark'], group: 'ansicht', action: () => setTheme('dark') });
+    add({ label: 'Tastenkürzel anzeigen', aliases: ['hilfe', 'shortcuts', 'tasten'], group: 'hilfe', action: () => showShortcuts(), shortcut: '?' });
+    NAV_LAYOUTS.forEach(l => add({
+      label: `Navigation: ${l.label}`, aliases: ['layout', 'ansicht', 'navigation', l.hint],
+      group: 'ansicht', action: () => setNavLayout(l.id),
+    }));
     
     const filtered = q
       ? cmds.filter(c => [c.label, ...(c.aliases || [])].join(' ').toLowerCase().includes(q))
       : cmds;
-    items = filtered;
+    // Content search: learning objectives, notes and material by text.
+    const hits = [];
+    if (q.length >= 2) {
+      const has = (v) => String(v ?? '').toLowerCase().includes(q);
+      const clip = (v, n = 64) => { const s = String(v ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+      state.learningObjectives.filter(o => has(o.title)).slice(0, 6).forEach(o => hits.push({
+        label: `Lernziel · ${clip(o.title)}`, group: 'lernziel',
+        action: () => { goModule(o.moduleId, 'ziele'); openObjectiveHistory(o.id); },
+      }));
+      (state.captures || []).filter(c => has(c?.content)).slice(0, 5).forEach(c => hits.push({
+        label: `Notiz · ${clip(c.content)}`, group: 'notiz', action: () => goTo('captures'),
+      }));
+      state.resources.filter(r => has(r.name)).slice(0, 5).forEach(r => hits.push({
+        label: `Material · ${clip(r.name)}`, group: 'material', action: () => goModule(r.moduleId, 'material'),
+      }));
+    }
+    const results = [...filtered, ...hits];
+    items = results;
     selected = 0;
     
-    if (!filtered.length) {
+    if (!results.length) {
       list.innerHTML = `<div class="palette-empty">Keine Treffer.</div>`;
+      input.removeAttribute('aria-activedescendant');
       return;
     }
     
-    list.innerHTML = filtered.map((c, i) => `
-      <div class="palette-item ${i === 0 ? 'selected' : ''}" data-i="${i}" role="option">
+    list.innerHTML = results.map((c, i) => `
+      <div class="palette-item ${i === 0 ? 'selected' : ''}" id="palette-opt-${i}" data-i="${i}" role="option" aria-selected="${i === 0}">
         <span>${escapeHtml(c.label)}</span>
         <span class="palette-meta"><span class="group">${escapeHtml(c.group)}</span>${c.shortcut ? `<kbd>${escapeHtml(c.shortcut)}</kbd>` : ''}</span>
       </div>
     `).join('');
     
+    input.setAttribute('aria-activedescendant', 'palette-opt-0');
     list.querySelectorAll('.palette-item').forEach(item => {
       item.addEventListener('click', () => execute(+item.dataset.i));
       item.addEventListener('mouseenter', () => select(+item.dataset.i));
@@ -120,7 +157,11 @@ export function initPalette() {
   
   function select(i) {
     selected = i;
-    list.querySelectorAll('.palette-item').forEach((el, idx) => el.classList.toggle('selected', idx === i));
+    list.querySelectorAll('.palette-item').forEach((el, idx) => {
+      el.classList.toggle('selected', idx === i);
+      el.setAttribute('aria-selected', String(idx === i));
+    });
+    input.setAttribute('aria-activedescendant', `palette-opt-${i}`);
   }
   
   function execute(i) {
@@ -130,7 +171,10 @@ export function initPalette() {
     cmd.action();
   }
   
+  let returnFocus = null;
+
   function open() {
+    if (!overlay.classList.contains('open')) returnFocus = document.activeElement;
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
     input.setAttribute('role', 'combobox');
@@ -141,9 +185,15 @@ export function initPalette() {
   }
 
   function close() {
+    const wasOpen = overlay.classList.contains('open');
     overlay.classList.remove('open');
     overlay.setAttribute('aria-hidden', 'true');
     input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+    // Hand focus back to where the user came from — unless the chosen
+    // command moved it on (dialog, page change).
+    if (wasOpen && returnFocus && returnFocus.isConnected && document.activeElement === input) returnFocus.focus?.();
+    if (wasOpen) returnFocus = null;
   }
   
   function move(delta) {

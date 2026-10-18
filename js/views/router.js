@@ -7,7 +7,7 @@
 
 import { stopSessionsTimerDisplay } from './module-sessions.js';
 import { stopMockExamDisplay } from './mock-exam.js';
-import { resolveModuleTab, getNavState, LEGACY_VIEW_TO_TAB } from '../utils/navigation.js';
+import { resolveModuleTab, isModuleTabKey, getNavState, LEGACY_VIEW_TO_TAB } from '../utils/navigation.js';
 
 export const VIEWS = {};
 let currentView = 'today';
@@ -155,8 +155,11 @@ export function routeFromHash() {
   // #/modul/:id/:tab
   if (segs[0] === 'modul') {
     const st = window.EMVS?.getState?.();
-    let id = segs[1] || st?.settings?.currentModuleId || st?.modules?.[0]?.id || '';
-    const tab = resolveModuleTab(segs[2]);
+    // '#/modul//ziele' (no current module) collapses to ['modul','ziele']:
+    // a lone tab name is a tab, never a module id.
+    const loneTab = segs.length === 2 && isModuleTabKey(segs[1]);
+    let id = (loneTab ? '' : segs[1]) || st?.settings?.currentModuleId || st?.modules?.[0]?.id || '';
+    const tab = resolveModuleTab(loneTab ? segs[1] : segs[2]);
     if (st && id && st.settings) {
       st.settings.currentModuleId = id;
       try { window.EMVS.save(); } catch {}
@@ -245,20 +248,22 @@ function render() {
   });
 
   // Bottom tabbar state (module detail counts as overview).
-  // Topbar and dock share the same destinations and stay in sync.
+  // The dock shares the same destinations and stays in sync.
   const tabFor = currentView === 'module' ? 'overview'
     : currentView === 'today' ? 'today'
     : currentView === 'weak-spots' ? 'weak-spots'
     : currentView === 'exams-global' ? 'exams-global' : '';
-  document.querySelectorAll('#tabbar .tab[data-route], #topbar [data-route], #dock [data-route]').forEach(t => {
+  document.querySelectorAll('#tabbar .tab[data-route], #dock [data-route]').forEach(t => {
     const on = t.dataset.route === tabFor;
     t.classList.toggle('active', on);
     t.setAttribute('aria-current', on ? 'page' : 'false');
   });
-  // Mobile back control: only off the four primary tab destinations.
+  // Mobile back control: off the four primary tab destinations, and on
+  // module pages (a module is a child of the Module overview, even though
+  // the Module tab stays highlighted there).
   // history.back() preserves browser history instead of inventing a parent.
   const backBtn = document.getElementById('mobileBack');
-  if (backBtn) backBtn.hidden = tabFor !== '';
+  if (backBtn) backBtn.hidden = tabFor !== '' && currentView !== 'module';
   window.EMVS?.tabbar?.updateBadges?.();
 
   const fn = VIEWS[currentView] || VIEWS['today'] || VIEWS['overview'];
@@ -269,6 +274,9 @@ function render() {
   const node = fn(state, currentParams);
   if (node) root.appendChild(node);
   document.getElementById('main')?.scrollTo?.({ top: 0 });
+  // Layouts (context modes, tree, mega bar, launchpad, focus handle,
+  // mobile header) refresh their active state from this single event.
+  document.dispatchEvent(new CustomEvent('emvs:navigated', { detail: { view: currentView, params: { ...currentParams } } }));
 }
 
 // Make navigate available globally for palette (guard: window.EMVS is

@@ -8,6 +8,23 @@ import { generateId, exportData, importData, clearAll, clearStorageError } from 
 import { renderAuthPanel } from '../services/auth.js';
 import { setNavLayout } from '../components/sidebar.js';
 import { NAV_LAYOUTS, NAV_LAYOUT_GROUPS, getNavLayout } from '../utils/navLayout.js';
+
+/** Tiny schematic of each navigation layout for the picker (decorative). */
+function layoutPreview(id) {
+  switch (id) {
+    case 'rail': return '<i class="nl-bar nl-slim"></i><i class="nl-page"></i>';
+    case 'workspace': return '<i class="nl-bar nl-slim"></i><i class="nl-panel"></i><i class="nl-page"></i>';
+    case 'tree': return '<i class="nl-bar nl-wide nl-lines"></i><i class="nl-page"></i>';
+    case 'mega': return '<i class="nl-top"></i><i class="nl-drop"></i><i class="nl-page"></i>';
+    case 'dock': return '<i class="nl-page"></i><i class="nl-pill"></i>';
+    case 'mobile': return '<i class="nl-phonetop"></i><i class="nl-page"></i><i class="nl-tabs"></i>';
+    case 'context': return '<i class="nl-bar nl-wide nl-segs"></i><i class="nl-page"></i>';
+    case 'command': return '<i class="nl-top nl-search"></i><i class="nl-page"></i>';
+    case 'bento': return '<i class="nl-cell nl-c1"></i><i class="nl-cell nl-c2"></i><i class="nl-cell nl-c3"></i><i class="nl-cell nl-c4"></i>';
+    case 'focus': return '<i class="nl-page"></i><i class="nl-dot"></i>';
+    default: return '<i class="nl-bar"></i><i class="nl-page"></i>';
+  }
+}
 import { getLocalAISettings, checkConnection, describeLocalAIError } from '../services/localAI.js';
 import { openPdfImport } from './pdf-import.js';
 
@@ -75,14 +92,12 @@ export function renderSettings(state) {
               ${NAV_LAYOUTS.filter(l => l.group === g.id).map(l => `
                 <label class="nav-layout-option${navLayout === l.id ? ' selected' : ''}">
                   <input type="radio" name="nav-layout" value="${l.id}"${navLayout === l.id ? ' checked' : ''}>
-                  <span class="nl-preview nl-${l.id}" aria-hidden="true">
-                    <span class="nl-bar"></span>${l.id === 'workspace' ? '<span class="nl-panel"></span>' : ''}<span class="nl-page"></span>
-                  </span>
+                  <span class="nl-preview nl-${l.id}" aria-hidden="true">${layoutPreview(l.id)}</span>
                   <span class="nl-text"><strong>${escapeHtml(l.label)}</strong><small>${escapeHtml(l.hint)}</small></span>
                 </label>`).join('')}
             </fieldset>`).join('')}
         </div>
-        <p class="muted" style="font-size: 12.5px; margin-top: 8px;">Wechselt sofort, ganz ohne Neuladen — die Auswahl bleibt gespeichert. Auf schmalen Bildschirmen nutzt Study Hub automatisch die mobile Navigation; die Desktop-Auswahl bleibt dabei erhalten.</p>
+        <p class="muted" style="font-size: 12.5px; margin-top: 8px;">Wechselt sofort, ganz ohne Neuladen — die Auswahl bleibt gespeichert. Auf schmalen Bildschirmen nutzt Study Hub automatisch die mobile Navigation (Befehlspalette: Strg+K; „Navigation: …“ wechselt das Layout von überall); die Desktop-Auswahl bleibt dabei erhalten.</p>
       </div>
     </div>
       </details>

@@ -1,9 +1,11 @@
 /**
  * Sidebar Component
- * Three desktop layouts (full / rail / workspace), selected in Settings
- * and persisted in settings.navLayout. Global destinations stay static in
- * index.html; the module section (current module Home + tabs, switcher)
- * renders here and — in workspace layout — also into the secondary panel.
+ * Owns the classic shell (rail / workspace) and applies the active layout
+ * (settings.navLayout, ten styles — see utils/navLayout.js). Global
+ * destinations stay static in index.html; the module section (current
+ * module Home + tabs, switcher) renders here and — in workspace layout —
+ * also into the secondary panel. The newer layouts (context, tree, mega,
+ * command, bento, focus) render through components/nav/.
  */
 
 import { navigate, getCurrentView, getCurrentParams } from '../views/router.js';
@@ -11,6 +13,8 @@ import { MODULE_TABS, getNavState } from '../utils/navigation.js';
 import { getNavLayout, setNavLayoutSetting } from '../utils/navLayout.js';
 import { objectiveProgressPercent } from '../utils/dashboard.js';
 import { closeMore } from './tabbar.js';
+import { renderLayoutChrome } from './nav/index.js';
+import { openLaunchpad } from './nav/bento.js';
 
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 
@@ -52,34 +56,46 @@ function applyCurrentModuleAccent() {
   const module = state.modules.find(m => m.id === state.settings.currentModuleId) || state.modules[0];
   const accent = module?.accent || '#b45309';
   const root = document.documentElement;
+  // Soft/ink tints depend on the theme: a light tint on the dark theme
+  // would put the theme's light text on a light background.
+  const dark = root.dataset.theme === 'dark';
   root.style.setProperty('--accent', accent);
-  root.style.setProperty('--accent-soft', mixHex(accent, '#ffffff', 0.82));
-  root.style.setProperty('--accent-ink', mixHex(accent, '#1c1917', 0.35));
+  root.style.setProperty('--accent-soft', dark ? mixHex(accent, '#16120c', 0.8) : mixHex(accent, '#ffffff', 0.82));
+  root.style.setProperty('--accent-ink', dark ? mixHex(accent, '#ffffff', 0.5) : mixHex(accent, '#1c1917', 0.35));
   root.style.setProperty('--on-accent', getReadableTextColor(accent));
+}
+
+// Theme switches (Settings, palette) only flip data-theme: re-derive the tints.
+if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined') {
+  new MutationObserver(() => { try { applyCurrentModuleAccent(); } catch {} })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }
 
 export function isSidebarExpanded() {
   try {
-    return getNavLayout(window.EMVS.getState()) === 'full';
+    return getNavLayout(window.EMVS.getState()) === 'tree';
   } catch {
     return false;
   }
 }
 
 export function setSidebarExpanded(expanded) {
-  setNavLayout(expanded ? 'full' : 'rail');
+  setNavLayout(expanded ? 'tree' : 'rail');
 }
 
 /**
  * Persist a layout choice and apply it immediately (no reload).
- * Unknown ids are ignored.
+ * Unknown ids are ignored. Choosing Bento opens its launchpad right away:
+ * the launchpad is that layout's home, so the switch shows it.
  */
 export function setNavLayout(layout) {
   const state = window.EMVS.getState();
+  const before = getNavLayout(state);
   if (!setNavLayoutSetting(state, layout)) return false;
   window.EMVS.save();
   try { closeMore(); } catch {}
   renderSidebar();
+  if (layout === 'bento' && before !== 'bento') openLaunchpad();
   return true;
 }
 
@@ -92,142 +108,31 @@ function goModule(id, tab) {
 }
 
 /**
- * Apply the active layout to the shell: body hook for CSS, the legacy
- * `expanded` rail class for 'full' (all existing expanded styles reuse),
- * rail toggle state, and the workspace panel visibility.
+ * Apply the active layout to the shell: body hook for CSS, the `expanded`
+ * (labeled) sidebar class for tree and focus, rail toggle state, and the
+ * workspace panel visibility.
  */
 function applyNavLayout(layout) {
   try {
     document.body.dataset.navlayout = layout;
   } catch {}
   const sidebarEl = document.getElementById('sidebar');
-  sidebarEl?.classList.toggle('expanded', layout === 'full');
+  sidebarEl?.classList.toggle('expanded', ['tree', 'focus', 'context', 'mobile'].includes(layout));
   const toggle = document.getElementById('railToggle');
   if (toggle) {
-    const expanded = layout === 'full';
+    const expanded = layout === 'tree';
     toggle.setAttribute('aria-expanded', String(expanded));
-    toggle.setAttribute('aria-label', expanded ? 'Seitenleiste einklappen' : 'Seitenleiste erweitern');
-    toggle.setAttribute('title', expanded ? 'Seitenleiste einklappen' : 'Seitenleiste erweitern');
+    toggle.setAttribute('aria-label', expanded ? 'Zur Icon-Leiste einklappen' : 'Seitenleiste als Baum erweitern');
+    toggle.setAttribute('title', expanded ? 'Zur Icon-Leiste einklappen' : 'Seitenleiste als Baum erweitern');
     toggle.querySelector('.rail-toggle-ico')?.replaceChildren(document.createTextNode(expanded ? '«' : '»'));
     if (!toggle.dataset.wired) {
       toggle.dataset.wired = '1';
-      toggle.addEventListener('click', () => setNavLayout(getNavLayout(window.EMVS.getState()) === 'full' ? 'rail' : 'full'));
+      toggle.addEventListener('click', () => setNavLayout(getNavLayout(window.EMVS.getState()) === 'tree' ? 'rail' : 'tree'));
     }
   }
   const panel = document.getElementById('workspace-panel');
   if (panel && layout !== 'workspace') panel.hidden = true;
 }
-
-/**
- * Render the Context layout's sidebar navigation.
- * Groups global view buttons into 4 sections (Lernen/Üben/Planen/Wiederholen).
- * All buttons keep their existing data-view attribute and href, so active-state
- * and router logic remain unchanged.
- */
-function renderContextNav(state, nav, cur) {
-  const globalNav = document.getElementById('nav-global');
-  const overflowWrap = document.getElementById('sidebar-overflow');
-  const overflowMenu = document.getElementById('overflow-menu');
-
-  if (!globalNav || !overflowWrap || !overflowMenu) return;
-
-  // View → human-readable label
-  const VIEW_LABELS = {
-    'today': 'Heute',
-    'overview': 'Module',
-    'weak-spots': 'Schwach',
-    'exams-global': 'Prüfungen',
-  };
-
-  // Each view belongs to exactly ONE intention group.
-  const SECTIONS = [
-    { id: 'learn', label: 'Lernen', views: ['overview'] },
-    { id: 'practice', label: 'Üben', views: ['exams-global', 'weak-spots'] },
-    { id: 'plan', label: 'Planen', views: ['today'] },
-  ];
-
-  const visibleViews = ['today', 'overview', 'weak-spots', 'exams-global'];
-
-  // Wrap items into sections
-  let sectionHtml = '';
-  SECTIONS.forEach(section => {
-    const sectionViews = section.views.filter(v => visibleViews.includes(v));
-    if (sectionViews.length === 0) return;
-    sectionHtml += `
-      <div class="context-section" aria-label="${escapeHtml(section.label)}">
-        <div class="context-section-header">
-          <span class="context-section-title">${escapeHtml(section.label)}</span>
-        </div>
-        <nav class="context-toc" role="list">${sectionViews.map(v => `
-          <div class="toc-item context-item" data-view="${v}" role="listitem"
-            title="${escapeHtml(VIEW_LABELS[v] || v)}" aria-label="${escapeHtml(VIEW_LABELS[v] || v)}">
-            <span class="toc-ico" aria-hidden="true">${ICONS[v] || '◉'}</span>
-            <span class="toc-lb">${escapeHtml(VIEW_LABELS[v] || v)}</span>
-          </div>`).join('')}
-        </nav>
-      </div>`;
-  });
-
-  globalNav.innerHTML = sectionHtml;
-
-  // Overflow logic (same as other layouts)
-  const allGlobalItems = [...globalNav.querySelectorAll('.toc-item')];
-  const hiddenItems2 = allGlobalItems.filter(item => !visibleViews.includes(item.dataset.view));
-  const useOverflow2 = hiddenItems2.length > 1;
-  const visibleItems2 = useOverflow2
-    ? allGlobalItems.filter(item => visibleViews.includes(item.dataset.view))
-    : allGlobalItems;
-
-  if (useOverflow2) {
-    hiddenItems2.forEach(item => {
-      item.remove();
-      item.classList.add('overflow-item');
-      overflowMenu.appendChild(item);
-    });
-  }
-
-  visibleItems2.forEach(n => {
-    n.classList.toggle('active', n.dataset.view === nav.global);
-    n.setAttribute('tabindex', '0');
-    n.setAttribute('role', 'link');
-    if (n.dataset.view === nav.global) n.setAttribute('aria-current', 'page');
-    else n.removeAttribute('aria-current');
-    const go = () => navigate(n.dataset.view);
-    n.onclick = go;
-    n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
-  });
-
-  overflowMenu.querySelectorAll('.toc-item').forEach(n => {
-    n.classList.toggle('active', n.dataset.view === nav.global);
-    n.setAttribute('tabindex', '0');
-    n.setAttribute('role', 'link');
-    const go = () => navigate(n.dataset.view);
-    n.onclick = go;
-    n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
-  });
-
-  overflowWrap.hidden = !useOverflow2;
-  if (useOverflow2) {
-    const toggle2 = overflowWrap.querySelector('.overflow-toggle');
-    const activeHiddenItem = hiddenItems2.find(item => item.dataset.view === nav.global);
-    toggle2.classList.toggle('has-active', Boolean(activeHiddenItem));
-    toggle2.firstChild.textContent = activeHiddenItem ? 'Mehr · aktiv ' : 'Mehr ';
-    toggle2.onclick = e => {
-      e.stopPropagation();
-      const isOpen = overflowWrap.classList.toggle('open');
-      overflowMenu.hidden = !isOpen;
-    };
-    overflowMenu.hidden = true;
-  }
-}
-
-/** Context view icons, indexed by data-view id. */
-const ICONS = {
-  'today': '◉',
-  'overview': '▦',
-  'weak-spots': '△',
-  'exams-global': '◷',
-};
 
 /** Share of mastered objectives for the workspace panel header. */
 function moduleProgress(state, moduleId) {
@@ -367,78 +272,21 @@ export function renderSidebar() {
     renderWorkspacePanel(state, nav, cur, currentView);
   }
 
-  if (layout === 'context') {
-    renderContextNav(state, nav, cur);
-  }
+  // Global destinations: active state + activation (re-bound on every render).
+  document.querySelectorAll('#nav-global .toc-item').forEach(n => {
+    n.classList.toggle('active', n.dataset.view === nav.global);
+    n.setAttribute('tabindex', '0');
+    n.setAttribute('role', 'link');
+    if (n.dataset.view === nav.global) n.setAttribute('aria-current', 'page');
+    else n.removeAttribute('aria-current');
+    const go = () => navigate(n.dataset.view);
+    n.onclick = go;
+    n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+  });
 
-  // Global nav items (re-bind every render; no {once:true} so nav keeps working)
-  const globalNav = document.getElementById('nav-global');
-  const overflowWrap = document.getElementById('sidebar-overflow');
-  const overflowMenu = document.getElementById('overflow-menu');
-  if (globalNav && overflowWrap && overflowMenu) {
-    // Restore any overflowed items in canonical order (nav also holds
-    // dividers/buttons, so plain appendChild would scramble the layout).
-    const ORDER = ['today', 'overview', 'weak-spots', 'exams-global'];
-    [...overflowMenu.querySelectorAll('.toc-item')].forEach(item => {
-      item.classList.remove('overflow-item');
-      const idx = ORDER.indexOf(item.dataset.view);
-      const ref = [...globalNav.querySelectorAll('.toc-item')].find(
-        el => ORDER.indexOf(el.dataset.view) > idx
-      );
-      globalNav.insertBefore(item, ref || globalNav.querySelector('.rail-div, .rail-fab, .rail-more, .rail-mod'));
-    });
-    overflowMenu.replaceChildren();
-
-    const allGlobalItems = [...globalNav.querySelectorAll('.toc-item')];
-    const visibleViews = ['today', 'overview', 'weak-spots', 'exams-global'];
-    const hiddenItems = allGlobalItems.filter(item => !visibleViews.includes(item.dataset.view));
-    const useOverflow = hiddenItems.length > 1;
-    const visibleItems = useOverflow
-      ? allGlobalItems.filter(item => visibleViews.includes(item.dataset.view))
-      : allGlobalItems;
-
-    if (useOverflow) {
-      hiddenItems.forEach(item => {
-        item.remove();
-        item.classList.add('overflow-item');
-        overflowMenu.appendChild(item);
-      });
-    }
-
-    visibleItems.forEach(n => {
-      n.classList.toggle('active', n.dataset.view === nav.global);
-      n.setAttribute('tabindex', '0');
-      n.setAttribute('role', 'link');
-      if (n.dataset.view === nav.global) n.setAttribute('aria-current', 'page');
-      else n.removeAttribute('aria-current');
-      const go = () => navigate(n.dataset.view);
-      n.onclick = go;
-      n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
-    });
-
-    overflowMenu.querySelectorAll('.toc-item').forEach(n => {
-      n.classList.toggle('active', n.dataset.view === nav.global);
-      n.setAttribute('tabindex', '0');
-      n.setAttribute('role', 'link');
-      const go = () => navigate(n.dataset.view);
-      n.onclick = go;
-      n.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
-    });
-
-    overflowWrap.hidden = !useOverflow;
-    if (useOverflow) {
-      const toggle2 = overflowWrap.querySelector('.overflow-toggle');
-      const activeHiddenItem = hiddenItems.find(item => item.dataset.view === nav.global);
-      toggle2.classList.toggle('has-active', Boolean(activeHiddenItem));
-      toggle2.firstChild.textContent = activeHiddenItem ? 'Mehr · aktiv ' : 'Mehr ';
-      toggle2.onclick = e => {
-        e.stopPropagation();
-        const isOpen = overflowWrap.classList.toggle('open');
-        overflowMenu.hidden = !isOpen;
-      };
-      overflowMenu.hidden = true;
-    }
-  }
+  // Layout-specific chrome (context modes, tree, mega/command/bento bars,
+  // focus handle) and the contextual mobile header.
+  renderLayoutChrome(layout, state);
 
   // Current-module presence chip in the rail
   const railMod = document.getElementById('railMod');
@@ -449,16 +297,6 @@ export function renderSidebar() {
       railMod.title = `Aktuelles Modul ${cur.code} — Module wählen`;
       railMod.querySelector('.rail-mod-dot').style.background = 'var(--accent)';
     }
-  }
-
-  // Current-module chip in the topbar (same data, same destination model)
-  const topbarMod = document.getElementById('topbarMod');
-  if (topbarMod) {
-    topbarMod.textContent = cur ? `Modul ${cur.code}` : 'Module';
-    topbarMod.setAttribute('aria-label', cur
-      ? `Aktuelles Modul ${cur.code} öffnen`
-      : 'Kein Modul ausgewählt — Module öffnen');
-    topbarMod.title = cur ? `Modul ${cur.code} — ${cur.title}` : 'Module öffnen';
   }
 }
 

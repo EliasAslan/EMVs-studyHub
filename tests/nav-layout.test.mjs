@@ -11,6 +11,7 @@ import {
   NAV_LAYOUTS,
   NAV_LAYOUT_GROUPS,
   DEFAULT_NAV_LAYOUT,
+  LEGACY_NAV_LAYOUTS,
   isNavLayoutId,
   resolveNavLayout,
   getNavLayout,
@@ -33,71 +34,63 @@ async function test(name, fn) {
   }
 }
 
-await test('registry holds the six layouts in selector order', async () => {
-  assert.deepEqual(NAV_LAYOUTS.map(l => l.id), ['full', 'rail', 'workspace', 'topbar', 'dock', 'context']);
+const TEN = ['rail', 'workspace', 'tree', 'mega', 'dock', 'mobile', 'context', 'command', 'bento', 'focus'];
+
+await test('registry holds the ten requested layouts in selector order', async () => {
+  assert.deepEqual(NAV_LAYOUTS.map(l => l.id), TEN);
   assert.equal(DEFAULT_NAV_LAYOUT, 'rail');
   const ids = NAV_LAYOUTS.map(l => l.id);
   assert.equal(new Set(ids).size, ids.length, 'ids unique');
   const groupIds = NAV_LAYOUT_GROUPS.map(g => g.id);
-  assert.deepEqual(groupIds, ['sidebar', 'bar']);
   for (const l of NAV_LAYOUTS) {
     assert.ok(l.label && l.label.length > 0, `${l.id} needs a label`);
     assert.ok(l.hint && l.hint.length > 0, `${l.id} needs a hint`);
     assert.ok(groupIds.includes(l.group), `${l.id} needs a known selector group`);
   }
-  assert.deepEqual(
-    NAV_LAYOUTS.filter(l => l.group === 'sidebar').map(l => l.id),
-    ['full', 'rail', 'workspace'],
-    'sidebar group holds the three sidebar styles');
+  for (const g of groupIds) {
+    assert.ok(NAV_LAYOUTS.some(l => l.group === g), `group ${g} is not empty`);
+  }
 });
 
 await test('isNavLayoutId accepts only known ids', async () => {
-  assert.equal(isNavLayoutId('full'), true);
-  assert.equal(isNavLayoutId('rail'), true);
-  assert.equal(isNavLayoutId('workspace'), true);
-  assert.equal(isNavLayoutId('topbar'), true);
-  assert.equal(isNavLayoutId('dock'), true);
-  assert.equal(isNavLayoutId('context'), true);
-  assert.equal(isNavLayoutId(''), false);
-  assert.equal(isNavLayoutId(null), false);
-  assert.equal(isNavLayoutId(undefined), false);
-  assert.equal(isNavLayoutId('RAIL'), false, 'ids are case-sensitive');
+  for (const id of TEN) assert.equal(isNavLayoutId(id), true, id);
+  for (const bad of ['full', 'topbar', '', 'RAIL', null, undefined, 3, {}]) {
+    assert.equal(isNavLayoutId(bad), false, String(bad));
+  }
 });
 
-await test('resolveNavLayout prefers stored ids, migrates legacy flag', async () => {
-  assert.equal(resolveNavLayout('full', {}), 'full');
-  assert.equal(resolveNavLayout('workspace', { settings: { sidebarExpanded: true } }), 'workspace', 'stored id wins over legacy flag');
-  assert.equal(resolveNavLayout('bogus', {}), 'rail', 'unknown → default');
-  assert.equal(resolveNavLayout('', {}), 'rail');
-  assert.equal(resolveNavLayout(null, {}), 'rail');
-  assert.equal(resolveNavLayout(undefined, { settings: { sidebarExpanded: true } }), 'full', 'legacy expanded migrates to full');
-  assert.equal(resolveNavLayout(undefined, { settings: { sidebarExpanded: false } }), 'rail');
-  assert.equal(resolveNavLayout(undefined, {}), 'rail', 'no flag → default');
-  assert.equal(resolveNavLayout(undefined, null), 'rail', 'null state → default');
+await test('legacy layout ids migrate to their successors', async () => {
+  assert.deepEqual(LEGACY_NAV_LAYOUTS, { full: 'tree', topbar: 'mega' });
+  assert.equal(resolveNavLayout('full', {}), 'tree');
+  assert.equal(resolveNavLayout('topbar', {}), 'mega');
+  assert.equal(getNavLayout({ settings: { navLayout: 'full' } }), 'tree');
+  assert.equal(getNavLayout({ settings: { navLayout: 'topbar' } }), 'mega');
+});
+
+await test('resolveNavLayout prefers stored ids, migrates the sidebarExpanded flag', async () => {
+  assert.equal(resolveNavLayout('bento', { settings: { sidebarExpanded: true } }), 'bento');
+  assert.equal(resolveNavLayout(undefined, { settings: { sidebarExpanded: true } }), 'tree');
+  assert.equal(resolveNavLayout(undefined, { settings: {} }), 'rail');
+  assert.equal(resolveNavLayout('nonsense', null), 'rail');
+  assert.equal(resolveNavLayout('constructor', {}), 'rail', 'prototype keys are not layouts');
 });
 
 await test('getNavLayout reads state settings safely', async () => {
-  assert.equal(getNavLayout({ settings: { navLayout: 'workspace' } }), 'workspace');
-  assert.equal(getNavLayout({ settings: {} }), 'rail');
-  assert.equal(getNavLayout({ settings: { navLayout: 'nope' } }), 'rail', 'invalid stored id falls back');
-  assert.equal(getNavLayout({}), 'rail');
   assert.equal(getNavLayout(null), 'rail');
-  assert.equal(getNavLayout(undefined), 'rail');
+  assert.equal(getNavLayout({}), 'rail');
+  assert.equal(getNavLayout({ settings: { navLayout: 'focus' } }), 'focus');
+  assert.equal(getNavLayout({ settings: { navLayout: 'nope' } }), 'rail');
 });
 
 await test('setNavLayoutSetting persists valid ids only', async () => {
-  const state = { settings: {} };
-  assert.equal(setNavLayoutSetting(state, 'workspace'), true);
-  assert.equal(state.settings.navLayout, 'workspace');
-  assert.equal(setNavLayoutSetting(state, 'full'), true);
-  assert.equal(state.settings.navLayout, 'full');
-  assert.equal(setNavLayoutSetting(state, 'sidebar'), false, 'unknown id rejected');
-  assert.equal(state.settings.navLayout, 'full', 'rejected id leaves state untouched');
-  assert.equal(setNavLayoutSetting(state, ''), false);
-  assert.equal(setNavLayoutSetting(state, null), false);
+  const state = { settings: { navLayout: 'rail' } };
+  assert.equal(setNavLayoutSetting(state, 'command'), true);
+  assert.equal(state.settings.navLayout, 'command');
+  assert.equal(setNavLayoutSetting(state, 'full'), false, 'legacy ids are read, never written');
+  assert.equal(state.settings.navLayout, 'command');
   const bare = {};
-  assert.equal(setNavLayoutSetting(bare, 'rail'), true, 'missing settings object is created');
-  assert.equal(bare.settings.navLayout, 'rail');
+  assert.equal(setNavLayoutSetting(bare, 'mobile'), true);
+  assert.equal(bare.settings.navLayout, 'mobile');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

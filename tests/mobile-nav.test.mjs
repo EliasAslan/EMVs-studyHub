@@ -79,7 +79,7 @@ await test('mobile breakpoint shows tabbar and keeps desktop chrome away', async
   assert.ok(/\.tabbar\s*\{\s*display:\s*grid/.test(m), 'tabbar becomes a grid on mobile');
   assert.ok(!/\.menu-btn\s*\{\s*display:\s*none/.test(css), 'drawer toggle is never hidden');
   assert.ok(m.includes('#workspace-panel') && m.includes('display: none !important'), 'workspace panel off on mobile');
-  assert.ok(m.includes('#topbar') && m.includes('#dock'), 'topbar/dock rules present on mobile');
+  assert.ok(m.includes('#topchrome') && m.includes('#dock') && m.includes('#focus-handle'), 'top chrome/dock/focus handle are off on mobile');
   assert.ok(/\.tabbar\s*\{\s*display:\s*none/.test(css), 'tabbar hidden on desktop');
 });
 
@@ -113,11 +113,13 @@ await test('mobile back button exists and is wired', async () => {
   assert.ok(tabbar.includes('mobileBack') && tabbar.includes('history.back()'), 'back button uses browser history');
 });
 
-await test('topbar stays usable on narrow desktop widths', async () => {
-  assert.ok(/max-width:\s*1020px/.test(css), 'narrow-desktop topbar rule exists');
+await test('every layout keeps named destinations; mobile header is contextual', async () => {
   for (const label of ['Heute', 'Module', 'Schwachstellen', 'Prüfungen']) {
-    assert.ok(html.includes(`aria-label="${label}"`), `topbar destination "${label}" keeps its name when collapsed`);
+    assert.ok(html.includes(`aria-label="${label}"`), `dock destination "${label}" keeps its name`);
   }
+  assert.ok(html.includes('id="mobileTitle"'), 'mobile header has a contextual title');
+  assert.ok(html.includes('id="topchrome"'), 'shared top chrome container exists');
+  assert.ok(css.includes('body[data-navlayout="mobile"] .tabbar'), 'mobile layout shows the bottom bar on wide screens');
 });
 
 await test('no horizontal overflow or content hidden behind the bar', async () => {

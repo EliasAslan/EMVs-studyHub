@@ -18,34 +18,145 @@ export const MODULE_TABS = [
 /** Landing tab when a module is opened without an explicit tab. */
 export const DEFAULT_MODULE_TAB = 'home';
 
-/** Top-level destinations in the sidebar rail / tabbar. */
 /**
- * Context navigation grouping by student intention.
- * "Learn" → modules, topics, learning objectives and resources.
- * "Practice" → exercises, quizzes and exam simulations.
- * "Plan" → planner, deadlines, tasks and study sessions.
- * "Review" → progress, weak topics, completed objectives and revision.
+ * Every place a student can go. One registry feeds the rail, mega menu,
+ * context modes, bento launchpad, command palette, focus drawer and the
+ * keyboard shortcuts, so labels, icons and keys can never drift apart.
+ *
+ * - `view`      → router view name (global destinations)
+ * - `moduleTab` → module detail tab (needs a current module; see goTo())
+ * - `key`       → single-key shortcut (no modifier, outside inputs)
  */
-export const CONTEXT_GROUPS = [
-  { id: 'learn', label: 'Lernen', icon: '📚',
-    views: ['overview', 'module-homepage', 'module-ziele', 'module-plan', 'module-sessions', 'module-material'] },
-  { id: 'practice', label: 'Üben', icon: '✏️',
-    views: ['weekly-review', 'tools', 'module-homepage', 'module-ziele', 'module-plan', 'module-sessions', 'module-material'] },
-  { id: 'plan', label: 'Planen', icon: '📅',
-    views: ['today', 'weak-spots', 'weekly-review', 'tools'] },
-  { id: 'review', label: 'Wiederholen', icon: '📈',
-    views: ['weak-spots', 'exams-global', 'weekly-review', 'tools'] },
+export const DESTINATIONS = {
+  'today': { label: 'Heute', ico: '◉', view: 'today', key: '1', hint: 'Tagesfokus' },
+  'overview': { label: 'Module', ico: '▦', view: 'overview', key: '2', hint: 'Alle Module im Überblick' },
+  'weak-spots': { label: 'Schwachstellen', short: 'Schwach', ico: '△', view: 'weak-spots', key: '3', hint: 'Fällige Wiederholungen' },
+  'exams-global': { label: 'Prüfungen', ico: '◷', view: 'exams-global', key: '4', hint: 'Alle Termine' },
+  'weekly-review': { label: 'Review', ico: '✎', view: 'weekly-review', key: '5', hint: 'Wochenrückblick' },
+  'tools': { label: 'Werkzeuge', ico: '⚒', view: 'tools', key: '6', hint: 'Links und Ressourcen' },
+  'settings': { label: 'Einstellungen', ico: '⚙', view: 'settings', key: '7', hint: 'Konto, Daten, Navigation' },
+  'exam-prep': { label: 'Prüfungsvorbereitung', ico: '⧉', view: 'exam-prep', key: '8', hint: 'Stoff und Lücken erkennen' },
+  'mock-exam': { label: 'Mock-Prüfung', ico: '⏱', view: 'mock-exam', hint: 'Prüfung unter Zeitdruck simulieren' },
+  'captures': { label: 'Erfassungen', ico: '⚡', view: 'captures', hint: 'Fragen, Fehler und Gedanken' },
+  'module:home': { label: 'Modul-Home', ico: '⌂', moduleTab: 'home', hint: 'Übersicht des aktuellen Moduls' },
+  'module:ziele': { label: 'Lernziele', ico: '◎', moduleTab: 'ziele', hint: 'Ziele und Sicherheit' },
+  'module:plan': { label: 'Plan', ico: '≡', moduleTab: 'plan', hint: 'Wochenplan' },
+  'module:sessions': { label: 'Sitzungen', ico: '▶', moduleTab: 'sessions', hint: 'Lernzeit erfassen' },
+  'module:material': { label: 'Material', ico: '▤', moduleTab: 'material', hint: 'Ressourcen und Prüfungen' },
+};
+
+/** Destination id for a route, or null when the route has none. */
+export function destinationIdFor(currentView, params = {}) {
+  if (currentView === 'module') return `module:${resolveModuleTab(params.tab)}`;
+  return Object.prototype.hasOwnProperty.call(DESTINATIONS, currentView) ? currentView : null;
+}
+
+/** Single-key shortcut → destination id (derived, never hand-maintained). */
+export function shortcutMap() {
+  const map = {};
+  for (const [id, d] of Object.entries(DESTINATIONS)) {
+    if (d.key) map[d.key] = id;
+  }
+  return map;
+}
+
+/**
+ * Context navigation: destinations grouped by what the student wants to do
+ * right now. Each destination lives in exactly one mode, so the active
+ * page always maps to exactly one mode.
+ */
+export const CONTEXT_MODES = [
+  { id: 'learn', label: 'Lernen', ico: '◈', lede: 'Stoff verstehen und einordnen',
+    items: ['overview', 'module:home', 'module:ziele', 'module:material', 'tools'] },
+  { id: 'practice', label: 'Üben', ico: '✦', lede: 'Abfragen und Prüfungen trainieren',
+    items: ['exam-prep', 'mock-exam', 'module:sessions'] },
+  { id: 'plan', label: 'Planen', ico: '❏', lede: 'Heute, Woche und Termine',
+    items: ['today', 'module:plan', 'exams-global'] },
+  { id: 'review', label: 'Wiederholen', ico: '↻', lede: 'Schwachstellen und Rückblick',
+    items: ['weak-spots', 'weekly-review', 'captures'] },
+];
+
+export const DEFAULT_CONTEXT_MODE = 'plan';
+
+export function isContextModeId(id) {
+  return CONTEXT_MODES.some(m => m.id === id);
+}
+
+/** Mode that owns a destination id (null for e.g. settings). */
+export function contextModeFor(destId) {
+  const mode = CONTEXT_MODES.find(m => m.items.includes(destId));
+  return mode ? mode.id : null;
+}
+
+/**
+ * Mode to show: the mode of the current page wins (so navigating by any
+ * other means never leaves the sidebar on a mode that does not contain
+ * where you are); otherwise the stored choice; otherwise the default.
+ */
+export function resolveContextMode(destId, stored) {
+  return contextModeFor(destId) || (isContextModeId(stored) ? stored : DEFAULT_CONTEXT_MODE);
+}
+
+/**
+ * Mega menu structure. Groups hold destination ids, or `kind: 'modules'`
+ * for the live list of subjects. Top-level entries without groups are
+ * plain links.
+ */
+export const MEGA_MENUS = [
+  { id: 'heute', label: 'Heute', dest: 'today' },
+  { id: 'lernen', label: 'Lernen', groups: [
+    { title: 'Fächer', kind: 'modules' },
+    { title: 'Aktuelles Modul', items: ['module:home', 'module:ziele', 'module:material'] },
+    { title: 'Mehr', items: ['overview', 'tools'] },
+  ] },
+  { id: 'pruefen', label: 'Prüfen', groups: [
+    { title: 'Vorbereiten', items: ['exam-prep', 'mock-exam'] },
+    { title: 'Termine', items: ['exams-global'] },
+    { title: 'Wiederholen', items: ['weak-spots'] },
+  ] },
+  { id: 'planen', label: 'Planen', groups: [
+    { title: 'Planen', items: ['module:plan', 'module:sessions'] },
+    { title: 'Rückblick', items: ['weekly-review', 'captures'] },
+  ] },
+];
+
+/** Modules hold their pages in tabs; the tree's "chapters" are these tabs. */
+export const TREE_CHAPTERS = [
+  { tab: 'home', label: 'Home' },
+  { tab: 'ziele', label: 'Lernziele' },
+  { tab: 'plan', label: 'Plan' },
+  { tab: 'sessions', label: 'Sitzungen' },
+  { tab: 'material', label: 'Material' },
 ];
 
 /**
- * Global views mapped to their primary context group for the Context layout.
+ * Title + subtitle for the contextual mobile header.
+ * Module pages show the module code with the tab as subtitle.
  */
-export const GLOBAL_TO_CONTEXT = {
-  'today': 'plan',
-  'overview': 'learn',
-  'weak-spots': 'review',
-  'exams-global': 'review',
-};
+export function routeTitle(currentView, params = {}, state = null) {
+  if (currentView === 'module') {
+    const id = params.id || state?.settings?.currentModuleId || null;
+    const mod = (state?.modules || []).find(m => m.id === id);
+    const tab = MODULE_TABS.find(t => t.key === resolveModuleTab(params.tab));
+    return { title: mod ? `Modul ${mod.code}` : 'Modul', sub: tab ? tab.label : '' };
+  }
+  const d = DESTINATIONS[currentView];
+  return { title: d ? d.label : 'EMVS', sub: '' };
+}
+
+/** Breadcrumb trail [{label, dest}] for the command bar. */
+export function getBreadcrumb(currentView, params = {}, state = null) {
+  if (currentView === 'module') {
+    const t = routeTitle(currentView, params, state);
+    return [
+      { label: 'Module', dest: 'overview' },
+      { label: t.title, dest: 'module:home' },
+      ...(t.sub && t.sub !== 'Home' ? [{ label: t.sub, dest: null }] : []),
+    ];
+  }
+  const d = DESTINATIONS[currentView];
+  return [{ label: d ? d.label : 'EMVS', dest: d ? currentView : null }];
+}
 
 export const GLOBAL_VIEWS = ['today', 'overview', 'weak-spots', 'exams-global'];
 

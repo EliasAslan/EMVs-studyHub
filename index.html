@@ -15,28 +15,17 @@
 <body>
 <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
-<header id="topbar" hidden>
-  <div class="topbar-brand"><span class="brand-mark">EMVS</span></div>
-  <nav class="topbar-nav" aria-label="Hauptnavigation">
-    <button data-route="today" aria-current="false" aria-label="Heute"><span aria-hidden="true">◉</span><span>Heute</span></button>
-    <button data-route="overview" aria-current="false" aria-label="Module"><span aria-hidden="true">▦</span><span>Module</span></button>
-    <button data-route="weak-spots" aria-current="false" aria-label="Schwachstellen"><span aria-hidden="true">△</span><span>Schwach</span><span class="tb-badge" data-badge="weak" role="status" hidden></span></button>
-    <button data-route="exams-global" aria-current="false" aria-label="Prüfungen"><span aria-hidden="true">◷</span><span>Prüfungen</span><span class="tb-badge" data-badge="exam" role="status" hidden></span></button>
-  </nav>
-  <div class="topbar-actions">
-    <button id="topbarMod" aria-label="Aktuelles Modul öffnen">Module</button>
-    <button id="topbarCapture" aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen">+</button>
-    <button id="topbarMore" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
-  </div>
-</header>
+<header id="topchrome" class="topchrome" hidden></header>
 
 <div class="app">
   <header class="mobile-header">
     <button class="icon-btn" id="mobileBack" aria-label="Zurück" hidden>‹</button>
-    <span class="mobile-brand">EMVS</span>
+    <span class="mobile-brand" id="mobileTitle" aria-live="polite">EMVS</span>
     <div class="mobile-actions">
+      <button class="icon-btn" id="mobileAction" aria-label="Sitzung starten (25 Min)" title="Sitzung starten (25 Min)" hidden>▶</button>
+      <button class="icon-btn" id="mobileLaunch" aria-label="Launchpad öffnen" title="Launchpad" aria-haspopup="dialog" hidden>⊞</button>
       <button class="icon-btn" id="searchBtn" aria-label="Suchen und Befehle (Strg+K)">⌕</button>
-      <button class="icon-btn" id="moreBtn" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
+      <button class="icon-btn" id="moreBtn" data-open-more aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
       <button class="menu-btn" id="menuBtn" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sidebar">☰</button>
     </div>
   </header>
@@ -49,16 +38,18 @@
     </div>
     <button class="rail-toggle" id="railToggle" aria-expanded="false" aria-label="Seitenleiste erweitern" title="Seitenleiste erweitern"><span class="rail-toggle-ico" aria-hidden="true">»</span><span class="toc-lb">Leiste</span></button>
 
+    <div id="context-nav" class="context-nav" hidden></div>
+
     <div class="toc-label">Menü</div>
     <nav class="toc" id="nav-global" role="list">
       <div class="toc-item" data-view="today" role="listitem" title="Heute — Tagesfokus"><span class="toc-ico" aria-hidden="true">◉</span><span class="toc-num">01</span> <span class="toc-lb">Heute</span></div>
       <div class="toc-item" data-view="overview" role="listitem" title="Module — alle Module im Überblick"><span class="toc-ico" aria-hidden="true">▦</span><span class="toc-num">02</span> <span class="toc-lb">Module</span></div>
       <div class="rail-div" aria-hidden="true"></div>
-      <button class="rail-fab" id="railCapture" aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" data-tip="Schnell erfassen: Frage, Fehler oder Gedanke festhalten"><span aria-hidden="true">+</span></button>
+      <button class="rail-fab" id="railCapture" data-capture aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" data-tip="Schnell erfassen: Frage, Fehler oder Gedanke festhalten"><span aria-hidden="true">+</span></button>
       <div class="toc-item" data-view="weak-spots" role="listitem" title="Schwachstellen"><span class="toc-ico" aria-hidden="true">△</span><span class="toc-num">03</span> <span class="toc-lb">Schwach</span><span class="rail-badge" id="railBadgeWeak" data-badge="weak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></div>
       <div class="toc-item" data-view="exams-global" role="listitem" title="Prüfungen — alle Termine"><span class="toc-ico" aria-hidden="true">◷</span><span class="toc-num">04</span> <span class="toc-lb">Prüfungen</span><span class="rail-badge" id="railBadgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></div>
       <div class="rail-div" aria-hidden="true"></div>
-      <button class="rail-more" id="railMore" aria-label="Weitere Bereiche öffnen: Review, Werkzeuge, Prüfungsvorbereitung, Einstellungen" title="Weitere Bereiche: Review, Werkzeuge, Prüfungsvorbereitung, Einstellungen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
+      <button class="rail-more" id="railMore" data-open-more aria-label="Weitere Bereiche öffnen: Review, Werkzeuge, Prüfungsvorbereitung, Einstellungen" title="Weitere Bereiche: Review, Werkzeuge, Prüfungsvorbereitung, Einstellungen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
       <button class="rail-mod" id="railMod" hidden><span class="rail-mod-dot" aria-hidden="true"></span><span class="rail-mod-code"></span></button>
     </nav>
     <div class="sidebar-overflow" id="sidebar-overflow" hidden>
@@ -68,6 +59,7 @@
 
     <div class="toc-label mod-label">Module</div>
     <div id="nav-modules"></div>
+    <div id="tree-nav" class="tree-nav" hidden></div>
 
     <div class="sidebar-footer">
       <button class="cmd-trigger" id="cmd-trigger" aria-label="Befehlspalette öffnen">
@@ -86,7 +78,7 @@
   <nav class="tabbar" id="tabbar" aria-label="Hauptbereiche">
     <button class="tab" data-route="today" aria-current="false"><span class="tab-ico" aria-hidden="true">◉</span><span class="tab-lb">Heute</span></button>
     <button class="tab" data-route="overview" aria-current="false"><span class="tab-ico" aria-hidden="true">▦</span><span class="tab-lb">Module</span></button>
-    <button class="tab fab" id="tabCapture" aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen"><span class="tab-fab-plus" aria-hidden="true">+</span></button>
+    <button class="tab fab" id="tabCapture" data-capture aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen"><span class="tab-fab-plus" aria-hidden="true">+</span></button>
     <button class="tab" data-route="weak-spots" aria-current="false"><span class="tab-ico" aria-hidden="true">△</span><span class="tab-lb">Schwach</span><span class="tab-badge" id="badgeWeak" data-badge="weak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></button>
     <button class="tab" data-route="exams-global" aria-current="false"><span class="tab-ico" aria-hidden="true">◷</span><span class="tab-lb">Prüfungen</span><span class="tab-badge" id="badgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></button>
   </nav>
@@ -111,11 +103,18 @@
 <nav id="dock" aria-label="Hauptnavigation" hidden>
   <button data-route="today" aria-current="false" aria-label="Heute"><span aria-hidden="true">◉</span></button>
   <button data-route="overview" aria-current="false" aria-label="Module"><span aria-hidden="true">▦</span></button>
-  <button id="dockCapture" aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen">+</button>
+  <button id="dockCapture" data-capture aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen">+</button>
   <button data-route="weak-spots" aria-current="false" aria-label="Schwachstellen"><span aria-hidden="true">△</span><span class="tb-badge" data-badge="weak" role="status" hidden></span></button>
   <button data-route="exams-global" aria-current="false" aria-label="Prüfungen"><span aria-hidden="true">◷</span><span class="tb-badge" data-badge="exam" role="status" hidden></span></button>
-  <button id="dockMore" aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
+  <button id="dockMore" data-open-more aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
 </nav>
+
+<button type="button" id="focus-handle" class="focus-handle" aria-expanded="false" aria-controls="sidebar" aria-label="Navigation öffnen" title="Navigation (M)" hidden><span aria-hidden="true">☰</span><span class="focus-where"></span></button>
+<div id="focus-edge" class="focus-edge" aria-hidden="true" hidden></div>
+
+<div class="launchpad" id="launchpad" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="lp-title">
+  <div class="lp-sheet" id="lp-sheet"></div>
+</div>
 
 <!-- Modal Overlay -->
 <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title">
@@ -133,7 +132,8 @@
 <div class="palette-overlay" id="palette-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Befehlspalette">
   <div class="palette" role="document">
     <input class="palette-input" id="palette-input" type="search" enterkeyhint="go" placeholder="Springe zu… oder führe aus…" autocomplete="off" aria-label="Befehlsuche" aria-controls="palette-list" aria-expanded="false">
-    <div class="palette-list" id="palette-list" role="listbox"></div>
+    <div class="palette-list" id="palette-list" role="listbox" aria-label="Treffer"></div>
+    <div class="palette-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> wählen</span><span><kbd>↵</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span></div>
   </div>
 </div>
 

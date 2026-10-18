@@ -43,3 +43,29 @@ package/build step is needed. Authentication requires an internet connection.
 - Download replaces the current local dataset after confirmation when data could be lost; export a JSON backup first. There is no automatic sync or merge.
 - Account-mismatch safeguards, row mapping, and sync status/error guidance are implemented in the manual workflow.
 
+## Navigation styles
+
+Settings → App-Einstellungen → Navigation offers ten styles. The choice applies
+instantly, is saved in `settings.navLayout`, and on phones every style falls
+back to the mobile shell (bottom bar + contextual header + drawer).
+
+| Style | Idea |
+| --- | --- |
+| Rail | Slim icon rail (default) |
+| Arbeitsbereich | Icon rail + contextual module panel |
+| Baum | Subjects → chapters → topics, keyboard-navigable tree |
+| Mega-Menü | Top bar with grouped mega menus |
+| Dock | Floating pill with the main destinations |
+| Mobil | Phone-first shell, also on desktop |
+| Kontext | Lernen / Üben / Planen / Wiederholen |
+| Befehl | Search-first bar + command palette + shortcuts |
+| Bento | Launchpad of cards (subjects, tests, activity, tools) |
+| Fokus | Navigation hidden; handle, `M`, or the left screen edge |
+
+Shortcuts: `1`–`8` destinations, `Strg/⌘+K` or `/` palette, `?` cheat sheet,
+`G` launchpad (Bento), `M` menu (Fokus). The palette can also switch the style
+(“Navigation: …”), so Fokus can never lock you out.
+
+Code map: `js/utils/navigation.js` (destinations, context modes, mega menu),
+`js/utils/navLayout.js` (registry), `js/utils/navData.js` (tree + bento data),
+`js/components/nav/` (one file per style).
