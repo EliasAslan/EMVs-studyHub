@@ -150,7 +150,7 @@ function moduleSectionHtml(state, nav, cur, currentView) {
   if (cur) {
     html += `
       <div class="mod-current" data-module="${cur.id}">
-        <button class="mod-current-head${nav.moduleTab === 'home' && currentView === 'module' ? ' active' : ''}" data-mtab-go="home" data-module="${cur.id}"
+        <button type="button" class="mod-current-head${nav.moduleTab === 'home' && currentView === 'module' ? ' active' : ''}" data-mtab-go="home" data-module="${cur.id}"
           title="Modul-Home — ${escapeHtml(cur.title)}" aria-label="Modul-Home — Modul ${escapeHtml(cur.code)}">
           <span class="toc-ico mod-home-ico" aria-hidden="true">⌂</span>
           <span class="rail-mod-dot" aria-hidden="true" style="background: var(--accent);"></span>
@@ -158,7 +158,7 @@ function moduleSectionHtml(state, nav, cur, currentView) {
         </button>
         <nav class="modtabs" data-module="${cur.id}" aria-label="Modulbereiche">
           ${MODULE_TABS.map(t => `
-            <button class="toc-item" data-mtab="${t.key}" data-module="${cur.id}" role="listitem"
+            <button type="button" class="toc-item" data-mtab="${t.key}" data-module="${cur.id}"
               title="${MTAB_META[t.key].tip}" aria-label="${MTAB_META[t.key].tip} — Modul ${escapeHtml(cur.code)}">
               <span class="toc-ico" aria-hidden="true">${MTAB_META[t.key].ico}</span><span class="toc-lb">${t.label}</span>
             </button>`).join('')}
@@ -168,9 +168,9 @@ function moduleSectionHtml(state, nav, cur, currentView) {
   if (state.modules.length > 1) {
     html += `
       <div class="toc-label">Alle Module</div>
-      <div class="mod-switcher-list" role="list">
+      <div class="mod-switcher-list">
         ${state.modules.map((m, i) => `
-          <button class="mod-pick${m.id === nav.moduleId ? ' active' : ''}" data-module-pick="${m.id}" role="listitem"
+          <button type="button" class="mod-pick${m.id === nav.moduleId ? ' active' : ''}" data-module-pick="${m.id}"
             title="Zu Modul ${escapeHtml(m.code)} wechseln" aria-label="Zu Modul ${escapeHtml(m.code)} — ${escapeHtml(m.title)} wechseln"
             ${m.id === nav.moduleId ? 'aria-current="page"' : ''}>
             <span class="toc-num" aria-hidden="true">${ROMAN[i] || (i + 1)}</span>
@@ -186,28 +186,16 @@ function moduleSectionHtml(state, nav, cur, currentView) {
 /** Bind one rendered module section (sidebar copy or panel copy). */
 function bindModuleSection(container) {
   // Module tab buttons: Home + 4 tabs keep module context.
+  // These controls are native buttons. Let the browser synthesize their
+  // click for Enter/Space; handling keydown as well would navigate twice.
   container.querySelectorAll('[data-mtab]').forEach(btn => {
-    btn.setAttribute('tabindex', '0');
-    const go = () => goModule(btn.dataset.module, btn.dataset.mtab);
-    btn.addEventListener('click', go);
-    btn.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
-    });
+    btn.addEventListener('click', () => goModule(btn.dataset.module, btn.dataset.mtab));
   });
   container.querySelectorAll('[data-mtab-go]').forEach(btn => {
-    btn.setAttribute('tabindex', '0');
-    const go = () => goModule(btn.dataset.module, btn.dataset.mtabGo);
-    btn.addEventListener('click', go);
-    btn.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
-    });
+    btn.addEventListener('click', () => goModule(btn.dataset.module, btn.dataset.mtabGo));
   });
   container.querySelectorAll('[data-module-pick]').forEach(btn => {
-    const go = () => goModule(btn.dataset.modulePick, 'home');
-    btn.addEventListener('click', go);
-    btn.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
-    });
+    btn.addEventListener('click', () => goModule(btn.dataset.modulePick, 'home'));
   });
 }
 
@@ -230,7 +218,7 @@ function renderWorkspacePanel(state, nav, cur, currentView) {
           ? `<h2 class="ws-title">Modul ${escapeHtml(cur.code)}</h2><p class="ws-sub">${escapeHtml(cur.title)}</p>`
           : `<h2 class="ws-title">Kein Modul</h2><p class="ws-sub">Lege ein Modul an, um zu starten.</p>`}
       </div>
-      <button class="ws-close" id="ws-close" aria-label="Modul-Panel schließen" title="Modul-Panel schließen">×</button>
+      <button class="ws-close" id="ws-close" aria-label="Arbeitsbereich einklappen und zur Rail wechseln" title="Arbeitsbereich einklappen"><span aria-hidden="true">‹</span></button>
     </div>
     ${prog ? `
       <div class="ws-progress" role="img" aria-label="${prog.done} von ${prog.total} Lernzielen gemeistert">

@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../css/main.css', import.meta.url), 'utf8');
+const sidebarJs = readFileSync(new URL('../js/components/sidebar.js', import.meta.url), 'utf8');
 
 let passed = 0;
 let failed = 0;
@@ -55,6 +56,18 @@ await test('tabbar covers the 4 primary destinations + capture', async () => {
   assert.ok(html.includes('id="tabCapture"'), 'capture FAB exists in tabbar');
   assert.ok(/id="tabCapture"[^>]*aria-label="[^"]+"/.test(html), 'capture FAB labeled');
   assert.ok(html.includes('id="badgeWeak"') && html.includes('id="badgeExam"'), 'tab badges present');
+});
+
+
+await test('capture is a secondary action, not a primary navigation destination', async () => {
+  assert.ok(/class="brand"[\s\S]*?id="railToggle"/.test(html), 'rail collapse control lives in the brand/header area');
+  assert.ok(/id="railCapture"[^>]*data-capture[^>]*>[\s\S]*?rail-capture-label/.test(html), 'rail capture has an explicit label in expanded navigation');
+  assert.ok(/id="ws-close"[^>]*aria-label="Arbeitsbereich einklappen/.test(sidebarJs), 'workspace collapse action explains its outcome');
+  const railFab = css.match(/\.rail-fab\s*\{([^}]*)\}/);
+  assert.ok(railFab && /background:\s*transparent/.test(railFab[1]), 'rail capture is not filled with the accent color');
+  const dockCapture = css.match(/#dockCapture\s*\{([^}]*)\}/);
+  assert.ok(dockCapture && /background:\s*transparent/.test(dockCapture[1]), 'dock capture is a secondary outlined action');
+  assert.ok(/\.tab-fab-plus\s*\{[^}]*background:\s*transparent/.test(css), 'mobile capture no longer uses a prominent filled pill');
 });
 
 await test('More sheet holds all secondary destinations', async () => {
