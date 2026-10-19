@@ -11,7 +11,7 @@
 
 import { escapeHtml, formatDateTime } from '../utils/helpers.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { generateId } from '../services/store.js';
+import { generateId, deleteWithTombstone } from '../services/store.js';
 import { CAPTURE_TYPES, CAPTURE_TYPE_LABELS } from '../utils/helpers.js';
 import { navigate, getCurrentView } from './router.js';
 
@@ -115,7 +115,7 @@ function paintCaptureList(el, state, modules, allObjectives) {
         message: 'Erfassung gelöscht',
         snapshot,
         remove: () => {
-          state.captures = state.captures.filter(x => x.id !== id);
+          deleteWithTombstone(state, 'captures', id);
         },
         restore: (snap) => {
           state.captures = snap;

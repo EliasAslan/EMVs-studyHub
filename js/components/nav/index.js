@@ -13,13 +13,11 @@ import { startTimer } from '../../views/module-sessions.js';
 import * as context from './context.js';
 import * as tree from './tree.js';
 import * as mega from './mega.js';
-import * as command from './command.js';
 import * as bento from './bento.js';
-import * as focus from './focus.js';
 import { currentModule, getState } from './shared.js';
 
-const STYLES = { context, tree, mega, command, bento, focus };
-const TOP_STYLES = ['mega', 'command', 'bento'];
+const STYLES = { context, tree, mega, bento };
+const TOP_STYLES = ['mega', 'bento'];
 
 let activeLayout = null;
 let initialized = false;
@@ -54,7 +52,6 @@ export function syncLayoutChrome() {
 export function closeTransient() {
   mega.closeMenus();
   bento.closeLaunchpad(false);
-  if (activeLayout === 'focus') focus.setFocusMenu(false);
 }
 
 /** Contextual mobile header: current section, back, and section action. */
@@ -70,7 +67,7 @@ export function syncMobileHeader(state = getState()) {
 }
 
 /**
- * The sidebar doubles as an off-canvas drawer (phones, Focus layout).
+ * The sidebar doubles as an off-canvas drawer (phones).
  * While it is closed and off-screen its controls must not be reachable by
  * Tab or screen readers, so it is made inert until it opens.
  */
@@ -78,7 +75,7 @@ export function syncSidebarInert() {
   const sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
   const phone = window.matchMedia && window.matchMedia('(max-width: 780px)').matches;
-  const offCanvas = phone || activeLayout === 'focus' || activeLayout === 'mobile';
+  const offCanvas = phone || activeLayout === 'mobile';
   const hide = offCanvas && !sidebar.classList.contains('open');
   if (hide) sidebar.setAttribute('inert', ''); else sidebar.removeAttribute('inert');
 }
@@ -109,6 +106,5 @@ export function initLayoutChrome() {
     open: bento.openLaunchpad, close: bento.closeLaunchpad,
     toggle: bento.toggleLaunchpad, isOpen: bento.isLaunchpadOpen,
   };
-  window.EMVS.focusMenu = { toggle: focus.toggleFocusMenu, isOpen: focus.isFocusMenuOpen, set: focus.setFocusMenu };
   window.EMVS.getLayout = () => activeLayout;
 }

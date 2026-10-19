@@ -12,7 +12,7 @@
 
 import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { generateId, ensureResourceFields, markResourceUsed, setResourceUnderstood, unlinkResourceEverywhere } from '../services/store.js';
+import { generateId, ensureResourceFields, markResourceUsed, setResourceUnderstood, unlinkResourceEverywhere, deleteWithTombstone } from '../services/store.js';
 import { RESOURCE_TYPES } from '../utils/helpers.js';
 import { getResourceUsage, formatLastUsed, rhythmOf } from '../utils/helpers.js';
 import { refresh, registerPatcher } from './router.js';
@@ -238,7 +238,7 @@ function bindResourceCard(card, el, state, moduleId) {
   card.querySelector('[data-act="delete"]')?.addEventListener('click', e => {
     e.stopPropagation();
     if (confirm('Ressource wirklich löschen? Verlauf und Verknüpfungen gehen verloren.')) {
-      state.resources = state.resources.filter(x => x.id !== id);
+      deleteWithTombstone(state, 'resources', id);
       // Unlink from sessions and plan items (keep them, drop the reference)
       unlinkResourceEverywhere(state, id);
       window.EMVS.save();

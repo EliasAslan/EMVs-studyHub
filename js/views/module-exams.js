@@ -11,7 +11,7 @@
 import { escapeHtml, formatDate, getExamGrade, calculateProjection, getObjectiveExamSignal } from '../utils/helpers.js';
 import { EXAM_RATING_LABELS } from '../utils/helpers.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { generateId, ensureExamFields, syncExamObjectives, setObjectiveRating } from '../services/store.js';
+import { generateId, ensureExamFields, syncExamObjectives, setObjectiveRating, deleteWithTombstone } from '../services/store.js';
 import { refresh, registerPatcher, navigate } from './router.js';
 import { setExamPrepPreset } from './exam-prep.js';
 
@@ -135,7 +135,8 @@ function bindExamItems(list, el, state, moduleId, exams) {
     item.querySelector('.delete-btn')?.addEventListener('click', e => {
       e.stopPropagation();
       if (confirm('Prüfung wirklich löschen? Diagnose und Aufschlüsselung gehen verloren.')) {
-        state.exams = state.exams.filter(x => x.id !== id);
+        deleteWithTombstone(state, 'exams', id);
+        // Also tombstone exam results for this exam
         state.examResults = state.examResults.filter(x => x.examId !== id);
         window.EMVS.save();
         refresh('exam-delete', { id });

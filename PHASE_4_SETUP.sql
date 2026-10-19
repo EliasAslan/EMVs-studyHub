@@ -1,5 +1,5 @@
 -- =====================================================================
--- EMVS Study Hub — Phase 4 setup script (REVIEWED, NOT YET APPLIED)
+-- EMVS Study Hub — Phase 4 setup script (v1, APPLIED AND SUPERSEDED)
 --
 -- Source: PHASE_3_FINAL_PLAN.md §§2–3 (authoritative) + §7 step 3.
 -- Derives from the PHASE_2_SCHEMA_PROPOSAL.md appendix with exactly
@@ -12,14 +12,11 @@
 -- composite FKs (rows 1–8), three-column exam_results FK + backing
 -- uq_exams_user_id_module, CHECKs/defaults, indexes, RLS + grants +
 -- policies. captures.objective_id stays a plain nullable TEXT column (D7).
+-- study_sessions.start_time and captures.timestamp use TIMESTAMPTZ
+-- (v1); v2 (PHASE_5_SETUP.sql) changes these to BIGINT epoch ms.
 --
--- HOW TO RUN (read these first):
---   1. Run the §0 PRE-FLIGHT query below first and confirm the project
---      is empty (no public.* EMVS tables yet). Do NOT run §§A–B twice:
---      plain CREATE TABLE statements fail if tables already exist.
---      If a re-run is ever needed, drop the tables first (rollback, §R).
---   2. Paste §§A–B into the Supabase SQL Editor and run once.
---   3. Use SYNTHETIC test data only. Never real study data in Phase 4.
+-- THIS SCRIPT IS SUPERSEDED BY PHASE_5_SETUP.sql (v2).
+-- Run PHASE_5_SETUP.sql for fresh deployments.
 -- =====================================================================
 
 -- ==================== §0. PRE-FLIGHT (read-only, run first) =================

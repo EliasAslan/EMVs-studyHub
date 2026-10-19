@@ -6,30 +6,28 @@
  * these so the available layouts, the default, legacy-id migration and
  * persistence stay in one place.
  *
- * Layouts:
- * - 'rail':      slim icon rail with tooltips (default).
- * - 'workspace': global icon rail plus a contextual panel (module pages/tools).
- * - 'tree':      hierarchical sidebar: subjects → chapters → topics.
+ * Kept layouts (6):
+ * - 'tree':      hierarchical sidebar: subjects → chapters → topics. (DEFAULT)
  * - 'mega':      top bar whose categories open grouped mega menus.
  * - 'dock':      floating pill-shaped dock with the main destinations.
- * - 'mobile':    phone-first shell: bottom bar + contextual header.
  * - 'context':   goal-based navigation: Learn / Practice / Plan / Review.
- * - 'command':   search-first bar with command palette and shortcuts.
  * - 'bento':     visual launchpad of grouped cards.
+ * - 'mobile':    phone-first shell: bottom bar + contextual header.
+ *
+ * Removed (4):
+ * - 'rail':      slim icon rail with tooltips (was default).
+ * - 'workspace': global icon rail plus a contextual panel.
+ * - 'command':   search-first bar with command palette.
  * - 'focus':     navigation hidden until requested.
  */
 
 export const NAV_LAYOUTS = [
-  { id: 'rail', group: 'sidebar', tier: 'recommended', label: 'Rail', hint: 'Schmale Icon-Leiste für die Hauptbereiche' },
-  { id: 'workspace', group: 'sidebar', tier: 'more', label: 'Arbeitsbereich', hint: 'Icon-Leiste plus Panel mit Seiten und Werkzeugen' },
-  { id: 'tree', group: 'sidebar', tier: 'more', label: 'Baum', hint: 'Fächer → Kapitel → Themen zum Auf- und Zuklappen' },
+  { id: 'tree', group: 'sidebar', tier: 'recommended', label: 'Baum', hint: 'Fächer → Kapitel → Themen zum Auf- und Zuklappen' },
   { id: 'mega', group: 'bar', tier: 'more', label: 'Mega-Menü', hint: 'Obere Leiste mit gruppierten Menüs' },
   { id: 'dock', group: 'bar', tier: 'more', label: 'Dock', hint: 'Schwebende Pillen-Leiste mit den Hauptzielen' },
-  { id: 'mobile', group: 'bar', tier: 'more', label: 'Mobil', hint: 'Handy-Layout: untere Leiste und Kontext-Kopfzeile' },
   { id: 'context', group: 'smart', tier: 'more', label: 'Kontext', hint: 'Nach Ziel: Lernen, Üben, Planen, Wiederholen' },
-  { id: 'command', group: 'smart', tier: 'more', label: 'Befehl', hint: 'Suche zuerst, mit Befehlspalette und Tastenkürzeln' },
   { id: 'bento', group: 'smart', tier: 'more', label: 'Bento', hint: 'Visuelle Startseite aus Karten (Launchpad)' },
-  { id: 'focus', group: 'smart', tier: 'more', label: 'Fokus', hint: 'Navigation ausgeblendet, öffnet auf Abruf' },
+  { id: 'mobile', group: 'bar', tier: 'more', label: 'Mobil', hint: 'Handy-Layout: untere Leiste und Kontext-Kopfzeile' },
 ];
 
 /** Selector groups in Settings. */
@@ -39,26 +37,27 @@ export const NAV_LAYOUT_GROUPS = [
   { id: 'smart', label: 'Zielorientierte Ansichten' },
 ];
 
-/**
- * Settings picker hierarchy: Rail is the default way; the other nine stay
- * available but secondary. Registry entries keep their ids and migration,
- * only the offered grouping carries the priority judgment.
- */
-export const NAV_LAYOUT_TIERS = [
-  { id: 'recommended', label: 'Empfohlen' },
-  { id: 'more', label: 'Weitere Layouts' },
-];
-
-/** Default preserves the long-standing compact rail behaviour. */
-export const DEFAULT_NAV_LAYOUT = 'rail';
+/** Default is now 'tree' (hierarchical sidebar). */
+export const DEFAULT_NAV_LAYOUT = 'tree';
 
 /**
  * Layout ids from earlier versions. Stored settings are never rewritten
  * eagerly; they are translated whenever they are read.
- *  - 'full'   (expanded labeled sidebar)  → 'tree'
- *  - 'topbar' (horizontal top navigation) → 'mega'
+ *  - 'full'       (expanded labeled sidebar)  → 'tree'
+ *  - 'topbar'     (horizontal top navigation) → 'mega'
+ *  - 'rail'       → 'tree'
+ *  - 'workspace'  → 'tree'
+ *  - 'command'    → 'context'
+ *  - 'focus'      → 'context'
  */
-export const LEGACY_NAV_LAYOUTS = { full: 'tree', topbar: 'mega' };
+export const LEGACY_NAV_LAYOUTS = {
+  full: 'tree',
+  topbar: 'mega',
+  rail: 'tree',
+  workspace: 'tree',
+  command: 'context',
+  focus: 'context',
+};
 
 export function isNavLayoutId(value) {
   return NAV_LAYOUTS.some(l => l.id === value);

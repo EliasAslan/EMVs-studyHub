@@ -1,9 +1,30 @@
 /**
  * EMVS - Main Application Entry Point
  * Orchestrates views, state, and persistence
+ *
+ * Module map (concern → file):
+ * - App bootstrap, window.EMVS global          → js/app.js
+ * - Persistence (localStorage), data model     → js/services/store.js
+ * - Storage adapter + failure latch            → js/services/storageAdapter.js
+ * - Cloud schema (Supabase)                    → PHASE_5_SETUP.sql (v2)
+ * - Cloud camelCase↔snake_case mapping        → js/services/cloudMap.js
+ * - Cloud sync + merge engine                  → js/services/cloudSync.js
+ * - Supabase client + publishable key          → js/services/supabaseClient.js
+ * - Auth UI + sync buttons                     → js/services/auth.js
+ * - Sync status + error translation            → js/services/syncStatus.js
+ * - Field/pure helpers (weakness, grades)      → js/utils/helpers.js
+ * - Layout registry (6 layouts)                → js/utils/navLayout.js
+ * - Nav layout renderers                       → js/components/nav/{index,context,tree,mega,dock,bento,mobile,shared}.js
+ * - Classic shell + module section             → js/components/sidebar.js
+ * - Bottom tabbar + More sheet                 → js/components/tabbar.js
+ * - Views (one per route)                      → js/views/*.js (router: js/views/router.js)
+ * - Tests (plain Node, no framework)           → tests/*.test.mjs
  */
 
 import { load, save, generateId, exportData, importData, clearAll, getStorageError } from './services/store.js';
+import { getSupabaseClient, isSupabaseConfigured } from './services/supabaseClient.js';
+import { syncState, uploadMergedData } from './services/cloudSync.js';
+import { isEmptyDataset } from './services/cloudMap.js';
 import { renderSidebar } from './components/sidebar.js';
 import { initPalette } from './components/palette.js';
 import { initModal } from './components/modal.js';
@@ -59,6 +80,10 @@ function init() {
   initTabbar();
   initLayoutChrome();
 
+  // Set platform-aware keyboard hint (⌘K on Mac, Strg+K on Windows/Linux)
+  const kbdHint = document.getElementById('kbd-hint');
+  if (kbdHint) kbdHint.textContent = kbdLabel();
+
   // Hash routing (deep-linkable tabs + module sub-tabs)
   window.addEventListener('hashchange', routeFromHash);
 
@@ -101,14 +126,6 @@ function init() {
       if (window.EMVS.modal?.isOpen?.()) return; // closes itself via its own handler
       if (window.EMVS.palette?.isOpen?.()) { window.EMVS.palette.close(); return; }
       if (window.EMVS.launchpad?.isOpen?.()) { window.EMVS.launchpad.close(); return; }
-      // NB: the Focus layout's "focus menu" and the classic phone drawer share
-      // the same #sidebar.open class. Only treat it as the focus menu while
-      // the Focus layout is actually active — otherwise the generic drawer
-      // branch below must own the Escape (menuBtn aria + focus restore).
-      if (window.EMVS.getLayout?.() === 'focus' && window.EMVS.focusMenu?.isOpen?.()) {
-        window.EMVS.focusMenu.set(false);
-        return;
-      }
       if (document.getElementById('more-overlay')?.classList.contains('open')) {
         window.EMVS.tabbar?.closeMore?.();
         return;
@@ -118,13 +135,8 @@ function init() {
         sidebarEl.classList.remove('open');
         document.getElementById('sidebarOverlay')?.classList.remove('open');
         // Focus returns to the control that opened the drawer.
-        if (window.EMVS.getLayout?.() === 'focus') {
-          document.getElementById('focus-handle')?.setAttribute('aria-expanded', 'false');
-          document.getElementById('focus-handle')?.focus?.();
-        } else {
-          document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
-          document.getElementById('menuBtn')?.focus?.();
-        }
+        document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
+        document.getElementById('menuBtn')?.focus?.();
         return;
       }
       window.EMVS.closeNavChrome?.();
@@ -143,7 +155,6 @@ function init() {
     if (e.key === '/') { e.preventDefault(); window.EMVS.palette?.open(); return; }
     if (e.key === '?') { showShortcuts(); return; }
     if (key === 'g' && window.EMVS.getLayout?.() === 'bento') { window.EMVS.launchpad?.toggle(); return; }
-    if (key === 'm' && window.EMVS.getLayout?.() === 'focus') { window.EMVS.focusMenu?.toggle(); return; }
     if (key === 's') {
       const st = window.EMVS.getState();
       const moduleId = st.settings.currentModuleId || st.modules[0]?.id;
@@ -171,7 +182,83 @@ function init() {
   
   // Set keyboard hint
   document.getElementById('kbd-hint').textContent = kbdLabel();
-  
+
+  // === Auto-sync triggers (W4.4) ===
+  let syncInFlight = false;
+  let syncPending = false;
+
+  async function runAutoSync() {
+    if (syncInFlight) {
+      syncPending = true;
+      return;
+    }
+    if (!isSupabaseConfigured()) return;
+    
+    const state = window.EMVS.getState();
+    if (isEmptyDataset(state)) return; // Don't sync empty local data
+
+    try {
+      const supabase = await getSupabaseClient();
+      const { syncState, uploadMergedData } = await import('./services/cloudSync.js');
+      
+      syncInFlight = true;
+      const { mergedState } = await syncState(supabase, state);
+      await uploadMergedData(supabase, mergedState);
+    } catch (err) {
+      // Silent failure - status UI will show error, no toast spam
+      console.debug('Auto-sync failed:', err?.message || err);
+    } finally {
+      syncInFlight = false;
+      if (syncPending) {
+        syncPending = false;
+        // Debounce: wait a bit before re-running
+        setTimeout(runAutoSync, 1000);
+      }
+    }
+  }
+
+  // 1. Auth state change sign-in trigger (handled by auth.js onAuthStateChange)
+  // 2. App start when session exists
+  if (isSupabaseConfigured()) {
+    getSupabaseClient().then(client => {
+      client.auth.getSession().then(({ data: { session } }) => {
+        if (session) runAutoSync();
+      }).catch(() => {});
+    }).catch(() => {});
+
+  // 3. Debounced 25s after every successful save()
+  let saveDebounceTimer = null;
+  const originalSave = window.EMVS.save;
+  window.EMVS.save = function() {
+    const result = originalSave.apply(this, arguments);
+    if (result === true) {
+      clearTimeout(saveDebounceTimer);
+      saveDebounceTimer = setTimeout(runAutoSync, 25000);
+    }
+    return result;
+  };
+
+  // 4. visibilitychange -> hidden fallback
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      runAutoSync();
+    }
+  });
+
+  // 5. Multi-tab: storage event for data key -> trigger merge
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'emvs_data_v1' && e.newValue !== e.oldValue) {
+      runAutoSync();
+    }
+  });
+
+  // Update sync status in Settings (quiet dot / red dot / last synced time)
+  function updateSyncStatusUI() {
+    const statusEl = document.getElementById('supabase-sync-status');
+    if (!statusEl) return;
+    // Updated in auth.js render instead
+  }
+
   console.log('EMVS initialized');
 }
 

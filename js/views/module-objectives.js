@@ -15,10 +15,10 @@ import {
   linkedResourceCount, resourcesForObjective,
   examsForObjective, getExamGrade, isDue,
 } from '../utils/helpers.js';
-import { openModal, closeModal } from '../components/modal.js';
+import { openModal, closeModal, confirmDialog } from '../components/modal.js';
 import {
   generateId, ensureObjectiveFields, recordReview, markUnderstood,
-  reopenObjective, unlinkObjectiveEverywhere,
+  reopenObjective, unlinkObjectiveEverywhere, pushCapped, deleteWithTombstone,
 } from '../services/store.js';
 import { refresh, registerPatcher } from './router.js';
 import { openSessionModal } from './module-sessions.js';
@@ -173,7 +173,7 @@ function bindObjectiveCard(item, state) {
       const n = +dot.dataset.n;
       obj.confidence = obj.confidence === n ? Math.max(0, n - 1) : n;
       obj.confidenceHistory = obj.confidenceHistory || [];
-      obj.confidenceHistory.push({ value: obj.confidence, timestamp: Date.now() });
+      pushCapped(obj.confidenceHistory, { value: obj.confidence, timestamp: Date.now() });
       ensureObjectiveFields(obj);
       obj.lastTouched = Date.now();
       obj.updatedAt = Date.now();
@@ -194,7 +194,7 @@ function bindObjectiveCard(item, state) {
   item.querySelector('.delete-btn')?.addEventListener('click', e => {
     e.stopPropagation();
     if (confirm('Lernziel wirklich löschen? Verlauf, Reviews und Verknüpfungen gehen verloren.')) {
-      state.learningObjectives = state.learningObjectives.filter(x => x.id !== id);
+      deleteWithTombstone(state, 'learningObjectives', id);
       // Strip the deleted id from all linked entities so exam/plan/resource
       // views stay consistent instead of counting orphaned links.
       unlinkObjectiveEverywhere(state, id);
@@ -342,9 +342,14 @@ function bindHistoryBody(state, objId) {
     closeModal();
     openSessionModal(null, obj?.moduleId, { linkedObjectiveIds: [objId], duration: 25 });
   });
-  act('understood', () => {
+  act('understood', async () => {
     const st = window.EMVS.getState();
     const obj = st.learningObjectives.find(o => o.id === objId);
+    if (obj.confidence < 4) {
+      const msg = `Verstanden markieren bei Confidence ${obj.confidence}/5?`;
+      const ok = await confirmDialog(msg, 'Confidence niedrig');
+      if (!ok) return;
+    }
     markUnderstood(obj);
     window.EMVS.save();
     window.EMVS.toast.show(`Verstanden — nächstes Review in ${obj.reviewSchedule.interval} Tagen`);
@@ -449,7 +454,7 @@ export function openObjectiveModal(objective = null, moduleId = null) {
     const newConf = Math.max(0, Math.min(5, parseInt(result.confidence) || 0));
     if (newConf !== obj.confidence) {
       obj.confidenceHistory = obj.confidenceHistory || [];
-      obj.confidenceHistory.push({ value: newConf, timestamp: Date.now() });
+      pushCapped(obj.confidenceHistory, { value: newConf, timestamp: Date.now() });
     }
     obj.confidence = newConf;
     obj.notes = result.notes?.trim() || obj.notes || '';

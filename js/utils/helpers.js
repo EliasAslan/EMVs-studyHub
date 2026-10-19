@@ -2,6 +2,8 @@
  * Utility helpers
  */
 
+import { isObjectiveDue as _isObjectiveDue, getDueObjectives as _getDueObjectives } from '../services/store.js';
+
 export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -241,7 +243,8 @@ export function isPlanItemLeftover(item, now = new Date()) {
   if (!item || item.done || item.dropped) return false;
   const currentWeek = getCurrentWeekNumber(now);
   const { start } = getWeekDateRange(currentWeek, now.getFullYear());
-  return getPlanItemWeekEnd(item.week, now.getFullYear()) < start;
+  const itemYear = typeof item.year === 'number' ? item.year : now.getFullYear();
+  return getPlanItemWeekEnd(item.week, itemYear) < start;
 }
 
 /** Unfinished past-week items, oldest suggestion first. Never a wall of shame — callers consolidate these into one reality check. */
@@ -323,19 +326,16 @@ export function getMostOverdueObjective(state) {
 }
 
 /**
- * All due objectives (incl. done), oldest first. Thin wrapper so views
- * don't need to know the store import.
+ * All due objectives (incl. done), oldest first. Re-exported from store.js
+ * as the single source of truth.
  */
-export function getDueObjectives(state, moduleId = null, now = Date.now()) {
-  return state.learningObjectives
-    .filter(o => (moduleId ? o.moduleId === moduleId : true)
-      && o.reviewSchedule?.nextReview && o.reviewSchedule.nextReview <= now)
-    .sort((a, b) => a.reviewSchedule.nextReview - b.reviewSchedule.nextReview);
-}
+export const getDueObjectives = _getDueObjectives;
 
-export function isDue(obj, now = Date.now()) {
-  return !!(obj?.reviewSchedule?.nextReview && obj.reviewSchedule.nextReview <= now);
-}
+/**
+ * Check if a single objective is due. Re-exported from store.js
+ * as the single source of truth.
+ */
+export const isDue = _isObjectiveDue;
 
 export function linkedResourceCount(state, obj) {
   if (!obj) return 0;
@@ -601,11 +601,27 @@ export function getObjectiveExamSignal(state, obj) {
  *
  * Signals:
  *  - confidence: low self-assessed confidence (gap to 5, when >= 3)
- *  - stale:      not touched for 7+ days
+ *  - stale:      not touched for 7+ days (0–4 pts, capped at 30 days)
  *  - exam:       weak/okay per-objective exam ratings (legacy unrated fails)
- *  - review:     never reviewed, or no review for 14+/21+ days
- *  - studytime:  high linked exam weight but below-median study time
- *  - mistakes / questions: repeated mistake/question captures
+ *                weak×3, okay×1, legacyFail×2, strong×2 offset (capped −3)
+ *  - review:     never reviewed, or no review for 14+/21+ days (1–2 pts)
+ *  - studytime:  high linked exam weight but below-median study time (2 pts)
+ *  - mistakes / questions: repeated mistake/question captures (1–3 pts)
+ *
+ * Weights (chosen values, tuned by judgment — see tests/weakness-ordering.test.mjs
+ * as the regression anchor):
+ *  - exam weak   ×3
+ *  - exam okay   ×1
+ *  - legacy fail ×2 (grade < 4.0 without per-objective ratings)
+ *  - exam strong ×2 offset, floored at −3 total from exam signal
+ *  - staleness   0–4 pts linear over 7–30 days
+ *  - confidence  gap to 5 (when gap ≥ 3)
+ *  - review gap  never >7d: 2; >21d: 2; >14d: 1
+ *  - studytime   2 if linkedWeight>0 and time<median
+ *  - mistakes    min(count, 3)
+ *  - questions   1 if count ≥ 3
+ *  - thresholds  level hoch ≥ 7 / mittel ≥ 3.5 / niedrig < 3.5
+ *  - confidence signal only when gap ≥ 3
  */
 export function getWeaknessBreakdown(state, obj, now = Date.now()) {
   const day = 86400000;

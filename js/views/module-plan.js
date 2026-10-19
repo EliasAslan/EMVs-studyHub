@@ -11,7 +11,7 @@
 
 import { escapeHtml, getWeekDateRange, getCurrentWeekNumber, getPlanLeftovers, getPlanItemActivity, getPlanReality } from '../utils/helpers.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { generateId, ensurePlanItemFields } from '../services/store.js';
+import { generateId, ensurePlanItemFields, deleteWithTombstone } from '../services/store.js';
 import { PLAN_ITEM_TYPES } from '../utils/helpers.js';
 import { refresh, registerPatcher } from './router.js';
 import { openObjectiveHistory } from './module-objectives.js';
@@ -316,7 +316,7 @@ function bindWeeks(container, el, state, moduleId) {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       if (confirm('Eintrag löschen?')) {
-        state.planItems = state.planItems.filter(i => i.id !== btn.dataset.id);
+        deleteWithTombstone(state, 'planItems', btn.dataset.id);
         window.EMVS.save();
         paintPlan(el, state, moduleId);
         refresh('plan-delete', { id: btn.dataset.id });
@@ -409,6 +409,7 @@ export function openPlanItemModal(item = null, moduleId = null, onChange = null)
     if (!result) return;
 
     i.week = parseInt(result.week) || getCurrentWeekNumber();
+    i.year = new Date().getFullYear();
     i.title = result.title?.trim() || `Woche ${i.week}`;
     i.text = result.text.trim();
     i.type = result.type;

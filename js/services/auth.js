@@ -10,6 +10,7 @@ import { confirmDialog } from '../components/modal.js';
 import {
   getSyncStatus,
   describeSyncStatus,
+  formatLastSynced,
   recordSyncSuccess,
   recordSyncFailure,
   translateSyncError,
@@ -46,17 +47,19 @@ export function renderAuthPanel(container) {
       Deine Lerndaten bleiben standardmäßig lokal im Browser. Mit den manuellen Aktionen unten kannst du sie gezielt in Supabase hochladen oder aus der Cloud übernehmen. Anmeldung allein synchronisiert keine Daten.
     </p>
     <div id="supabase-sync-panel" style="margin-top:16px; border-top:1px solid var(--rule-2); padding-top:12px; max-width:560px;" hidden>
-      <div class="section-label">Cloud-Synchronisation (manuell)</div>
+      <div class="section-label">Cloud-Synchronisation</div>
       <p style="font-size:13px; color:var(--ink-2); max-width:58ch;">
-        localStorage bleibt der Standard. Lokale Änderungen werden NICHT
-        automatisch synchronisiert — nur die Aktionen unten schreiben oder
-        ersetzen Daten.
+        localStorage bleibt der Standard. Sync läuft automatisch (Anmeldung, alle 25s nach Speichern, App-Hintergrund, Tab-Wechsel).
+        Die Buttons unten sind für manuellen Force-Sync / Recovery.
       </p>
       <div id="supabase-sync-account" role="status" aria-live="polite" style="font-size:13px; color:var(--ink-2); margin-bottom:8px;"></div>
       <div id="supabase-sync-status" role="status" aria-live="polite" style="font-size:13px; color:var(--ink-2); margin-bottom:8px;"></div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; font-size:13px; color:var(--ink-2);">
+        <span id="supabase-sync-last" style="display:inline-flex; align-items:center; gap:6px;">Letzte Sync: <span id="supabase-sync-time">Nie</span></span>
+      </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn primary" id="cloud-upload" type="button">Lokale Daten hochladen</button>
-        <button class="btn" id="cloud-download" type="button">Cloud-Daten herunterladen</button>
+        <button class="btn primary" id="cloud-upload" type="button">Force Upload</button>
+        <button class="btn" id="cloud-download" type="button">Force Download</button>
       </div>
       <div id="supabase-sync-message" role="status" aria-live="polite" style="font-size:13px; color:var(--ink-2); margin-top:8px;"></div>
     </div>
@@ -118,6 +121,9 @@ export function renderAuthPanel(container) {
       div.textContent = line;
       el.appendChild(div);
     }
+    // Update "last synced" time
+    const timeEl = container.querySelector('#supabase-sync-time');
+    if (timeEl) timeEl.textContent = formatLastSynced(getSyncStatus());
   };
 
   const refreshSyncAccount = async () => {
@@ -234,46 +240,35 @@ export function renderAuthPanel(container) {
   });
 
   uploadButton?.addEventListener('click', async () => {
-    setSyncMessage('Upload läuft …');
+    setSyncMessage('Sync läuft …');
     uploadButton.disabled = true;
     downloadButton.disabled = true;
     try {
       const supabase = await getSupabaseClient();
-      const { uploadLocalData, getSessionUserId, checkAccountBinding } = await import('./cloudSync.js');
-      const { isEmptyDataset, countDataset } = await import('./cloudMap.js');
+      const { syncState, uploadMergedData } = await import('./cloudSync.js');
       const state = window.EMVS?.getState?.();
       if (!state) throw new Error('Lokale Daten sind nicht verfügbar.');
-      const uid = await getSessionUserId(supabase);
-      const binding = checkAccountBinding(uid, state);
-      if (binding.status === 'mismatch') {
-        const keep = await confirmDialog(
-          `Dieses Gerät hält lokale Daten, die zuletzt mit Konto ${String(binding.lastUid).slice(0, 8)}… verknüpft waren. ` +
-          `Du bist als neues Konto angemeldet. Exportiere zuerst ein JSON-Backup, bevor du fortfährst. Jetzt Backup exportieren?`,
-          'Anderes Konto erkannt',
+
+      // Run merge engine
+      const { mergedState, erasureCount, needsBackupPrompt } = await syncState(supabase, state);
+
+      // If merge would erase >10 local records, prompt for backup
+      if (needsBackupPrompt) {
+        const backup = await confirmDialog(
+          `Die Synchronisation würde ${erasureCount} lokale Datensätze ersetzen (Cloud gewinnt). ` +
+          `Möchtest du vorher ein JSON-Backup der aktuellen lokalen Daten exportieren?`,
+          'Backup vor Sync'
         );
-        if (keep) window.EMVS?.exportData?.();
-        setSyncMessage('Upload blockiert: Kontenfrage zuerst klären (Backup angeboten). Lokale Daten unverändert.', true);
-        return;
+        if (backup) window.EMVS?.exportData?.();
       }
-      if (isEmptyDataset(state)) {
-        setSyncMessage('Lokale Daten sind leer — es gibt nichts hochzuladen. Cloud bleibt unverändert.', true);
-        return;
-      }
-      const counts = countDataset(state);
-      const ok = await confirmDialog(
-        `Wirklich ${counts.total} lokale Datensätze in deine Cloud hochladen? Cloud-Zeilen werden nur ergänzt/aktualisiert, nie gelöscht.`,
-        'Upload bestätigen',
-      );
-      if (!ok) {
-        setSyncMessage('Upload abgebrochen. Nichts wurde verändert.');
-        return;
-      }
-      const result = await uploadLocalData(supabase, state);
+
+      // Upload merged state (including tombstones)
+      const result = await uploadMergedData(supabase, mergedState);
       const parts = result.ledger.filter((l) => !l.skipped).map((l) => `${l.table}: ${l.written}`);
       recordSyncSuccess('upload');
       refreshSyncStatus();
-      setSyncMessage(`Upload erfolgreich (${parts.join(', ') || 'nichts zu schreiben'}). Lokale Daten bleiben aktiv.`);
-      window.EMVS?.toast?.show?.('Cloud-Upload erfolgreich');
+      setSyncMessage(`Sync erfolgreich (${parts.join(', ') || 'nichts zu schreiben'}).`);
+      window.EMVS?.toast?.show?.('Cloud-Sync erfolgreich');
       refreshSyncAccount();
     } catch (error) {
       recordSyncFailure(error?.code);
@@ -285,48 +280,31 @@ export function renderAuthPanel(container) {
   });
 
   downloadButton?.addEventListener('click', async () => {
-    setSyncMessage('Download läuft …');
+    setSyncMessage('Sync läuft …');
     uploadButton.disabled = true;
     downloadButton.disabled = true;
     try {
       const supabase = await getSupabaseClient();
-      const { downloadCloudData, downloadReplacementCheck } = await import('./cloudSync.js');
-      const { isEmptyDataset, countDataset } = await import('./cloudMap.js');
-      const local = window.EMVS?.getState?.();
-      if (!local) throw new Error('Lokale Daten sind nicht verfügbar.');
-      const { state: cloud } = await downloadCloudData(supabase);
-      const check = downloadReplacementCheck(local, cloud);
-      const cloudCounts = countDataset(cloud);
-      if (check.needsDecision) {
+      const { syncState, uploadMergedData } = await import('./cloudSync.js');
+      const state = window.EMVS?.getState?.();
+      if (!state) throw new Error('Lokale Daten sind nicht verfügbar.');
+
+      // Run merge engine
+      const { mergedState, erasureCount, needsBackupPrompt } = await syncState(supabase, state);
+
+      // If merge would erase >10 local records, prompt for backup
+      if (needsBackupPrompt) {
         const backup = await confirmDialog(
-          'Das Ersetzen lokaler Daten kann nicht rückgängig gemacht werden. Zuerst ein JSON-Backup der aktuellen lokalen Daten exportieren?',
-          'Backup vor Download',
+          `Die Synchronisation würde ${erasureCount} lokale Datensätze ersetzen (Cloud gewinnt). ` +
+          `Möchtest du vorher ein JSON-Backup der aktuellen lokalen Daten exportieren?`,
+          'Backup vor Sync'
         );
         if (backup) window.EMVS?.exportData?.();
-        const reason = check.reason === 'cloud-empty'
-          ? 'Die Cloud ist leer, deine lokalen Daten sind es nicht. Herunterladen würde lokale Daten durch Leere ersetzen.'
-          : `Lokale (${check.conflict.localCounts.total}) und Cloud-Daten (${cloudCounts.total}) sind beide nicht leer. Herunterladen ersetzt lokale Daten — nichts wird zusammengeführt.`;
-        const ok = await confirmDialog(`${reason} Wirklich fortfahren?`, 'Download bestätigen');
-        if (!ok) {
-          setSyncMessage('Download abgebrochen. Lokale Daten unverändert.');
-          return;
-        }
-      } else if (!isEmptyDataset(local)) {
-        const ok = await confirmDialog(
-          `Cloud-Daten (${cloudCounts.total} Datensätze) laden und lokale Daten ersetzen? Zuerst ein Backup exportieren wird empfohlen.`,
-          'Download bestätigen',
-        );
-        if (!ok) {
-          setSyncMessage('Download abgebrochen. Lokale Daten unverändert.');
-          return;
-        }
       }
+
+      // Apply merged state locally
       const store = await import('./store.js');
       const { commitDownloadReplacement, setLastSyncedUid, getSessionUserId } = await import('./cloudSync.js');
-      // Safe commit: keeps the previous in-memory state and restores it
-      // when local persistence fails, so a failed save can never leave
-      // replaced state behind while reporting "unchanged". The storage
-      // latch is cleared only here at the confirmed commit point.
       commitDownloadReplacement(
         {
           getState: () => window.EMVS.getState(),
@@ -336,7 +314,7 @@ export function renderAuthPanel(container) {
           renderSidebar: () => window.EMVS.renderSidebar?.(),
           navigate: (v) => window.EMVS.navigate?.(v),
         },
-        cloud,
+        mergedState,
       );
       try {
         setLastSyncedUid(await getSessionUserId(supabase));
@@ -344,8 +322,8 @@ export function renderAuthPanel(container) {
       refreshSyncAccount();
       recordSyncSuccess('download');
       refreshSyncStatus();
-      setSyncMessage(`Download erfolgreich (${cloudCounts.total} Datensätze übernommen).`);
-      window.EMVS?.toast?.show?.('Cloud-Daten übernommen');
+      setSyncMessage('Sync erfolgreich — lokale Daten mit Cloud zusammengeführt.');
+      window.EMVS?.toast?.show?.('Cloud-Sync erfolgreich');
     } catch (error) {
       recordSyncFailure(error?.code);
       setSyncError(error);

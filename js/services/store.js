@@ -10,6 +10,7 @@ const MIGRATION_KEY = 'emvs_schema_version';
 const CURRENT_SCHEMA_VERSION = 1;
 
 import { activeAdapter, readLegacyStorage, StorageError } from './storageAdapter.js';
+import { RESOURCE_TYPES, CAPTURE_TYPES, PLAN_ITEM_TYPES } from '../utils/helpers.js';
 
 /**
  * Last storage read failure observed by load().
@@ -58,60 +59,10 @@ export function getSeedData() {
     planItems: [],
     captures: [],
     weeklyReviews: [],
+    tombstones: [],
     settings: {
       theme: 'light',
       currentModuleId: null,
-    }
-  };
-}
-
-/**
- * Demo seed for true first runs (no v1 data and no legacy data).
- * One small module so Today has something to work with; the user can
- * delete everything — empty-state copy covers that case.
- * clearAll() intentionally returns the blank seed, not this.
- */
-export function getDemoSeedData() {
-  const now = Date.now();
-  const day = 86400000;
-  const iso = (ts) => new Date(ts).toISOString();
-  const ymd = (ts) => new Date(ts).toISOString().slice(0, 10);
-
-  const modId = `demo-mod-${now.toString(36)}`;
-  const o1 = `demo-obj1-${now.toString(36)}`;
-  const o2 = `demo-obj2-${now.toString(36)}`;
-  const o3 = `demo-obj3-${now.toString(36)}`;
-  const examId = `demo-exam-${now.toString(36)}`;
-
-  return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
-    modules: [
-      { id: modId, code: 'DB1', title: 'Beispielmodul — Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: now - 20 * day, updatedAt: now - 2 * day }
-    ],
-    learningObjectives: [
-      { id: o1, moduleId: modId, number: 1, title: 'Erklärt den Unterschied zwischen 2NF und 3NF an einem Beispiel', description: '', status: 'in-progress', confidence: 4, notes: '', confidenceHistory: [{ value: 4, timestamp: now - 1 * day }], lastTouched: now - 1 * day, lastReviewed: now - 1 * day, totalStudyTime: 25, reviewHistory: [{ timestamp: now - 1 * day, outcome: 'solid', interval: 4, promisedInterval: 1, nextReview: now + 3 * day }], reviewSchedule: { interval: 4, nextReview: now + 3 * day, reviewCount: 1 }, createdAt: now - 20 * day, updatedAt: now - 1 * day, sessionHistory: [] },
-      { id: o2, moduleId: modId, number: 2, title: 'Normalisiert eine Tabelle von UNF bis 3NF', description: '', status: 'todo', confidence: 2, notes: '', confidenceHistory: [{ value: 2, timestamp: now - 9 * day }], lastTouched: now - 4 * day, lastReviewed: null, totalStudyTime: 30, reviewHistory: [], reviewSchedule: { interval: 1, nextReview: now - 2 * day, reviewCount: 0 }, createdAt: now - 20 * day, updatedAt: now - 4 * day, sessionHistory: [] },
-      { id: o3, moduleId: modId, number: 3, title: 'Schreibt mehrstufige SQL-Abfragen mit JOIN und GROUP BY', description: '', status: 'todo', confidence: 1, notes: '', confidenceHistory: [], lastTouched: now - 12 * day, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: null, createdAt: now - 20 * day, updatedAt: now - 12 * day, sessionHistory: [] }
-    ],
-    resources: [
-      { id: `demo-res-${now.toString(36)}`, moduleId: modId, name: 'SQL Zoo — SELECT bis JOIN (Demo)', type: 'Exercise', focus: '70', status: 'in-progress', url: 'https://sqlzoo.net/', linkedObjectiveIds: [o3], notes: '', usageHistory: [], understood: false, understoodAt: null, understoodHistory: [], lastUsed: null, createdAt: now - 15 * day, updatedAt: now - 5 * day }
-    ],
-    studySessions: [
-      { id: `demo-ses1-${now.toString(36)}`, moduleId: modId, startTime: iso(now - 1 * day - 2 * 3600000), duration: 25, linkedObjectiveIds: [o1], linkedResourceIds: [], note: '3NF-Beispiel mit Kurs-Tabelle durchgearbeitet', createdAt: now - 1 * day, updatedAt: now - 1 * day },
-      { id: `demo-ses2-${now.toString(36)}`, moduleId: modId, startTime: iso(now - 4 * day - 3 * 3600000), duration: 30, linkedObjectiveIds: [o2], linkedResourceIds: [], note: '', createdAt: now - 4 * day, updatedAt: now - 4 * day }
-    ],
-    exams: [
-      { id: examId, moduleId: modId, name: 'Beispielprüfung', date: ymd(now + 12 * day), weight: 40, score: '', max: '', linkedObjectiveIds: [o1, o2, o3], objectiveResults: [{ objectiveId: o1, rating: null, note: '' }, { objectiveId: o2, rating: null, note: '' }, { objectiveId: o3, rating: null, note: '' }], description: '', createdAt: now - 20 * day, updatedAt: now - 20 * day }
-    ],
-    examResults: [],
-    planItems: [
-      { id: `demo-plan-${now.toString(36)}`, moduleId: modId, week: getIsoWeekFallback(), title: `Woche ${getIsoWeekFallback()}`, text: 'JOIN-Abfragen üben (SQL Zoo)', type: 'task', linkedObjectiveIds: [o3], linkedResourceIds: [], done: false, dropped: false, notes: '', dueDate: null, createdAt: now - 2 * day, updatedAt: now - 2 * day }
-    ],
-    captures: [],
-    weeklyReviews: [],
-    settings: {
-      theme: 'light',
-      currentModuleId: modId,
     }
   };
 }
@@ -165,9 +116,8 @@ export function load() {
         migrated.planItems.forEach(ensurePlanItemFields);
         return migrated;
       }
-      const demo = getDemoSeedData();
-      demo.learningObjectives.forEach(ensureObjectiveFields);
-      return demo;
+      // First run with empty storage → guided first-run (blank seed, no demo data)
+      return getSeedData();
     }
     
     // raw is already parsed by the adapter
@@ -192,8 +142,13 @@ export function load() {
       planItems: parsed.planItems || [],
       captures: parsed.captures || [],
       weeklyReviews: parsed.weeklyReviews || [],
+      tombstones: Array.isArray(parsed.tombstones) ? parsed.tombstones : [],
       settings: { ...getSeedData().settings, ...parsed.settings }
     };
+    // Prune tombstones older than 90 days (90 * 24 * 60 * 60 * 1000 = 7,776,000,000 ms)
+    const now = Date.now();
+    const ninetyDaysMs = 90 * 86400000;
+    normalized.tombstones = normalized.tombstones.filter(t => now - t.deletedAt < ninetyDaysMs);
     // History-first: every objective carries review/session/confidence history.
     normalized.learningObjectives.forEach(ensureObjectiveFields);
     // Diagnosis: every exam carries per-objective results.
@@ -429,6 +384,60 @@ export function reviewIntervalFor(completedReviews) {
 }
 
 /**
+ * Push entry to array, keeping at most `max` entries (drop oldest).
+ * Only trims when length exceeds max — no-op for typical sizes.
+ */
+export function pushCapped(arr, entry, max = 100) {
+  arr.push(entry);
+  if (arr.length > max) {
+    // drop oldest entries
+    const excess = arr.length - max;
+    arr.splice(0, excess);
+  }
+}
+
+/**
+ * Delete an entity by adding a tombstone and removing it from the collection.
+ * @param {Object} state - The app state
+ * @param {string} collection - Collection name (e.g., 'modules', 'learningObjectives')
+ * @param {string} id - Entity ID to delete
+ * @returns {boolean} True if entity was found and deleted
+ */
+export function deleteWithTombstone(state, collection, id) {
+  const arr = state[collection];
+  if (!Array.isArray(arr)) return false;
+  const idx = arr.findIndex(e => e.id === id);
+  if (idx === -1) return false;
+  const deleted = arr[idx];
+  const now = Date.now();
+  // Add tombstone
+  if (!Array.isArray(state.tombstones)) state.tombstones = [];
+  pushCapped(state.tombstones, { collection, id, deletedAt: now });
+  // Remove entity
+  arr.splice(idx, 1);
+  // Run cleanup for cross-references
+  if (collection === 'modules') {
+    // Tombstone all children of this module
+    const childCollections = [
+      'learningObjectives', 'resources', 'studySessions', 'exams',
+      'planItems', 'captures', 'weeklyReviews'
+    ];
+    for (const childColl of childCollections) {
+      const children = state[childColl];
+      if (Array.isArray(children)) {
+        for (let i = children.length - 1; i >= 0; i--) {
+          if (children[i].moduleId === id) {
+            pushCapped(state.tombstones, { collection: childColl, id: children[i].id, deletedAt: now });
+            children.splice(i, 1);
+          }
+        }
+      }
+    }
+  }
+  return true;
+}
+
+/**
  * Ensure every history/review field exists on an objective.
  * Safe to call repeatedly (load, import, recalculate).
  */
@@ -486,7 +495,7 @@ export function recordReview(obj, outcome = 'solid', note = '') {
   const promised = obj.reviewSchedule?.interval ?? reviewIntervalFor(before);
   let interval;
   if (outcome === 'lost') interval = reviewIntervalFor(Math.max(0, before - 1));
-  else if (outcome === 'shaky') interval = reviewIntervalFor(before > 2 ? before - 1 : before);
+  else if (outcome === 'shaky') interval = promised;
   else interval = reviewIntervalFor(before);
   const entry = {
     timestamp: now,
@@ -496,7 +505,7 @@ export function recordReview(obj, outcome = 'solid', note = '') {
     nextReview: now + interval * DAY_MS,
   };
   if (note) entry.note = note;
-  obj.reviewHistory.push(entry);
+  pushCapped(obj.reviewHistory, entry);
   obj.lastReviewed = now;
   obj.lastTouched = now;
   obj.updatedAt = now;
@@ -512,15 +521,12 @@ export function recordReview(obj, outcome = 'solid', note = '') {
  * Mark an objective as understood/done WITHOUT retiring it.
  * It stays visible and gets its first (or next) scheduled resurfacing.
  * If it already has a schedule, keep it — done means "resting until review".
+ * Does NOT modify confidence or confidenceHistory — human judgment is preserved.
  */
 export function markUnderstood(obj, now = Date.now()) {
   ensureObjectiveFields(obj);
   if (obj.status !== 'done') {
     obj.status = 'done';
-    if (obj.confidence < 4) {
-      obj.confidence = 4;
-      obj.confidenceHistory.push({ value: 4, timestamp: now });
-    }
   }
   if (!obj.reviewSchedule?.nextReview) {
     scheduleNextReview(obj, now);
@@ -587,7 +593,7 @@ export function markResourceUsed(res, opts = {}) {
   const entry = { timestamp: now };
   if (opts.sessionId) entry.sessionId = opts.sessionId;
   if (opts.note) entry.note = opts.note;
-  res.usageHistory.push(entry);
+  pushCapped(res.usageHistory, entry);
   res.lastUsed = now;
   res.updatedAt = now;
   return entry;
@@ -605,7 +611,7 @@ export function setResourceUnderstood(res, understood) {
   if (res.understood !== value) {
     res.understood = value;
     res.understoodAt = value ? now : res.understoodAt;
-    res.understoodHistory.push({ timestamp: now, value });
+    pushCapped(res.understoodHistory, { timestamp: now, value });
     res.updatedAt = now;
   }
   return res.understood;
@@ -627,6 +633,7 @@ export function ensurePlanItemFields(item) {
   if (typeof item.text !== 'string') item.text = '';
   if (typeof item.week !== 'number') item.week = parseInt(item.week) || 1;
   if (!('dueDate' in item)) item.dueDate = null;
+  if (typeof item.year !== 'number') item.year = new Date().getFullYear();
   return item;
 }
 /**
@@ -723,6 +730,7 @@ export function exportData(data) {
 /**
  * Import data from JSON file
  * Returns { success: boolean, data: object, error?: string }
+ * Sanitizer: validates and clamps every field to prevent injection.
  */
 export function importData(jsonString) {
   try {
@@ -745,28 +753,288 @@ export function importData(jsonString) {
     imported.schemaVersion = imported.schemaVersion || CURRENT_SCHEMA_VERSION;
     imported.settings = imported.settings || getSeedData().settings;
     
-    // Generate missing IDs for any entities without them.
-    // Non-object entries (null, strings, numbers) are rejected instead of
-    // being silently spread into blank rows ({...null} === {}).
-    const entityArrays = [
-      'modules', 'learningObjectives', 'resources',
-      'studySessions', 'exams', 'examResults',
-      'planItems', 'captures', 'weeklyReviews'
-    ];
+    // Sanitizer configuration
+    const ID_REGEX = /^[A-Za-z0-9-]{1,64}$/;
+    const ACCENT_REGEX = /^#[0-9a-fA-F]{6}$/;
+    const OBJECTIVE_STATUSES = new Set(['todo', 'in-progress', 'done']);
+    const RESOURCE_STATUSES = new Set(['todo', 'in-progress', 'done']);
+    const HISTORY_MAX = 100;
     
-    for (const key of entityArrays) {
-      imported[key] = imported[key].map(item => {
-        if (item === null || typeof item !== 'object' || Array.isArray(item)) {
-          throw new Error(`Invalid ${key} entry (expected object)`);
-        }
-        return {
-          ...item,
-          id: item.id || generateId(),
-          createdAt: item.createdAt || Date.now(),
-          updatedAt: item.updatedAt || Date.now()
-        };
-      });
+    function sanitizeId(id, collection, index) {
+      if (!id) return generateId();
+      if (typeof id !== 'string' || !ID_REGEX.test(id)) {
+        throw new Error(`Ungültige ID in ${collection}[${index}]: muss 1-64 alphanumerische Zeichen oder Bindestriche sein`);
+      }
+      return id;
     }
+    
+    function sanitizeEnum(value, allowed, collection, index, field, fallback) {
+      if (value === undefined || value === null) return fallback;
+      if (allowed.has(value)) return value;
+      throw new Error(`Ungültiger ${field} in ${collection}[${index}]: ${value}`);
+    }
+    
+    function sanitizeNumber(value, min, max, collection, index, field, fallback) {
+      if (value === undefined || value === null) return fallback;
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    }
+    
+    function sanitizeHistory(arr, collection, index) {
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .filter(e => e && typeof e.timestamp === 'number' && Number.isFinite(e.timestamp))
+        .slice(-HISTORY_MAX);
+    }
+    
+    function sanitizeAccent(value) {
+      if (typeof value === 'string' && ACCENT_REGEX.test(value)) return value;
+      return '#b45309';
+    }
+    
+    // Module IDs for referential integrity check
+    const validModuleIds = new Set();
+    
+    // Sanitize modules
+    imported.modules = imported.modules.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`modules[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'modules', idx);
+      validModuleIds.add(id);
+      return {
+        ...item,
+        id,
+        code: String(item.code || '').slice(0, 20),
+        title: String(item.title || '').slice(0, 100),
+        accent: sanitizeAccent(item.accent),
+        targetGrade: sanitizeNumber(item.targetGrade, 1, 6, 'modules', idx, 'targetGrade', 5.0),
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
+      };
+    });
+    
+    // Sanitize learningObjectives
+    imported.learningObjectives = imported.learningObjectives.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`learningObjectives[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'learningObjectives', idx);
+      // Drop if moduleId doesn't resolve
+      if (!validModuleIds.has(item.moduleId)) {
+        throw new Error(`learningObjectives[${idx}]: unbekanntes moduleId ${item.moduleId}`);
+      }
+      return {
+        ...item,
+        id,
+        moduleId: item.moduleId,
+        number: sanitizeNumber(item.number, 1, 999, 'learningObjectives', idx, 'number', idx + 1),
+        title: String(item.title || '').slice(0, 200),
+        description: String(item.description || '').slice(0, 5000),
+        status: sanitizeEnum(item.status, OBJECTIVE_STATUSES, 'learningObjectives', idx, 'status', 'todo'),
+        confidence: sanitizeNumber(item.confidence, 0, 5, 'learningObjectives', idx, 'confidence', 0),
+        notes: String(item.notes || '').slice(0, 5000),
+        confidenceHistory: sanitizeHistory(item.confidenceHistory, 'learningObjectives', idx),
+        sessionHistory: sanitizeHistory(item.sessionHistory, 'learningObjectives', idx),
+        reviewHistory: sanitizeHistory(item.reviewHistory, 'learningObjectives', idx),
+        reviewSchedule: item.reviewSchedule && typeof item.reviewSchedule === 'object' ? {
+          interval: sanitizeNumber(item.reviewSchedule.interval, 1, 90, 'learningObjectives', idx, 'reviewSchedule.interval', 1),
+          nextReview: typeof item.reviewSchedule.nextReview === 'number' && Number.isFinite(item.reviewSchedule.nextReview) ? item.reviewSchedule.nextReview : Date.now(),
+          reviewCount: sanitizeNumber(item.reviewSchedule.reviewCount, 0, 999, 'learningObjectives', idx, 'reviewSchedule.reviewCount', 0),
+        } : null,
+        lastTouched: typeof item.lastTouched === 'number' && Number.isFinite(item.lastTouched) ? item.lastTouched : Date.now(),
+        lastReviewed: typeof item.lastReviewed === 'number' && Number.isFinite(item.lastReviewed) ? item.lastReviewed : null,
+        totalStudyTime: sanitizeNumber(item.totalStudyTime, 0, 999999, 'learningObjectives', idx, 'totalStudyTime', 0),
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
+      };
+    });
+    
+    // Sanitize resources
+    imported.resources = imported.resources.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`resources[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'resources', idx);
+      if (!validModuleIds.has(item.moduleId)) {
+        throw new Error(`resources[${idx}]: unbekanntes moduleId ${item.moduleId}`);
+      }
+      return {
+        ...item,
+        id,
+        moduleId: item.moduleId,
+        name: String(item.name || '').slice(0, 200),
+        type: sanitizeEnum(item.type, new Set(RESOURCE_TYPES), 'resources', idx, 'type', 'Other'),
+        focus: String(item.focus || '').slice(0, 50),
+        status: sanitizeEnum(item.status, RESOURCE_STATUSES, 'resources', idx, 'status', 'todo'),
+        url: String(item.url || '').slice(0, 500),
+        linkedObjectiveIds: Array.isArray(item.linkedObjectiveIds) ? item.linkedObjectiveIds.filter(id => typeof id === 'string') : [],
+        notes: String(item.notes || '').slice(0, 5000),
+        usageHistory: sanitizeHistory(item.usageHistory, 'resources', idx),
+        understood: Boolean(item.understood),
+        understoodAt: typeof item.understoodAt === 'number' && Number.isFinite(item.understoodAt) ? item.understoodAt : null,
+        understoodHistory: sanitizeHistory(item.understoodHistory, 'resources', idx),
+        lastUsed: typeof item.lastUsed === 'number' && Number.isFinite(item.lastUsed) ? item.lastUsed : null,
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
+      };
+    });
+    
+    // Sanitize studySessions
+    imported.studySessions = imported.studySessions.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`studySessions[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'studySessions', idx);
+      if (!validModuleIds.has(item.moduleId)) {
+        throw new Error(`studySessions[${idx}]: unbekanntes moduleId ${item.moduleId}`);
+      }
+      return {
+        ...item,
+        id,
+        moduleId: item.moduleId,
+        startTime: typeof item.startTime === 'string' ? item.startTime : new Date().toISOString(),
+        duration: sanitizeNumber(item.duration, 1, 480, 'studySessions', idx, 'duration', 25),
+        linkedObjectiveIds: Array.isArray(item.linkedObjectiveIds) ? item.linkedObjectiveIds.filter(id => typeof id === 'string') : [],
+        linkedResourceIds: Array.isArray(item.linkedResourceIds) ? item.linkedResourceIds.filter(id => typeof id === 'string') : [],
+        note: String(item.note || '').slice(0, 5000),
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
+      };
+    });
+    
+    // Sanitize exams
+    imported.exams = imported.exams.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`exams[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'exams', idx);
+      if (!validModuleIds.has(item.moduleId)) {
+        throw new Error(`exams[${idx}]: unbekanntes moduleId ${item.moduleId}`);
+      }
+      return {
+        ...item,
+        id,
+        moduleId: item.moduleId,
+        name: String(item.name || '').slice(0, 200),
+        date: typeof item.date === 'string' ? item.date : '',
+        weight: sanitizeNumber(item.weight, 0, 100, 'exams', idx, 'weight', 0),
+        score: String(item.score || '').slice(0, 20),
+        max: String(item.max || '').slice(0, 20),
+        linkedObjectiveIds: Array.isArray(item.linkedObjectiveIds) ? item.linkedObjectiveIds.filter(id => typeof id === 'string') : [],
+        objectiveResults: Array.isArray(item.objectiveResults) ? item.objectiveResults
+          .filter(r => r && typeof r === 'object' && typeof r.objectiveId === 'string')
+          .map(r => ({
+            objectiveId: r.objectiveId,
+            rating: sanitizeEnum(r.rating, new Set(EXAM_RATINGS), 'exams.objectiveResults', idx, 'rating', null),
+            note: String(r.note || '').slice(0, 5000),
+          })) : [],
+        isMock: Boolean(item.isMock),
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
+      };
+    });
+    
+    // Sanitize examResults
+    imported.examResults = imported.examResults.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`examResults[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'examResults', idx);
+      if (!validModuleIds.has(item.moduleId)) {
+        throw new Error(`examResults[${idx}]: unbekanntes moduleId ${item.moduleId}`);
+      }
+      return {
+        ...item,
+        id,
+        moduleId: item.moduleId,
+        examId: String(item.examId || ''),
+        objectiveId: String(item.objectiveId || ''),
+        rating: sanitizeEnum(item.rating, new Set(EXAM_RATINGS), 'examResults', idx, 'rating', null),
+        note: String(item.note || '').slice(0, 5000),
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        // examResults uses createdAt only in cloud schema
+      };
+    });
+    
+    // Sanitize planItems
+    imported.planItems = imported.planItems.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`planItems[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'planItems', idx);
+      if (!validModuleIds.has(item.moduleId)) {
+        throw new Error(`planItems[${idx}]: unbekanntes moduleId ${item.moduleId}`);
+      }
+      return {
+        ...item,
+        id,
+        moduleId: item.moduleId,
+        week: sanitizeNumber(item.week, 1, 53, 'planItems', idx, 'week', 1),
+        year: typeof item.year === 'number' && Number.isFinite(item.year) ? item.year : new Date().getFullYear(),
+        title: String(item.title || '').slice(0, 200),
+        text: String(item.text || '').slice(0, 5000),
+        type: sanitizeEnum(item.type, new Set(PLAN_ITEM_TYPES), 'planItems', idx, 'type', 'task'),
+        linkedObjectiveIds: Array.isArray(item.linkedObjectiveIds) ? item.linkedObjectiveIds.filter(id => typeof id === 'string') : [],
+        linkedResourceIds: Array.isArray(item.linkedResourceIds) ? item.linkedResourceIds.filter(id => typeof id === 'string') : [],
+        done: Boolean(item.done),
+        dropped: Boolean(item.dropped),
+        notes: String(item.notes || '').slice(0, 5000),
+        dueDate: typeof item.dueDate === 'string' ? item.dueDate : null,
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
+      };
+    });
+    
+    // Sanitize captures
+    imported.captures = imported.captures.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`captures[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'captures', idx);
+      if (!validModuleIds.has(item.moduleId)) {
+        throw new Error(`captures[${idx}]: unbekanntes moduleId ${item.moduleId}`);
+      }
+      return {
+        ...item,
+        id,
+        moduleId: item.moduleId,
+        objectiveId: item.objectiveId || null,
+        content: String(item.content || '').slice(0, 5000),
+        type: sanitizeEnum(item.type, new Set(CAPTURE_TYPES), 'captures', idx, 'type', 'thought'),
+        timestamp: typeof item.timestamp === 'number' && Number.isFinite(item.timestamp) ? item.timestamp : Date.now(),
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
+      };
+    });
+    
+    // Sanitize weeklyReviews
+    imported.weeklyReviews = imported.weeklyReviews.map((item, idx) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        throw new Error(`weeklyReviews[${idx}]: erwartet Objekt`);
+      }
+      const id = sanitizeId(item.id, 'weeklyReviews', idx);
+      if (!validModuleIds.has(item.moduleId)) {
+        throw new Error(`weeklyReviews[${idx}]: unbekanntes moduleId ${item.moduleId}`);
+      }
+      return {
+        ...item,
+        id,
+        moduleId: item.moduleId,
+        week: sanitizeNumber(item.week, 1, 53, 'weeklyReviews', idx, 'week', 1),
+        year: typeof item.year === 'number' && Number.isFinite(item.year) ? item.year : new Date().getFullYear(),
+        answers: item.answers && typeof item.answers === 'object' ? {
+          timeSpent: String(item.answers.timeSpent || '').slice(0, 5000),
+          progress: String(item.answers.progress || '').slice(0, 5000),
+          blockers: String(item.answers.blockers || '').slice(0, 5000),
+        } : { timeSpent: '', progress: '', blockers: '' },
+        createdAt: typeof item.createdAt === 'number' && Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt) ? item.updatedAt : Date.now(),
+      };
+    });
+    
+    // Re-run field normalization after sanitization
     imported.learningObjectives.forEach(ensureObjectiveFields);
     imported.exams.forEach(ensureExamFields);
     imported.resources.forEach(ensureResourceFields);

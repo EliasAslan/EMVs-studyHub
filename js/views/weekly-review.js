@@ -14,7 +14,7 @@
 
 import { escapeHtml, formatDate, getWeekDateRange, getCurrentWeekNumber, getWeekActivity, hasWeeklyReview, getReviewAttention } from '../utils/helpers.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { generateId } from '../services/store.js';
+import { generateId, deleteWithTombstone } from '../services/store.js';
 import { navigate } from './router.js';
 
 const QUESTIONS = [
@@ -82,7 +82,7 @@ export function renderWeeklyReview(state) {
     item.querySelector('.delete-review-btn')?.addEventListener('click', e => {
       e.stopPropagation();
       if (confirm('Review löschen?')) {
-        state.weeklyReviews = state.weeklyReviews.filter(x => x.id !== id);
+        deleteWithTombstone(state, 'weeklyReviews', id);
         window.EMVS.save();
         navigate('weekly-review');
       }

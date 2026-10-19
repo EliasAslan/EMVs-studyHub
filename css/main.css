@@ -214,16 +214,7 @@ p, li { overflow-wrap: break-word; }
 .chapter-nav .toc-num { display: none; }
 .chapter-header.active .chapter-title { color: var(--accent-ink); }
 
-/* Expand/collapse toggle: visually quiet, never mistaken for navigation */
-.rail-toggle {
-  margin-left: auto; flex: 0 0 28px; width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 5px; color: var(--ink-3); font-size: 19px; line-height: 1;
-  border: 1px solid transparent; background: transparent;
-}
-.rail-toggle:hover { color: var(--ink); border-color: var(--rule); background: var(--paper); }
-.rail-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.rail-toggle-ico { display: block; line-height: 1; }
+
 
 /* Current-module block: Home shortcut + 5 tab rows + switcher list */
 .mod-current { margin-top: 4px; }
@@ -274,17 +265,6 @@ p, li { overflow-wrap: break-word; }
 .projection strong { font-family: var(--mono); font-weight: 500; color: var(--accent-ink); font-size: 13.5px; }
 
 .sidebar-footer { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--rule); }
-.cmd-trigger {
-  width: 100%; display: flex; align-items: center; justify-content: space-between;
-  min-height: 44px;
-  padding: 10px 12px; border-radius: 6px; font-size: 13px; color: var(--ink-2);
-  background: var(--paper); border: 1px solid var(--rule); transition: border-color 0.12s ease, color 0.12s ease;
-}
-.cmd-trigger:hover { border-color: var(--rule-2); color: var(--ink); }
-kbd {
-  font-family: var(--mono); font-size: 10.5px; padding: 2px 6px; border-radius: 3px;
-  background: var(--bg); border: 1px solid var(--rule); color: var(--ink-3);
-}
 
 /* ============ MAIN ============ */
 .main { flex: 1; overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; min-width: 0; }
@@ -590,33 +570,8 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 .rail-mod[hidden] { display: none; }
 .rail-mod-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 
-/* Secondary workspace panel (Arbeitsbereich layout): module navigation
-   beside the global icon rail. Hidden unless the layout enables it. */
-#workspace-panel { display: none; }
-#workspace-panel[hidden] { display: none !important; }
-
 /* Upper navigation + floating dock (desktop layouts, enabled per layout) */
 #dock { display: none; }
-.ws-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-.ws-head-text { min-width: 0; }
-.ws-head-text .eyebrow { margin-bottom: 4px; }
-.ws-title { font-family: var(--serif); font-size: 22px; line-height: 1.15; color: var(--ink); font-weight: 400; }
-.ws-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; overflow-wrap: anywhere; }
-.ws-close {
-  width: 30px; min-width: 30px; height: 30px; min-height: 30px; margin-top: 2px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 25px; line-height: 1; color: var(--ink-3); border-radius: 5px; flex-shrink: 0;
-  border: 1px solid transparent; background: transparent;
-}
-.ws-close:hover { background: var(--paper); border-color: var(--rule); color: var(--ink); }
-.ws-close:active, .rail-toggle:active, .rail-fab:active, .rail-more:active { transform: translateY(1px); }
-.ws-close, .rail-toggle, .rail-fab, .rail-more { transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, transform 0.12s ease; }
-.ws-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ws-progress { margin: 12px 0 4px; }
-.ws-progress-meta { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
-.ws-progress-meta strong { font-family: var(--mono); font-size: 12px; color: var(--ink); }
-.ws-progress-line { height: 6px; border-radius: 99px; background: var(--rule); overflow: hidden; }
-.ws-progress-line span { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 .ws-body { margin-top: 8px; }
 
 /* Settings: navigation layout picker with schematic previews */
@@ -763,7 +718,7 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   /* The workspace panel is desktop-only; the drawer covers mobile nav */
   #workspace-panel { display: none !important; }
   /* Top bars, dock and focus handle are desktop layouts; phones keep tabbar + drawer */
-  #topchrome, #dock, #focus-handle, #focus-edge { display: none !important; }
+  #topchrome, #dock { display: none !important; }
 }
 
 /* Coarse pointers (Nothing Phone touch): 44px targets */
@@ -792,31 +747,21 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 /* Desktop: slim icon rail instead of 260px text sidebar */
 @media (min-width: 781px) {
   .sidebar { width: 96px; padding: 20px 10px calc(16px + env(safe-area-inset-bottom)); align-items: stretch; }
-  /* Workspace layout: global rail stays narrow, module nav lives in the panel */
-  body[data-navlayout="workspace"] #workspace-panel {
-    display: flex; flex-direction: column; flex-shrink: 0;
-    width: 264px; padding: 28px 18px calc(18px + env(safe-area-inset-bottom));
-    border-right: 1px solid var(--rule); background: var(--bg);
-    overflow-y: auto; overscroll-behavior: contain;
-  }
-  body[data-navlayout="workspace"] .rail-toggle { display: none; }
 
   /* Layouts without a sidebar: the sidebar only exists as the phone drawer */
-  body[data-navlayout="mega"] .sidebar, body[data-navlayout="mega"] #workspace-panel,
-  body[data-navlayout="command"] .sidebar, body[data-navlayout="command"] #workspace-panel,
-  body[data-navlayout="bento"] .sidebar, body[data-navlayout="bento"] #workspace-panel,
-  body[data-navlayout="dock"] .sidebar, body[data-navlayout="dock"] #workspace-panel { display: none; }
+  body[data-navlayout="mega"] .sidebar, body[data-navlayout="bento"] .sidebar,
+  body[data-navlayout="dock"] .sidebar { display: none; }
 
-  /* Shared top chrome (mega / command / bento): in normal flow so content,
+  /* Shared top chrome (mega / bento): in normal flow so content,
      dialogs and notifications can never slide underneath it. */
-  body[data-navlayout="mega"], body[data-navlayout="command"], body[data-navlayout="bento"] { --chrome-h: 61px; }
-  body[data-navlayout="mega"] #topchrome, body[data-navlayout="command"] #topchrome, body[data-navlayout="bento"] #topchrome {
+  body[data-navlayout="mega"], body[data-navlayout="bento"] { --chrome-h: 61px; }
+  body[data-navlayout="mega"] #topchrome, body[data-navlayout="bento"] #topchrome {
     display: flex; align-items: center; gap: 16px;
     min-height: 60px; padding: 8px 20px;
     background: var(--paper); border-bottom: 1px solid var(--rule);
     position: sticky; top: 0; z-index: 90;
   }
-  body[data-navlayout="mega"] .app, body[data-navlayout="command"] .app, body[data-navlayout="bento"] .app {
+  body[data-navlayout="mega"] .app, body[data-navlayout="bento"] .app {
     height: calc(100vh - var(--chrome-h)); height: calc(100dvh - var(--chrome-h));
   }
   #topchrome .brand-mark { font-size: 22px; flex-shrink: 0; }
@@ -899,17 +844,8 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   .bento-launch kbd { background: transparent; border-color: currentColor; color: inherit; opacity: 0.7; }
   .bento-where { flex: 1; min-width: 0; font-family: var(--serif); font-size: 20px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* Focus: the sidebar becomes an on-demand drawer */
-  body[data-navlayout="focus"] .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; width: 300px; z-index: 100;
-    transform: translateX(-104%); box-shadow: 12px 0 40px rgba(0, 0, 0, 0.12);
-  }
-  body[data-navlayout="focus"] .sidebar.open { transform: translateX(0); }
-  body[data-navlayout="focus"] .rail-toggle { display: none; }
-  body[data-navlayout="focus"] .page { padding-top: 64px; }
-
-  /* Tree / context use the labeled sidebar; the rail toggle swaps tree <-> rail */
-  body[data-navlayout="context"] .rail-toggle { display: none; }
+  /* Tree / context use the labeled sidebar */
+  body[data-navlayout="context"] .sidebar { width: 264px; }
 
   /* Mobile layout on wide screens: phone-first column with bottom bar */
   body[data-navlayout="mobile"] { background: var(--rule); }
@@ -984,10 +920,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   .sidebar.expanded .rail-mod { font-size: 12px; }
   .sidebar.expanded #nav-modules { display: block !important; }
   .sidebar.expanded .mod-label { display: block !important; }
-  .sidebar.expanded .sidebar-footer .cmd-trigger span,
-  .sidebar.expanded .sidebar-footer .cmd-trigger kbd { display: inline-flex; }
-  .sidebar.expanded .sidebar-footer .cmd-trigger { justify-content: space-between; }
-  .sidebar.expanded .sidebar-footer .cmd-trigger::after { content: none; }
   .sidebar:not(.expanded) .toc-lb { display: none; }
   .sidebar:not(.expanded) .toc-num { display: none; }
   .sidebar:not(.expanded) .toc-label { text-align: center; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1002,8 +934,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   .sidebar:not(.expanded) .mod-home-ico { display: inline; font-size: 20px; }
   .brand { position: relative; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 16px; padding-top: 2px; }
   .brand-mark { font-size: 19px; }
-  .sidebar:not(.expanded) .rail-toggle { position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; flex-basis: 22px; font-size: 16px; }
-  .sidebar.expanded .rail-toggle { margin-left: auto; }
   .brand-sub { display: none; }
   .toc-label { text-align: center; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .toc-item {
@@ -1042,9 +972,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   .mod-body .eyebrow, .mod-body .page-title { display: none; }
   .chapter-header { flex-direction: column; align-items: center; text-align: center; min-height: 52px; justify-content: center; }
   .chapter-num { min-width: 0; }
-  .sidebar-footer .cmd-trigger span, .sidebar-footer kbd { display: none; }
-  .sidebar-footer .cmd-trigger { justify-content: center; min-height: 48px; }
-  .sidebar-footer .cmd-trigger::after { content: "⌕"; font-size: 18px; }
   .tabbar { display: none; }
   .sheet-overlay { align-items: center; padding: 24px; }
   .sheet { border-radius: 16px; border-bottom: 1px solid var(--rule-2); }
@@ -1681,7 +1608,7 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 
 
 /* ============ NAVIGATION LAYOUTS (shared pieces) ============ */
-#topchrome[hidden], .focus-handle[hidden], .focus-edge[hidden], #mobileLaunch[hidden], #mobileAction[hidden] { display: none !important; }
+#topchrome[hidden], #mobileLaunch[hidden], #mobileAction[hidden] { display: none !important; }
 
 /* Destination buttons shared by context, mega, command, bento */
 .nav-dest {
@@ -1745,16 +1672,6 @@ body[data-navlayout="tree"] .sidebar.expanded #nav-modules, body[data-navlayout=
 .tree-status.st-done { background: var(--green); }
 .tree-more { font-size: 11.5px; color: var(--ink-3); padding: 2px 8px 6px 40px; }
 @media (pointer: coarse) { .tree-row { min-height: 44px; } }
-
-/* Focus layout: handle + hot edge */
-.focus-handle {
-  position: fixed; top: 12px; left: 12px; z-index: 60; display: inline-flex; align-items: center; gap: 8px;
-  min-height: 40px; padding: 0 14px; border-radius: 99px; background: var(--paper); border: 1px solid var(--rule);
-  color: var(--ink-3); font-size: 13px; opacity: 0.6; transition: opacity 0.15s ease;
-}
-.focus-handle:hover, .focus-handle:focus-visible, .focus-handle[aria-expanded="true"] { opacity: 1; color: var(--ink); }
-.focus-where { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.focus-edge { position: fixed; left: 0; top: 0; bottom: 0; width: 10px; z-index: 55; }
 
 /* Launchpad (Bento) */
 .launchpad {

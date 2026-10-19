@@ -95,6 +95,7 @@ function modulesToRow(m) {
     target_grade: typeof m?.targetGrade === 'number' ? m.targetGrade : 5.0,
     created_at: num(m?.createdAt, Date.now()),
     updated_at: num(m?.updatedAt, Date.now()),
+    deleted_at: m?.deletedAt ?? null,
   };
 }
 
@@ -117,6 +118,7 @@ function objectivesToRow(o) {
     review_schedule: o?.reviewSchedule ?? null,
     created_at: num(o?.createdAt, Date.now()),
     updated_at: num(o?.updatedAt, Date.now()),
+    deleted_at: o?.deletedAt ?? null,
   };
 }
 
@@ -138,6 +140,7 @@ function resourcesToRow(r) {
     last_used: numOrNull(r?.lastUsed),
     created_at: num(r?.createdAt, Date.now()),
     updated_at: num(r?.updatedAt, Date.now()),
+    deleted_at: r?.deletedAt ?? null,
   };
 }
 
@@ -145,13 +148,14 @@ function sessionsToRow(s) {
   return {
     id: str(s?.id),
     module_id: str(s?.moduleId),
-    start_time: str(s?.startTime),
+    start_time: str(s?.startTime),  // v2: epoch ms BIGINT (was TIMESTAMPTZ)
     duration: num(s?.duration, 30),
     linked_objective_ids: arr(s?.linkedObjectiveIds),
     linked_resource_ids: arr(s?.linkedResourceIds),
     note: str(s?.note),
     created_at: num(s?.createdAt, Date.now()),
     updated_at: num(s?.updatedAt, Date.now()),
+    deleted_at: s?.deletedAt ?? null,
   };
 }
 
@@ -178,6 +182,7 @@ function examsToRow(e) {
     duration_min: numOrNull(e?.durationMin),
     created_at: num(e?.createdAt, Date.now()),
     updated_at: num(e?.updatedAt, Date.now()),
+    deleted_at: e?.deletedAt ?? null,
   };
 }
 
@@ -193,7 +198,8 @@ function examResultsToRow(r) {
     objective_results: arr(r?.objectiveResults),
     notes: str(r?.notes),
     created_at: num(r?.createdAt, Date.now()),
-    // NOTE: exam_results has no updated_at column; app updatedAt is dropped.
+    updated_at: num(r?.updatedAt, Date.now()),
+    deleted_at: r?.deletedAt ?? null,
   };
 }
 
@@ -202,6 +208,7 @@ function planItemsToRow(p) {
     id: str(p?.id),
     module_id: str(p?.moduleId),
     week: num(p?.week, 1),
+    year: num(p?.year, new Date().getFullYear()),
     title: str(p?.title),
     text: str(p?.text),
     type: str(p?.type, 'task'),
@@ -213,6 +220,7 @@ function planItemsToRow(p) {
     due_date: emptyToNull(p?.dueDate),
     created_at: num(p?.createdAt, Date.now()),
     updated_at: num(p?.updatedAt, Date.now()),
+    deleted_at: p?.deletedAt ?? null,
   };
 }
 
@@ -224,9 +232,10 @@ function capturesToRow(c) {
     type: str(c?.type, 'thought'),
     content: str(c?.content),
     tags: arr(c?.tags),
-    timestamp: str(c?.timestamp),
+    timestamp: str(c?.timestamp),  // v2: epoch ms BIGINT (was TIMESTAMPTZ)
     created_at: num(c?.createdAt, Date.now()),
     updated_at: num(c?.updatedAt, Date.now()),
+    deleted_at: c?.deletedAt ?? null,
   };
 }
 
@@ -247,6 +256,7 @@ function reviewsToRow(r) {
     objectives_reviewed: num(r?.objectivesReviewed),
     created_at: num(r?.createdAt, Date.now()),
     updated_at: num(r?.updatedAt, Date.now()),
+    deleted_at: r?.deletedAt ?? null,
   };
 }
 
@@ -285,6 +295,9 @@ export function toRow(collection, item) {
 // ---------------------------------------------------------------------------
 
 function rowToModule(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   return {
     id: str(r?.id),
     code: str(r?.code),
@@ -297,6 +310,9 @@ function rowToModule(r) {
 }
 
 function rowToObjective(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   return {
     id: str(r?.id),
     moduleId: str(r?.module_id),
@@ -319,6 +335,9 @@ function rowToObjective(r) {
 }
 
 function rowToResource(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   return {
     id: str(r?.id),
     moduleId: str(r?.module_id),
@@ -340,10 +359,13 @@ function rowToResource(r) {
 }
 
 function rowToSession(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   return {
     id: str(r?.id),
     moduleId: str(r?.module_id),
-    startTime: str(r?.start_time),
+    startTime: str(r?.start_time),  // v2: epoch ms BIGINT
     duration: num(r?.duration, 0),
     linkedObjectiveIds: arr(r?.linked_objective_ids),
     linkedResourceIds: arr(r?.linked_resource_ids),
@@ -362,6 +384,9 @@ function examTextToScore(text, isMock) {
 }
 
 function rowToExam(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   const isMock = !!r?.is_mock;
   return {
     id: str(r?.id),
@@ -382,6 +407,9 @@ function rowToExam(r) {
 }
 
 function rowToExamResult(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   return {
     id: str(r?.id),
     examId: str(r?.exam_id),
@@ -393,15 +421,19 @@ function rowToExamResult(r) {
     objectiveResults: arr(r?.objective_results),
     notes: str(r?.notes),
     createdAt: num(r?.created_at, 0),
-    updatedAt: num(r?.created_at, 0),
+    updatedAt: num(r?.updated_at, 0),
   };
 }
 
 function rowToPlanItem(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   return {
     id: str(r?.id),
     moduleId: str(r?.module_id),
     week: num(r?.week, 1),
+    year: num(r?.year, new Date().getFullYear()),
     title: str(r?.title),
     text: str(r?.text),
     type: str(r?.type, 'task'),
@@ -417,6 +449,9 @@ function rowToPlanItem(r) {
 }
 
 function rowToCapture(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   return {
     id: str(r?.id),
     moduleId: r?.module_id ?? null,
@@ -424,13 +459,16 @@ function rowToCapture(r) {
     type: str(r?.type, 'thought'),
     content: str(r?.content),
     tags: arr(r?.tags),
-    timestamp: str(r?.timestamp),
+    timestamp: str(r?.timestamp),  // v2: epoch ms BIGINT
     createdAt: num(r?.created_at, 0),
     updatedAt: num(r?.updated_at, 0),
   };
 }
 
 function rowToReview(r) {
+  if (r?.deleted_at != null) {
+    return { _tombstone: true, id: str(r?.id), deletedAt: num(r?.deleted_at) };
+  }
   return {
     id: str(r?.id),
     week: num(r?.week, 1),
@@ -508,6 +546,7 @@ export function fromCloudDataset(tables) {
     planItems: [],
     captures: [],
     weeklyReviews: [],
+    tombstones: [],
     settings: { theme: 'light', currentModuleId: null },
   };
   for (const collection of COLLECTIONS) {
@@ -517,7 +556,15 @@ export function fromCloudDataset(tables) {
     if (collection === 'settings') {
       if (rows[0]) state.settings = fromRow('settings', rows[0]);
     } else {
-      state[collection] = rows.map((row) => fromRow(collection, row));
+      for (const row of rows) {
+        const item = fromRow(collection, row);
+        if (item && item._tombstone) {
+          // Tombstone: add to tombstones array, don't add to collection
+          state.tombstones.push({ collection, id: item.id, deletedAt: item.deletedAt });
+        } else {
+          state[collection].push(item);
+        }
+      }
     }
   }
   return state;

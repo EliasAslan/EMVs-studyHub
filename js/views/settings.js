@@ -4,24 +4,20 @@
 
 import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal, confirmDialog } from '../components/modal.js';
-import { generateId, exportData, importData, clearAll, clearStorageError } from '../services/store.js';
+import { generateId, exportData, importData, clearAll, clearStorageError, deleteWithTombstone } from '../services/store.js';
 import { renderAuthPanel } from '../services/auth.js';
 import { setNavLayout } from '../components/sidebar.js';
-import { NAV_LAYOUTS, NAV_LAYOUT_TIERS, getNavLayout } from '../utils/navLayout.js';
+import { NAV_LAYOUTS, getNavLayout } from '../utils/navLayout.js';
 
 /** Tiny schematic of each navigation layout for the picker (decorative). */
 function layoutPreview(id) {
   switch (id) {
-    case 'rail': return '<i class="nl-bar nl-slim"></i><i class="nl-page"></i>';
-    case 'workspace': return '<i class="nl-bar nl-slim"></i><i class="nl-panel"></i><i class="nl-page"></i>';
     case 'tree': return '<i class="nl-bar nl-wide nl-lines"></i><i class="nl-page"></i>';
     case 'mega': return '<i class="nl-top"></i><i class="nl-drop"></i><i class="nl-page"></i>';
     case 'dock': return '<i class="nl-page"></i><i class="nl-pill"></i>';
     case 'mobile': return '<i class="nl-phonetop"></i><i class="nl-page"></i><i class="nl-tabs"></i>';
     case 'context': return '<i class="nl-bar nl-wide nl-segs"></i><i class="nl-page"></i>';
-    case 'command': return '<i class="nl-top nl-search"></i><i class="nl-page"></i>';
     case 'bento': return '<i class="nl-cell nl-c1"></i><i class="nl-cell nl-c2"></i><i class="nl-cell nl-c3"></i><i class="nl-cell nl-c4"></i>';
-    case 'focus': return '<i class="nl-page"></i><i class="nl-dot"></i>';
     default: return '<i class="nl-bar"></i><i class="nl-page"></i>';
   }
 }
@@ -86,16 +82,12 @@ export function renderSettings(state) {
       </div>
       <div class="field-row">
         <div class="nav-layout-pick" role="radiogroup" aria-label="Navigation">
-          ${NAV_LAYOUT_TIERS.map(g => `
-            <fieldset class="nav-layout-group" data-tier="${g.id}">
-              <legend>${escapeHtml(g.label)}</legend>
-              ${NAV_LAYOUTS.filter(l => l.tier === g.id).map(l => `
-                <label class="nav-layout-option${navLayout === l.id ? ' selected' : ''}">
-                  <input type="radio" name="nav-layout" value="${l.id}"${navLayout === l.id ? ' checked' : ''}>
-                  <span class="nl-preview nl-${l.id}" aria-hidden="true">${layoutPreview(l.id)}</span>
-                  <span class="nl-text"><strong>${escapeHtml(l.label)}</strong><small>${escapeHtml(l.hint)}</small></span>
-                </label>`).join('')}
-            </fieldset>`).join('')}
+          ${NAV_LAYOUTS.map(l => `
+            <label class="nav-layout-option${navLayout === l.id ? ' selected' : ''}">
+              <input type="radio" name="nav-layout" value="${l.id}"${navLayout === l.id ? ' checked' : ''}>
+              <span class="nl-preview nl-${l.id}" aria-hidden="true">${layoutPreview(l.id)}</span>
+              <span class="nl-text"><strong>${escapeHtml(l.label)}</strong><small>${escapeHtml(l.hint)}</small></span>
+            </label>`).join('')}
         </div>
         <p class="muted" style="font-size: 12.5px; margin-top: 8px;">Wechselt sofort, ganz ohne Neuladen — die Auswahl bleibt gespeichert. Auf schmalen Bildschirmen nutzt Study Hub automatisch die mobile Navigation (Befehlspalette: Strg+K; „Navigation: …“ wechselt das Layout von überall); die Desktop-Auswahl bleibt dabei erhalten.</p>
       </div>
@@ -360,15 +352,8 @@ export function renderSettings(state) {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
       if (await confirmDialog('Modul wirklich löschen? Alle zugehörigen Lernziele, Ressourcen, Sitzungen, Prüfungen, Plan-Einträge werden ebenfalls gelöscht.', 'Modul löschen')) {
-        state.modules = state.modules.filter(m => m.id !== id);
-        state.learningObjectives = state.learningObjectives.filter(o => o.moduleId !== id);
-        state.resources = state.resources.filter(r => r.moduleId !== id);
-        state.studySessions = state.studySessions.filter(s => s.moduleId !== id);
-        state.exams = state.exams.filter(e => e.moduleId !== id);
-        state.examResults = state.examResults.filter(e => e.moduleId !== id);
-        state.planItems = state.planItems.filter(p => p.moduleId !== id);
-        state.captures = state.captures.filter(c => c.moduleId !== id);
-        state.weeklyReviews = state.weeklyReviews.filter(w => w.moduleId !== id);
+        // Delete module with tombstone (cascades to all child collections)
+        deleteWithTombstone(state, 'modules', id);
         
         if (state.settings.currentModuleId === id) {
           state.settings.currentModuleId = state.modules[0]?.id || null;

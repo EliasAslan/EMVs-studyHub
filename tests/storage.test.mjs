@@ -196,7 +196,7 @@ test('loadTimerState() returns null on corrupt data without throwing or writing'
 test('load(): missing key follows first-run path and writes nothing', () => {
   const fake = makeFake();
   const data = store.load();
-  assert(Array.isArray(data.modules) && data.modules.length >= 1, 'demo seed expected');
+  assert(Array.isArray(data.modules) && data.modules.length === 0, 'blank seed expected (no demo data)');
   assert(data.settings && typeof data.settings === 'object', 'settings expected');
   assert(store.getStorageError() === null, 'no storage error expected');
   assert(fake._map.size === 0, 'load must not write to storage');
@@ -325,7 +325,7 @@ test('saves work again after a successful load, a first run, or a reset', () => 
   // Legitimate first run (missing key): saves work, enabling normal setup.
   fake = makeFake();
   const first = store.load();
-  assert(first.modules.length >= 1, 'first-run data');
+  assert(first.modules.length === 0, 'first-run blank seed (no demo data)');
   assert(store.save(first) === true, 'save works after first-run init');
   // Explicit reset after a failure unblocks saving.
   fake = makeFake();

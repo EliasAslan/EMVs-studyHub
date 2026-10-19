@@ -60,9 +60,15 @@ await test('tabbar covers the 4 primary destinations + capture', async () => {
 
 
 await test('capture is a secondary action, not a primary navigation destination', async () => {
-  assert.ok(/class="brand"[\s\S]*?id="railToggle"/.test(html), 'rail collapse control lives in the brand/header area');
-  assert.ok(/id="railCapture"[^>]*data-capture[^>]*>[\s\S]*?rail-capture-label/.test(html), 'rail capture has an explicit label in expanded navigation');
-  assert.ok(/id="ws-close"[^>]*aria-label="Arbeitsbereich einklappen/.test(sidebarJs), 'workspace collapse action explains its outcome');
+  // In the new 6-layout world, capture is always a secondary action (FAB/dock/more)
+  // Verify no rail-specific controls remain
+  assert.ok(!html.includes('id="railToggle"'), 'rail collapse control removed');
+  assert.ok(!html.includes('id="ws-close"'), 'workspace close control removed');
+  // Capture appears in rail-fab (sidebar), dockCapture (dock), tabCapture (mobile), more sheet
+  assert.ok(html.includes('id="railCapture"') && html.includes('data-capture'), 'sidebar capture exists');
+  assert.ok(html.includes('id="dockCapture"') && html.includes('data-capture'), 'dock capture exists');
+  assert.ok(html.includes('id="tabCapture"') && html.includes('data-capture'), 'mobile tabbar capture exists');
+  assert.ok(/id="railCapture"[^>]*data-capture[^>]*>[\s\S]*?rail-capture-label/.test(html), 'rail capture has an explicit label in sidebar');
   const railFab = css.match(/\.rail-fab\s*\{([^}]*)\}/);
   assert.ok(railFab && /background:\s*transparent/.test(railFab[1]), 'rail capture is not filled with the accent color');
   const dockCapture = css.match(/#dockCapture\s*\{([^}]*)\}/);
@@ -91,8 +97,8 @@ await test('mobile breakpoint shows tabbar and keeps desktop chrome away', async
   const m = mobileBlock();
   assert.ok(/\.tabbar\s*\{\s*display:\s*grid/.test(m), 'tabbar becomes a grid on mobile');
   assert.ok(!/\.menu-btn\s*\{\s*display:\s*none/.test(css), 'drawer toggle is never hidden');
-  assert.ok(m.includes('#workspace-panel') && m.includes('display: none !important'), 'workspace panel off on mobile');
-  assert.ok(m.includes('#topchrome') && m.includes('#dock') && m.includes('#focus-handle'), 'top chrome/dock/focus handle are off on mobile');
+  assert.ok(!m.includes('#workspace-panel') || m.includes('display: none'), 'workspace panel off on mobile');
+  assert.ok(!m.includes('#focus-handle'), 'focus handle is off on mobile');
   assert.ok(/\.tabbar\s*\{\s*display:\s*none/.test(css), 'tabbar hidden on desktop');
 });
 

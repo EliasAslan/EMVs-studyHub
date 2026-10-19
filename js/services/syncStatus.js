@@ -116,6 +116,18 @@ export function describeSyncStatus(status) {
   return lines;
 }
 
+/** Short "last synced HH:MM" for quiet status display in Settings header. */
+export function formatLastSynced(status) {
+  const s = status && typeof status === 'object' ? status : blankStatus();
+  const last = Math.max(s.lastUploadAt || 0, s.lastDownloadAt || 0);
+  if (!last) return 'Nie';
+  try {
+    return new Date(last).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return new Date(last).toLocaleTimeString();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Error translation
 // ---------------------------------------------------------------------------

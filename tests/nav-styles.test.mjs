@@ -10,7 +10,7 @@ import {
   contextModeFor, resolveContextMode, routeTitle, getBreadcrumb,
 } from '../js/utils/navigation.js';
 import { buildNavTree, getBentoData, getUpcomingExams, getRecentActivity, relativeTime } from '../js/utils/navData.js';
-import { getDemoSeedData } from '../js/services/store.js';
+import { getSeedData } from '../js/services/store.js';
 
 let passed = 0;
 let failed = 0;
@@ -80,7 +80,9 @@ await test('mega menu only references real destinations', async () => {
 });
 
 await test('routeTitle and breadcrumb describe the current page', async () => {
-  const state = getDemoSeedData();
+  // Create test state with a module
+  const state = getSeedData();
+  state.modules.push({ id: 'm1', code: 'DB1', title: 'Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: 1, updatedAt: 1 });
   const mod = state.modules[0];
   assert.deepEqual(routeTitle('today', {}, state), { title: 'Heute', sub: '' });
   assert.deepEqual(routeTitle('module', { id: mod.id, tab: 'ziele' }, state), { title: `Modul ${mod.code}`, sub: 'Ziele' });
@@ -92,14 +94,21 @@ await test('routeTitle and breadcrumb describe the current page', async () => {
 });
 
 await test('tree: subjects → chapters → topics with stable ids', async () => {
-  const state = getDemoSeedData();
+  // Create test state with a module and objectives
+  const state = getSeedData();
+  state.modules.push({ id: 'm1', code: 'DB1', title: 'Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: 1, updatedAt: 1 });
+  state.learningObjectives.push(
+    { id: 'o1', moduleId: 'm1', number: 1, title: 'Ziel 1', description: '', status: 'todo', confidence: 3, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: null, createdAt: 1, updatedAt: 1, sessionHistory: [] },
+    { id: 'o2', moduleId: 'm1', number: 2, title: 'Ziel 2', description: '', status: 'todo', confidence: 2, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: null, createdAt: 1, updatedAt: 1, sessionHistory: [] },
+    { id: 'o3', moduleId: 'm1', number: 3, title: 'Ziel 3', description: '', status: 'todo', confidence: 1, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: null, createdAt: 1, updatedAt: 1, sessionHistory: [] }
+  );
   const tree = buildNavTree(state);
   assert.equal(tree.length, 1);
   const subject = tree[0];
   assert.equal(subject.type, 'subject');
   assert.deepEqual(subject.children.map(c => c.tab), ['home', 'ziele', 'plan', 'sessions', 'material']);
   const ziele = subject.children.find(c => c.tab === 'ziele');
-  assert.equal(ziele.children.length, state.learningObjectives.length);
+  assert.equal(ziele.children.length, 3);
   assert.ok(ziele.children.every(c => c.type === 'topic' && c.kind === 'objective'));
   const ids = [];
   (function walk(n) { ids.push(n.id); (n.children || []).forEach(walk); })(subject);
@@ -108,8 +117,9 @@ await test('tree: subjects → chapters → topics with stable ids', async () =>
 });
 
 await test('tree: long topic lists are capped and report what was left out', async () => {
-  const state = getDemoSeedData();
-  const modId = state.modules[0].id;
+  const state = getSeedData();
+  state.modules.push({ id: 'm1', code: 'DB1', title: 'Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: 1, updatedAt: 1 });
+  const modId = 'm1';
   state.learningObjectives = Array.from({ length: 75 }, (_, i) => ({ id: `o${i}`, moduleId: modId, number: i + 1, title: `Ziel ${i + 1}`, status: 'todo' }));
   const ziele = buildNavTree(state)[0].children.find(c => c.tab === 'ziele');
   assert.equal(ziele.count, 75);
@@ -134,8 +144,9 @@ await test('bento: upcoming exams are future-only, soonest first, invalid dates 
 });
 
 await test('bento: recent activity merges sessions, captures and reviews, newest first', async () => {
-  const state = getDemoSeedData();
-  state.captures = [{ id: 'c1', content: 'Was ist ein Fremdschlüssel?', timestamp: new Date(Date.now() - 60000).toISOString(), moduleId: state.modules[0].id },
+  const state = getSeedData();
+  state.modules.push({ id: 'm1', code: 'DB1', title: 'Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: 1, updatedAt: 1 });
+  state.captures = [{ id: 'c1', content: 'Was ist ein Fremdschlüssel?', timestamp: new Date(Date.now() - 60000).toISOString(), moduleId: 'm1' },
     { id: 'c2', content: '   ', timestamp: new Date().toISOString() }];
   const act = getRecentActivity(state, { limit: 10 });
   assert.equal(act[0].kind, 'capture', 'the minute-old note is newest');
@@ -145,7 +156,19 @@ await test('bento: recent activity merges sessions, captures and reviews, newest
 });
 
 await test('bento: one call returns everything the launchpad shows', async () => {
-  const data = getBentoData(getDemoSeedData());
+  const now = Date.now();
+  const state = getSeedData();
+  state.modules.push({ id: 'm1', code: 'DB1', title: 'Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: 1, updatedAt: 1 });
+  state.learningObjectives.push(
+    { id: 'o1', moduleId: 'm1', number: 1, title: 'Ziel 1', description: '', status: 'todo', confidence: 3, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: { nextReview: now - 1000, interval: 1, reviewCount: 1 }, createdAt: 1, updatedAt: 1, sessionHistory: [] },
+    { id: 'o2', moduleId: 'm1', number: 2, title: 'Ziel 2', description: '', status: 'todo', confidence: 2, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: { nextReview: now - 1000, interval: 1, reviewCount: 1 }, createdAt: 1, updatedAt: 1, sessionHistory: [] },
+    { id: 'o3', moduleId: 'm1', number: 3, title: 'Ziel 3', description: '', status: 'todo', confidence: 1, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: { nextReview: now - 1000, interval: 1, reviewCount: 1 }, createdAt: 1, updatedAt: 1, sessionHistory: [] }
+  );
+  state.exams.push({ id: 'e1', moduleId: 'm1', name: 'Prüfung', date: '2026-11-30', weight: 40, score: '', max: '', linkedObjectiveIds: ['o1', 'o2', 'o3'], objectiveResults: [{ objectiveId: 'o1', rating: null, note: '' }, { objectiveId: 'o2', rating: null, note: '' }, { objectiveId: 'o3', rating: null, note: '' }], description: '', isMock: false, durationMin: null, createdAt: 1, updatedAt: 1 });
+  state.planItems.push({ id: 'p1', moduleId: 'm1', week: 1, title: 'Woche 1', text: 'Lernen', type: 'task', linkedObjectiveIds: ['o1'], linkedResourceIds: [], done: false, dropped: false, notes: '', dueDate: null, createdAt: 1, updatedAt: 1 });
+  state.studySessions.push({ id: 's1', moduleId: 'm1', startTime: new Date().toISOString(), duration: 25, linkedObjectiveIds: ['o1'], linkedResourceIds: [], note: '', createdAt: 1, updatedAt: 1 });
+  
+  const data = getBentoData(state);
   assert.equal(data.subjects.length, 1);
   assert.equal(data.subjects[0].total, 3);
   assert.equal(data.subjects[0].pct, 0);

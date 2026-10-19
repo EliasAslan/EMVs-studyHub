@@ -34,11 +34,11 @@ async function test(name, fn) {
   }
 }
 
-const TEN = ['rail', 'workspace', 'tree', 'mega', 'dock', 'mobile', 'context', 'command', 'bento', 'focus'];
+const SIX = ['tree', 'mega', 'dock', 'context', 'bento', 'mobile'];
 
-await test('registry holds the ten requested layouts in selector order', async () => {
-  assert.deepEqual(NAV_LAYOUTS.map(l => l.id), TEN);
-  assert.equal(DEFAULT_NAV_LAYOUT, 'rail');
+await test('registry holds the six kept layouts in selector order', async () => {
+  assert.deepEqual(NAV_LAYOUTS.map(l => l.id), SIX);
+  assert.equal(DEFAULT_NAV_LAYOUT, 'tree');
   const ids = NAV_LAYOUTS.map(l => l.id);
   assert.equal(new Set(ids).size, ids.length, 'ids unique');
   const groupIds = NAV_LAYOUT_GROUPS.map(g => g.id);
@@ -53,41 +53,60 @@ await test('registry holds the ten requested layouts in selector order', async (
 });
 
 await test('isNavLayoutId accepts only known ids', async () => {
-  for (const id of TEN) assert.equal(isNavLayoutId(id), true, id);
-  for (const bad of ['full', 'topbar', '', 'RAIL', null, undefined, 3, {}]) {
+  for (const id of SIX) assert.equal(isNavLayoutId(id), true, id);
+  // Cut layouts should return false
+  for (const cut of ['rail', 'workspace', 'command', 'focus']) {
+    assert.equal(isNavLayoutId(cut), false, `cut layout ${cut} should be false`);
+  }
+  for (const bad of ['full', 'topbar', '', 'TREE', null, undefined, 3, {}]) {
     assert.equal(isNavLayoutId(bad), false, String(bad));
   }
 });
 
 await test('legacy layout ids migrate to their successors', async () => {
-  assert.deepEqual(LEGACY_NAV_LAYOUTS, { full: 'tree', topbar: 'mega' });
+  assert.deepEqual(LEGACY_NAV_LAYOUTS, {
+    full: 'tree',
+    topbar: 'mega',
+    rail: 'tree',
+    workspace: 'tree',
+    command: 'context',
+    focus: 'context',
+  });
   assert.equal(resolveNavLayout('full', {}), 'tree');
   assert.equal(resolveNavLayout('topbar', {}), 'mega');
+  assert.equal(resolveNavLayout('rail', {}), 'tree');
+  assert.equal(resolveNavLayout('workspace', {}), 'tree');
+  assert.equal(resolveNavLayout('command', {}), 'context');
+  assert.equal(resolveNavLayout('focus', {}), 'context');
   assert.equal(getNavLayout({ settings: { navLayout: 'full' } }), 'tree');
   assert.equal(getNavLayout({ settings: { navLayout: 'topbar' } }), 'mega');
+  assert.equal(getNavLayout({ settings: { navLayout: 'rail' } }), 'tree');
+  assert.equal(getNavLayout({ settings: { navLayout: 'workspace' } }), 'tree');
+  assert.equal(getNavLayout({ settings: { navLayout: 'command' } }), 'context');
+  assert.equal(getNavLayout({ settings: { navLayout: 'focus' } }), 'context');
 });
 
 await test('resolveNavLayout prefers stored ids, migrates the sidebarExpanded flag', async () => {
   assert.equal(resolveNavLayout('bento', { settings: { sidebarExpanded: true } }), 'bento');
   assert.equal(resolveNavLayout(undefined, { settings: { sidebarExpanded: true } }), 'tree');
-  assert.equal(resolveNavLayout(undefined, { settings: {} }), 'rail');
-  assert.equal(resolveNavLayout('nonsense', null), 'rail');
-  assert.equal(resolveNavLayout('constructor', {}), 'rail', 'prototype keys are not layouts');
+  assert.equal(resolveNavLayout(undefined, { settings: {} }), 'tree');
+  assert.equal(resolveNavLayout('nonsense', null), 'tree');
+  assert.equal(resolveNavLayout('constructor', {}), 'tree', 'prototype keys are not layouts');
 });
 
 await test('getNavLayout reads state settings safely', async () => {
-  assert.equal(getNavLayout(null), 'rail');
-  assert.equal(getNavLayout({}), 'rail');
-  assert.equal(getNavLayout({ settings: { navLayout: 'focus' } }), 'focus');
-  assert.equal(getNavLayout({ settings: { navLayout: 'nope' } }), 'rail');
+  assert.equal(getNavLayout(null), 'tree');
+  assert.equal(getNavLayout({}), 'tree');
+  assert.equal(getNavLayout({ settings: { navLayout: 'bento' } }), 'bento');
+  assert.equal(getNavLayout({ settings: { navLayout: 'nope' } }), 'tree');
 });
 
 await test('setNavLayoutSetting persists valid ids only', async () => {
-  const state = { settings: { navLayout: 'rail' } };
-  assert.equal(setNavLayoutSetting(state, 'command'), true);
-  assert.equal(state.settings.navLayout, 'command');
+  const state = { settings: { navLayout: 'tree' } };
+  assert.equal(setNavLayoutSetting(state, 'context'), true);
+  assert.equal(state.settings.navLayout, 'context');
   assert.equal(setNavLayoutSetting(state, 'full'), false, 'legacy ids are read, never written');
-  assert.equal(state.settings.navLayout, 'command');
+  assert.equal(state.settings.navLayout, 'context');
   const bare = {};
   assert.equal(setNavLayoutSetting(bare, 'mobile'), true);
   assert.equal(bare.settings.navLayout, 'mobile');
