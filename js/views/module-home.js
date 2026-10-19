@@ -26,7 +26,11 @@ export function renderModuleHomeSection(state, m) {
   const stats = getModuleStats(state, m.id);
   const projection = calculateProjection(state, m.id, m.targetGrade ?? 5.0);
   const lastSession = getRecentSessions(state, 50).find(s => s.moduleId === m.id) || null;
-  const spots = getWeakSpots(state, { moduleId: m.id, limit: 2 });
+  // The primary continue-learning card owns the weakest objective; the
+  // attention list should surface other objectives instead of repeating it.
+  const spots = getWeakSpots(state, { moduleId: m.id, limit: state.learningObjectives.length })
+    .filter(({ objective }) => objective.id !== weak?.id)
+    .slice(0, 2);
   const notes = getRecentCaptures(state, { limit: 3 }).filter(c => !c.moduleId || c.moduleId === m.id);
   const todos = getOpenPlanItems(state, { moduleId: m.id, limit: 3 });
 
@@ -55,10 +59,10 @@ export function renderModuleHomeSection(state, m) {
       <div class="section-label" style="margin-top: 24px;">Prognose</div>
       <div class="projection">${renderProjectionText(projection, m.targetGrade ?? 5.0)}</div>
     ` : ''}
-    ${renderLastSession(state, m, lastSession)}
     ${spots.length ? renderSpots(state, m, spots) : ''}
-    ${notes.length ? renderNotes(state, notes) : ''}
+    ${renderLastSession(state, m, lastSession)}
     ${todos.length ? renderTodos(state, m, todos) : ''}
+    ${notes.length ? renderNotes(state, notes) : ''}
   `;
 
   wireModuleHome(el, state, m);

@@ -16,16 +16,11 @@ export function renderToday(state) {
   const now = new Date();
   const dateLine = now.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const focus = pickFocus(state);
-  const nextUp = pickNextUp(state, focus);
+  const plan = buildTodayPlan(state);
+  const { focus, nextUp, weak, due, dueCount } = plan;
   const closestExams = closestTests(state, 3);
-  const weak = focus?.objective
-    ? getRiskiestObjective(state, [focus.objective.id])
-    : getRiskiestObjective(state);
   const recent = getRecentSessions(state, 3);
   const prompt = getDailyPrompt(now);
-  const due = getDueObjectives(state).slice(0, 5);
-  const dueCount = getDueObjectives(state).length;
   const todos = getOpenPlanItems(state, { limit: 5 });
   const notes = getRecentCaptures(state, { limit: 3 });
   const reviewWeek = getCurrentWeekNumber(now);
@@ -48,10 +43,12 @@ export function renderToday(state) {
     <div class="section-label" style="margin-top: 24px;">Nächste Prüfungen</div>
     ${renderClosestExams(closestExams, state)}
 
-    ${due.length ? `
+    ${dueCount ? `
       <div class="section-label" style="margin-top: 28px;">Wieder fällig · ${dueCount}</div>
-      <p class="today-empty-line" style="margin-bottom: 12px;">Zuerst vergessen: Verstandenes kehrt im Rhythmus zurück — kein Häkchen, sondern ein Wiedersehen.</p>
-      <div class="today-due-list">${due.map(o => renderDueRow(o, state)).join('')}</div>
+      ${due.length ? `
+        <p class="today-empty-line" style="margin-bottom: 12px;">Zuerst vergessen: Verstandenes kehrt im Rhythmus zurück — kein Häkchen, sondern ein Wiedersehen.</p>
+        <div class="today-due-list">${due.map(o => renderDueRow(o, state)).join('')}</div>
+      ` : '<p class="today-empty-line">Die fälligen Lernziele sind bereits oben eingeordnet.</p>'}
     ` : ''}
 
     ${weak ? `
@@ -80,7 +77,7 @@ export function renderToday(state) {
     ${reviewDue ? `
       <div class="today-review-nudge">
         <div>
-          <div class="today-review-nudge-title">Wochenreview offen — KW ${reviewWeek}</div>
+          <div class="today-review-nudge-title">Wochenreflexion offen — KW ${reviewWeek}</div>
           <div class="today-review-nudge-sub">Drei Fragen, fünf Minuten, mit den Fakten der Woche daneben.</div>
         </div>
         <button class="btn primary" id="today-review-now">Jetzt reviewen</button>
@@ -90,7 +87,6 @@ export function renderToday(state) {
 
     <div class="today-prompt">
       <span class="today-prompt-q">„${escapeHtml(prompt)}“</span>
-      <a href="#/review" class="today-prompt-link" id="today-review-link">Zum Wochenreview →</a>
     </div>
   `;
 
@@ -193,11 +189,6 @@ export function renderToday(state) {
     });
   });
 
-  // Review prompt link
-  el.querySelector('#today-review-link')?.addEventListener('click', e => {
-    e.preventDefault();
-    navigate('weekly-review');
-  });
   el.querySelector('#today-review-now')?.addEventListener('click', () => navigate('weekly-review'));
 
   // Weak signal → full ranked list
@@ -221,9 +212,22 @@ export function renderToday(state) {
 }
 
 /**
- * Recommender: one focus + max two secondary actions.
- * Secondary = next due (excluding focus) + riskiest excluding focus/due.
+ * Build one de-duplicated daily plan. Higher-priority recommendations own an
+ * objective first; the due list shows only remaining items, while dueCount
+ * always reflects the full queue.
  */
+export function buildTodayPlan(state) {
+  const focus = pickFocus(state);
+  const nextUp = pickNextUp(state, focus);
+  const recommended = new Set([focus?.objective?.id, ...nextUp.map(n => n.objective.id)].filter(Boolean));
+  const weak = getRiskiestObjective(state, [...recommended]);
+  if (weak) recommended.add(weak.id);
+  const allDue = getDueObjectives(state);
+  const due = allDue.filter(o => !recommended.has(o.id)).slice(0, 5);
+  return { focus, nextUp, weak, due, dueCount: allDue.length };
+}
+
+/** Secondary recommendations never repeat the primary focus objective. */
 function pickNextUp(state, focus) {
   const out = [];
   const focusId = focus?.objective?.id;

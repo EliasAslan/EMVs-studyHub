@@ -5,6 +5,6 @@
   "version": "1.0.0",
   "scripts": {
     "start": "node server.cjs",
-    "test": "node tests/storage.test.mjs && node tests/reliability.test.mjs && node tests/supabase-data.test.mjs && node tests/cloud-sync.test.mjs && node tests/demo-exclusion.test.mjs && node tests/sync-status.test.mjs && node tests/workflow.test.mjs && node tests/dashboard.test.mjs && node tests/pdf-import.test.mjs && node tests/pdf-tasks.test.mjs && node tests/navigation.test.mjs && node tests/nav-layout.test.mjs && node tests/nav-styles.test.mjs && node tests/mobile-nav.test.mjs && node tests/nav-interaction.test.mjs"
+    "test": "node tests/storage.test.mjs && node tests/reliability.test.mjs && node tests/supabase-data.test.mjs && node tests/cloud-sync.test.mjs && node tests/demo-exclusion.test.mjs && node tests/sync-status.test.mjs && node tests/workflow.test.mjs && node tests/dashboard.test.mjs && node tests/pdf-import.test.mjs && node tests/pdf-tasks.test.mjs && node tests/navigation.test.mjs && node tests/nav-layout.test.mjs && node tests/nav-styles.test.mjs && node tests/mobile-nav.test.mjs && node tests/nav-interaction.test.mjs && node tests/today-plan.test.mjs"
   }
 }
