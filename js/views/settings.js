@@ -7,7 +7,7 @@ import { openModal, closeModal, confirmDialog } from '../components/modal.js';
 import { generateId, exportData, importData, clearAll, clearStorageError } from '../services/store.js';
 import { renderAuthPanel } from '../services/auth.js';
 import { setNavLayout } from '../components/sidebar.js';
-import { NAV_LAYOUTS, NAV_LAYOUT_GROUPS, getNavLayout } from '../utils/navLayout.js';
+import { NAV_LAYOUTS, NAV_LAYOUT_TIERS, getNavLayout } from '../utils/navLayout.js';
 
 /** Tiny schematic of each navigation layout for the picker (decorative). */
 function layoutPreview(id) {
@@ -86,10 +86,10 @@ export function renderSettings(state) {
       </div>
       <div class="field-row">
         <div class="nav-layout-pick" role="radiogroup" aria-label="Navigation">
-          ${NAV_LAYOUT_GROUPS.map(g => `
-            <fieldset class="nav-layout-group">
+          ${NAV_LAYOUT_TIERS.map(g => `
+            <fieldset class="nav-layout-group" data-tier="${g.id}">
               <legend>${escapeHtml(g.label)}</legend>
-              ${NAV_LAYOUTS.filter(l => l.group === g.id).map(l => `
+              ${NAV_LAYOUTS.filter(l => l.tier === g.id).map(l => `
                 <label class="nav-layout-option${navLayout === l.id ? ' selected' : ''}">
                   <input type="radio" name="nav-layout" value="${l.id}"${navLayout === l.id ? ' checked' : ''}>
                   <span class="nl-preview nl-${l.id}" aria-hidden="true">${layoutPreview(l.id)}</span>

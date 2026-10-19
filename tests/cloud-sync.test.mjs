@@ -378,13 +378,17 @@ await test('upload verifies the user_settings row too', async () => {
 
 await test('recordsEqual ignores object key order but preserves array order', async () => {
   // Semantically identical nested objects with different key order must pass.
+  // Fixed timestamps: toRow() defaults createdAt/updatedAt/lastTouched to
+  // Date.now(), so unpinned fields would rarely be identical across two
+  // round-trips and the comparison would depend on wall-clock timing.
+  const pinned = { createdAt: 1700000000000, updatedAt: 1700000000000, lastTouched: 1700000000000 };
   const a = fromRow('learningObjectives', toRow('learningObjectives', {
-    id: 'demo-obj1-mv1ff5nk', moduleId: 'mod-1', number: 1, title: 'T',
+    id: 'demo-obj1-mv1ff5nk', moduleId: 'mod-1', number: 1, title: 'T', ...pinned,
     reviewHistory: [{ timestamp: 1700000000000, outcome: 'solid' }],
     reviewSchedule: { interval: 4, nextReview: 1700000000001, reviewCount: 1 },
   }));
   const b = fromRow('learningObjectives', toRow('learningObjectives', {
-    id: 'demo-obj1-mv1ff5nk', moduleId: 'mod-1', number: 1, title: 'T',
+    id: 'demo-obj1-mv1ff5nk', moduleId: 'mod-1', number: 1, title: 'T', ...pinned,
     reviewHistory: [{ outcome: 'solid', timestamp: 1700000000000 }],
     reviewSchedule: { reviewCount: 1, nextReview: 1700000000001, interval: 4 },
   }));

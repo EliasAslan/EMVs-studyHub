@@ -269,11 +269,25 @@ function render() {
   const fn = VIEWS[currentView] || VIEWS['today'] || VIEWS['overview'];
   const root = document.getElementById('view-root');
   if (!root) return;
+  // Focus restore on route change: if focus lived inside the replaced view
+  // content (keyboard navigation), move it to the new page heading so
+  // keyboard and screen-reader users land on the new page, not on <body>.
+  // Same-view re-renders (patcher fallback / refresh) keep focus untouched.
+  const needsRestore = previousView !== currentView
+    && typeof document !== 'undefined'
+    && document.activeElement !== document.body
+    && document.activeElement instanceof Element
+    && root.contains(document.activeElement);
   root.dataset.view = currentView;
   root.innerHTML = '';
   const node = fn(state, currentParams);
   if (node) root.appendChild(node);
   document.getElementById('main')?.scrollTo?.({ top: 0 });
+  if (needsRestore && document.activeElement instanceof Element && !root.contains(document.activeElement)) {
+    const heading = root.querySelector('.page-title, h1');
+    heading?.setAttribute('tabindex', '-1');
+    heading?.focus?.({ preventScroll: true });
+  }
   // Layouts (context modes, tree, mega bar, launchpad, focus handle,
   // mobile header) refresh their active state from this single event.
   document.dispatchEvent(new CustomEvent('emvs:navigated', { detail: { view: currentView, params: { ...currentParams } } }));

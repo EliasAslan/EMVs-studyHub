@@ -20,16 +20,16 @@
  */
 
 export const NAV_LAYOUTS = [
-  { id: 'rail', group: 'sidebar', label: 'Rail', hint: 'Schmale Icon-Leiste für die Hauptbereiche' },
-  { id: 'workspace', group: 'sidebar', label: 'Arbeitsbereich', hint: 'Icon-Leiste plus Panel mit Seiten und Werkzeugen' },
-  { id: 'tree', group: 'sidebar', label: 'Baum', hint: 'Fächer → Kapitel → Themen zum Auf- und Zuklappen' },
-  { id: 'mega', group: 'bar', label: 'Mega-Menü', hint: 'Obere Leiste mit gruppierten Menüs' },
-  { id: 'dock', group: 'bar', label: 'Dock', hint: 'Schwebende Pillen-Leiste mit den Hauptzielen' },
-  { id: 'mobile', group: 'bar', label: 'Mobil', hint: 'Handy-Layout: untere Leiste und Kontext-Kopfzeile' },
-  { id: 'context', group: 'smart', label: 'Kontext', hint: 'Nach Ziel: Lernen, Üben, Planen, Wiederholen' },
-  { id: 'command', group: 'smart', label: 'Befehl', hint: 'Suche zuerst, mit Befehlspalette und Tastenkürzeln' },
-  { id: 'bento', group: 'smart', label: 'Bento', hint: 'Visuelle Startseite aus Karten (Launchpad)' },
-  { id: 'focus', group: 'smart', label: 'Fokus', hint: 'Navigation ausgeblendet, öffnet auf Abruf' },
+  { id: 'rail', group: 'sidebar', tier: 'recommended', label: 'Rail', hint: 'Schmale Icon-Leiste für die Hauptbereiche' },
+  { id: 'workspace', group: 'sidebar', tier: 'more', label: 'Arbeitsbereich', hint: 'Icon-Leiste plus Panel mit Seiten und Werkzeugen' },
+  { id: 'tree', group: 'sidebar', tier: 'more', label: 'Baum', hint: 'Fächer → Kapitel → Themen zum Auf- und Zuklappen' },
+  { id: 'mega', group: 'bar', tier: 'more', label: 'Mega-Menü', hint: 'Obere Leiste mit gruppierten Menüs' },
+  { id: 'dock', group: 'bar', tier: 'more', label: 'Dock', hint: 'Schwebende Pillen-Leiste mit den Hauptzielen' },
+  { id: 'mobile', group: 'bar', tier: 'more', label: 'Mobil', hint: 'Handy-Layout: untere Leiste und Kontext-Kopfzeile' },
+  { id: 'context', group: 'smart', tier: 'more', label: 'Kontext', hint: 'Nach Ziel: Lernen, Üben, Planen, Wiederholen' },
+  { id: 'command', group: 'smart', tier: 'more', label: 'Befehl', hint: 'Suche zuerst, mit Befehlspalette und Tastenkürzeln' },
+  { id: 'bento', group: 'smart', tier: 'more', label: 'Bento', hint: 'Visuelle Startseite aus Karten (Launchpad)' },
+  { id: 'focus', group: 'smart', tier: 'more', label: 'Fokus', hint: 'Navigation ausgeblendet, öffnet auf Abruf' },
 ];
 
 /** Selector groups in Settings. */
@@ -37,6 +37,16 @@ export const NAV_LAYOUT_GROUPS = [
   { id: 'sidebar', label: 'Seitenleisten' },
   { id: 'bar', label: 'Leisten' },
   { id: 'smart', label: 'Zielorientierte Ansichten' },
+];
+
+/**
+ * Settings picker hierarchy: Rail is the default way; the other nine stay
+ * available but secondary. Registry entries keep their ids and migration,
+ * only the offered grouping carries the priority judgment.
+ */
+export const NAV_LAYOUT_TIERS = [
+  { id: 'recommended', label: 'Empfohlen' },
+  { id: 'more', label: 'Weitere Layouts' },
 ];
 
 /** Default preserves the long-standing compact rail behaviour. */

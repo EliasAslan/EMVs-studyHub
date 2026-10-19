@@ -17,12 +17,17 @@ export function initModal() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && overlay.classList.contains('open')) {
       closeModal();
+      // The modal is the topmost surface: consume this Escape so later
+      // document handlers (e.g. the app-level topmost chain) don't also
+      // close the palette/More sheet underneath.
+      e.stopImmediatePropagation();
     }
   });
   
   window.EMVS.modal = {
     open: openModal,
-    close: closeModal
+    close: closeModal,
+    isOpen: () => overlay.classList.contains('open')
   };
 }
 

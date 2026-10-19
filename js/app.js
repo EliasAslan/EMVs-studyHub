@@ -95,13 +95,39 @@ function init() {
       return;
     }
     if (e.key === 'Escape') {
-      window.EMVS.modal?.close();
-      window.EMVS.palette?.close();
-      window.EMVS.tabbar?.closeMore?.();
+      // Topmost-surface policy: Escape closes exactly one surface, the one
+      // highest in the stacking order — never everything at once. The More
+      // sheet (focus-trapped) handles its own Escape in the capture phase.
+      if (window.EMVS.modal?.isOpen?.()) return; // closes itself via its own handler
+      if (window.EMVS.palette?.isOpen?.()) { window.EMVS.palette.close(); return; }
+      if (window.EMVS.launchpad?.isOpen?.()) { window.EMVS.launchpad.close(); return; }
+      // NB: the Focus layout's "focus menu" and the classic phone drawer share
+      // the same #sidebar.open class. Only treat it as the focus menu while
+      // the Focus layout is actually active — otherwise the generic drawer
+      // branch below must own the Escape (menuBtn aria + focus restore).
+      if (window.EMVS.getLayout?.() === 'focus' && window.EMVS.focusMenu?.isOpen?.()) {
+        window.EMVS.focusMenu.set(false);
+        return;
+      }
+      if (document.getElementById('more-overlay')?.classList.contains('open')) {
+        window.EMVS.tabbar?.closeMore?.();
+        return;
+      }
+      const sidebarEl = document.getElementById('sidebar');
+      if (sidebarEl?.classList.contains('open')) {
+        sidebarEl.classList.remove('open');
+        document.getElementById('sidebarOverlay')?.classList.remove('open');
+        // Focus returns to the control that opened the drawer.
+        if (window.EMVS.getLayout?.() === 'focus') {
+          document.getElementById('focus-handle')?.setAttribute('aria-expanded', 'false');
+          document.getElementById('focus-handle')?.focus?.();
+        } else {
+          document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
+          document.getElementById('menuBtn')?.focus?.();
+        }
+        return;
+      }
       window.EMVS.closeNavChrome?.();
-      document.getElementById('sidebar')?.classList.remove('open');
-      document.getElementById('sidebarOverlay')?.classList.remove('open');
-      document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
       return;
     }
     if (window.EMVS.palette?.isOpen()) return;

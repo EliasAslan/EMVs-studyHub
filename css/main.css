@@ -566,6 +566,13 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 .toc-item.active .toc-ico { color: var(--accent); }
 .toc-lb { overflow-wrap: anywhere; min-width: 0; }
 .rail-div { height: 1px; background: var(--rule); margin: 8px 10px; flex-shrink: 0; }
+/* Schnellaktionen / Weitere Bereiche: grouped so screen readers announce
+   them as one unit instead of unrelated rail children. */
+.rail-actions { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.rail-actions .rail-fab,
+.rail-actions .rail-more,
+.rail-actions .rail-mod { margin-top: 0; }
+.rail-actions + .rail-div { margin-top: 10px; }
 .rail-badge {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px;
   background: var(--accent); color: var(--on-accent);
