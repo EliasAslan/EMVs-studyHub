@@ -38,7 +38,7 @@ export function renderModuleExams(state) {
     </div>
 
     <hr class="rule" style="margin-top: 32px;">
-    <div class="section-label">Prognose</div>
+    <h2 class="section-label">Prognose</h2>
     <div class="projection" id="projection" style="padding: 24px 0; font-size: 15px; color: var(--ink-2); line-height: 1.55; max-width: 60ch;"></div>
   `;
 
@@ -180,7 +180,7 @@ function breakdownHtml(state, exam, objectives) {
       ${entry?.note ? `<span class="exam-obj-note">${escapeHtml(entry.note.length > 80 ? entry.note.slice(0, 80) + '…' : entry.note)}</span>` : ''}
     </div>`;
   }).join('');
-  return `<div class="section-label" style="margin:12px 0 8px;">Aufschlüsselung · ${covered.length} ${covered.length === 1 ? 'Lernziel' : 'Lernziele'}</div>
+  return `<h3 class="section-label" style="margin:12px 0 8px;">Aufschlüsselung · ${covered.length} ${covered.length === 1 ? 'Lernziel' : 'Lernziele'}</h3>
     <div class="exam-obj-list">${rows}</div>
     <div class="exam-dx-line">${diagnosisLine(state, exam, objectives)}</div>`;
 }
@@ -300,7 +300,7 @@ function diagnosisHtml(state, exam) {
       <p class="today-empty-line" style="margin-top:8px;">Die Note ist ein Datum. Entscheidend ist die Aufschlüsselung darunter — sie speist die Schwachstellen-Einschätzung.</p>
     </div>
 
-    <div class="section-label" style="margin-top:20px;">Abdeckung · ${covered.length} ${covered.length === 1 ? 'Lernziel' : 'Lernziele'}</div>
+    <h3 class="section-label" style="margin-top:20px;">Abdeckung · ${covered.length} ${covered.length === 1 ? 'Lernziel' : 'Lernziele'}</h3>
     <div class="field-row">
       <label>Abgedeckte Lernziele (Mehrfachauswahl)</label>
       <select id="dx-coverage" multiple style="min-height: 100px;">
@@ -308,7 +308,7 @@ function diagnosisHtml(state, exam) {
       </select>
     </div>
 
-    <div class="section-label" style="margin-top:20px;">Leistung pro Lernziel</div>
+    <h3 class="section-label" style="margin-top:20px;">Leistung pro Lernziel</h3>
     <div id="dx-rows">
       ${covered.length ? covered.map(o => {
         const entry = exam.objectiveResults?.find(r => r.objectiveId === o.id);
@@ -323,7 +323,7 @@ function diagnosisHtml(state, exam) {
       }).join('') : `<p class="today-empty-line">Noch nichts abgedeckt — wähle oben Lernziele aus.</p>`}
     </div>
 
-    <div class="section-label" style="margin-top:20px;">Schwachstellen aus dieser Prüfung</div>
+    <h3 class="section-label" style="margin-top:20px;">Schwachstellen aus dieser Prüfung</h3>
     <div class="exam-dx-line">${diagnosisLine(state, exam, objectives)}</div>
   `;
 }

@@ -42,22 +42,22 @@ test('global sidebar items are native buttons grouped into destinations and quic
   assert.ok(!nav.includes('role="listitem"'), 'button items must not wear listitem roles');
   const group = nav.match(/role="group" aria-label="Schnellaktionen"/);
   assert.ok(group, 'quick actions are one announced group');
-  assert.ok(nav.includes('class="rail-actions"'), 'quick actions are contained in a group wrapper');
+  assert.ok(nav.includes('class="nav-quick"'), 'quick actions are contained in a group wrapper');
   assert.ok(nav.includes('<span class="toc-lb">Schwachstellen</span>'), 'weak spots label is not abbreviated');
-  assert.ok(/<div class="rail-actions" role="group" aria-label="Weitere Bereiche">[\s\S]*id="railMore"/.test(nav),
+  assert.ok(/<div class="nav-quick" role="group" aria-label="Weitere Bereiche">[\s\S]*id="railMore"/.test(nav),
     'more/mod actions live in their own group');
   const cssText = readFileSync(new URL('../css/main.css', import.meta.url), 'utf8');
-  assert.match(cssText, /\.rail-actions \{[^}]*flex-direction: column/s, 'group wrapper keeps the sidebar column layout');
+  assert.match(cssText, /\.nav-quick \{[^}]*flex-direction: column/s, 'group wrapper keeps the sidebar column layout');
 });
 
-test('layout picker offers tree as recommended with the rest as secondary choices', () => {
+test('layout picker offers context as recommended with the rest as secondary choices', () => {
   const navLayout = readFileSync(new URL('../js/utils/navLayout.js', import.meta.url), 'utf8');
   const settings = readFileSync(new URL('../js/views/settings.js', import.meta.url), 'utf8');
   assert.equal([...navLayout.matchAll(/tier: 'recommended'/g)].length, 1, 'exactly one recommended layout');
-  assert.ok(navLayout.includes("id: 'tree', group: 'sidebar', tier: 'recommended'"), 'tree is the recommended layout');
+  assert.ok(navLayout.includes("id: 'context', group: 'smart', tier: 'recommended'"), 'context is the recommended layout');
   const ids = [...navLayout.matchAll(/id: '([a-z]+)', group:/g)].map(m => m[1]);
-  assert.deepEqual(ids, ['tree', 'mega', 'dock', 'context', 'bento', 'mobile'],
-    'registry keeps the six kept layouts for migration');
+  assert.deepEqual(ids, ['context', 'mega', 'dock', 'bento', 'mobile'],
+    'registry keeps the five kept layouts for migration');
   assert.ok(!settings.includes('NAV_LAYOUT_TIERS'), 'picker no longer uses NAV_LAYOUT_TIERS (flat list)');
   assert.ok(!settings.includes('NAV_LAYOUT_GROUPS'), 'picker no longer uses NAV_LAYOUT_GROUPS');
 });

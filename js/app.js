@@ -59,6 +59,13 @@ window.EMVS = {
 // Pick up navigate registered during router module evaluation
 window.EMVS.navigate = navigate;
 window.EMVS.renderSidebar = renderSidebar;
+// Re-render the current view in place (used by in-place flows like Today's
+// review outcome, which must not navigate away or reset the route).
+window.EMVS.refresh = () => {
+  renderSidebar();
+  routeFromHash();
+};
+window.EMVS.getCurrentView = getCurrentView;
 if (window.__EMVS_pendingNavigate) delete window.__EMVS_pendingNavigate;
 
 // Initialize app
@@ -178,11 +185,22 @@ function init() {
       const st = window.EMVS.getState();
       if (st.modules.length) openQuickCapture({ moduleId: st.settings.currentModuleId || null });
     }
+    // Today view queue shortcuts: Enter = start review, n = skip.
+    // Enter is also the native activation key for buttons/links, so only
+    // treat it as a queue shortcut when focus is not on an interactive row.
+    else if (key === 'enter' && window.EMVS.getCurrentView?.() === 'today'
+      && !target.closest('button, a, [role="button"], [role="link"]')) {
+      e.preventDefault();
+      const qStart = document.querySelector('.q-card .q-start, .today-focus .btn.primary');
+      qStart?.click();
+    }
+    else if (key === 'n' && window.EMVS.getCurrentView?.() === 'today') {
+      e.preventDefault();
+      const qSkip = document.querySelector('.q-card .q-skip');
+      qSkip?.click();
+    }
   });
   
-  // Set keyboard hint
-  document.getElementById('kbd-hint').textContent = kbdLabel();
-
   // === Auto-sync triggers (W4.4) ===
   let syncInFlight = false;
   let syncPending = false;
@@ -225,6 +243,7 @@ function init() {
         if (session) runAutoSync();
       }).catch(() => {});
     }).catch(() => {});
+  }
 
   // 3. Debounced 25s after every successful save()
   let saveDebounceTimer = null;

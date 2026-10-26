@@ -89,7 +89,7 @@ function renderRealityCheck(reality, state) {
   const n = reality.leftovers.length;
   return `
     <div class="plan-reality">
-      <div class="section-label">Realitätscheck · ${n} offene ${n === 1 ? 'Punkt' : 'Punkte'} aus früheren Wochen</div>
+      <h2 class="section-label">Realitätscheck · ${n} offene ${n === 1 ? 'Punkt' : 'Punkte'} aus früheren Wochen</h2>
       <p class="today-empty-line" style="margin-bottom: 12px;">Du bist in Woche ${reality.currentWeek}, aber das hier ist liegen geblieben. Hole es in diese Woche — oder lasse bewusst fallen, was nicht mehr zählt. Beides ist eine Entscheidung, kein Versäumnis.</p>
       <div class="plan-leftover-list">
         ${reality.leftovers.map(item => {

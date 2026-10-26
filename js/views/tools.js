@@ -37,7 +37,7 @@ export function renderTools(state) {
     <p class="page-lede">Kuratierte externe Ressourcen, nach Kategorien gruppiert.</p>
     ${Object.entries(groups).map(([name, links]) => `
       <div style="margin-bottom: 32px;">
-        <div class="section-label">${escapeHtml(name)}</div>
+        <h2 class="section-label">${escapeHtml(name)}</h2>
         <div class="link-list">
           ${links.map((l, i) => `
             <div class="link-row" role="link" tabindex="0" data-target="${escapeHtml(l.target)}" style="display: grid; grid-template-columns: 28px 1fr auto; align-items: baseline; gap: 12px; padding: 12px 8px; border-radius: 4px; cursor: pointer; transition: background 0.15s;">

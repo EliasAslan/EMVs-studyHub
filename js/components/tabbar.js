@@ -1,6 +1,6 @@
 /**
  * Bottom tabbar + More sheet wiring.
- * Tabs: Heute / Module / + Erfassen (FAB) / Schwach / Prüfungen
+ * Tabs: Heute / Module / + Schnell erfassen (FAB) / Schwach (Kurzform) / Prüfungen
  * Secondary views live in the More sheet + header.
  * Capture ([data-capture]) and More ([data-open-more]) triggers are shared
  * by every navigation layout.

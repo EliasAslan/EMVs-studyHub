@@ -45,7 +45,7 @@ export function renderModuleSessions(state) {
     
     <div class="mt-3 timer-actions">
       <button class="btn primary" id="log-session">＋ Sitzung manuell protokollieren</button>
-      <button class="btn" id="quick-capture" title="Frage, Fehler, Gedanke festhalten — Timer läuft weiter">⚡ Erfassen</button>
+      <button class="btn" id="quick-capture" title="Frage, Fehler, Gedanke festhalten — Timer läuft weiter">⚡ Schnell erfassen</button>
     </div>
     
     ${Object.keys(byDate).length ? Object.entries(byDate).map(([date, daySessions]) => `
@@ -462,12 +462,15 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
 
   // Preset for callers like Today ("Start Session" on a focused objective):
   // pre-selects objectives/resources and suggests a duration.
+  // Optional onSave callback: if provided, called with (session, isNew) instead of navigating.
   if (isNew && preset) {
     if (Array.isArray(preset.linkedObjectiveIds)) s.linkedObjectiveIds = [...preset.linkedObjectiveIds];
     if (Array.isArray(preset.linkedResourceIds)) s.linkedResourceIds = [...preset.linkedResourceIds];
     if (typeof preset.duration === 'number' && preset.duration > 0) s.duration = preset.duration;
     if (typeof preset.note === 'string') s.note = preset.note;
   }
+  
+  const onSave = typeof preset.onSave === 'function' ? preset.onSave : null;
   
   openModal({
     title: isNew ? 'Sitzung protokollieren' : 'Sitzung bearbeiten',
@@ -528,7 +531,12 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
     }
     
     window.EMVS.save();
-    navigate('module-sessions');
+    
+    if (onSave) {
+      onSave(s, isNew);
+    } else {
+      navigate('module-sessions');
+    }
   });
   
   setTimeout(() => {

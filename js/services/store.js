@@ -84,12 +84,12 @@ function getIsoWeekFallback(date = new Date()) {
  * Load data from localStorage with migration support.
  *
  * Three outcomes, kept strictly apart:
- * - key missing → existing first-run path (legacy migration or demo seed).
+ * - key missing → existing first-run path (legacy migration or blank seed).
  * - key present and valid → normalized data.
- * - read access failure or invalid JSON → blank seed WITHOUT demo data,
+ * - read access failure or invalid JSON → blank seed,
  *   recorded via getStorageError(). The stored value is never written,
  *   so corrupt data survives for inspection/recovery instead of being
- *   replaced by demo content.
+ *   replaced by a fresh seed.
  */
 export function load() {
   let raw;
@@ -105,7 +105,7 @@ export function load() {
   clearStorageError();
   try {
     if (raw === null) {
-      // True first run: honour legacy data if present, else demo seed.
+      // True first run: honour legacy data if present, else the blank seed.
       const migrated = migrateFromLegacy({});
       const hasContent = migrated.modules.length || migrated.learningObjectives.length ||
         migrated.studySessions.length || migrated.exams.length;
@@ -116,7 +116,7 @@ export function load() {
         migrated.planItems.forEach(ensurePlanItemFields);
         return migrated;
       }
-      // First run with empty storage → guided first-run (blank seed, no demo data)
+      // First run with empty storage → guided first-run (blank seed)
       return getSeedData();
     }
     

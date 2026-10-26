@@ -2,21 +2,20 @@
  * Layout chrome orchestrator.
  *
  * sidebar.js owns the classic rail/workspace shell. Everything the newer
- * layouts add (context modes, tree, mega bar, command bar, launchpad,
- * focus handle) is rendered here, each into its own container, so no
- * layout can ever leave debris behind for the next one.
+ * layouts add (context modes, mega bar, launchpad) is rendered here, each
+ * into its own container, so no layout can ever leave debris behind for the
+ * next one.
  */
 
 import { getCurrentView, getCurrentParams } from '../../views/router.js';
 import { routeTitle } from '../../utils/navigation.js';
 import { startTimer } from '../../views/module-sessions.js';
 import * as context from './context.js';
-import * as tree from './tree.js';
 import * as mega from './mega.js';
 import * as bento from './bento.js';
 import { currentModule, getState } from './shared.js';
 
-const STYLES = { context, tree, mega, bento };
+const STYLES = { context, mega, bento };
 const TOP_STYLES = ['mega', 'bento'];
 
 let activeLayout = null;

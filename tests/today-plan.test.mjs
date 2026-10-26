@@ -22,7 +22,7 @@ assert.ok(plan.due.length <= 5);
 const today = readFileSync(new URL('../js/views/today.js', import.meta.url), 'utf8');
 assert.ok(!today.includes('id="today-review-link"'), 'daily prompt does not duplicate the weekly-reflection CTA');
 assert.ok(today.includes('id="today-review-now"'), 'due reminder retains its explicit action');
-assert.ok(today.includes('Die fälligen Lernziele sind bereits oben eingeordnet.'));
+assert.ok(today.includes('class="queue"'), 'queue list renders');
 const moduleHome = readFileSync(new URL('../js/views/module-home.js', import.meta.url), 'utf8');
 assert.ok(moduleHome.includes('.filter(({ objective }) => objective.id !== weak?.id)'));
 console.log('ok - Today plan de-duplicates objective recommendations and weekly-reflection CTA');

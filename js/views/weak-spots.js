@@ -144,7 +144,7 @@ function bindSpot(card, state) {
     detail.dataset.kind = 'resources';
     detail.hidden = false;
     detail.innerHTML = `
-      <div class="section-label" style="margin: 4px 0 8px;">Verknüpfte Ressourcen · ${list.length}</div>
+      <h3 class="section-label" style="margin: 4px 0 8px;">Verknüpfte Ressourcen · ${list.length}</h3>
       ${list.map(r => {
         const u = getResourceUsage(window.EMVS.getState(), r);
         return `<div class="obj-hist-res-row">
@@ -167,7 +167,7 @@ function bindSpot(card, state) {
     detail.dataset.kind = 'captures';
     detail.hidden = false;
     detail.innerHTML = `
-      <div class="section-label" style="margin: 4px 0 8px;">Fehler & Fragen · ${list.length}</div>
+      <h3 class="section-label" style="margin: 4px 0 8px;">Fehler & Fragen · ${list.length}</h3>
       ${list.map(c => `<div class="obj-hist-res-row">
         <span>${icons[c.type] || '✎'}</span>
         <span class="obj-hist-res-name">${escapeHtml((c.content || '').length > 100 ? c.content.slice(0, 100) + '…' : c.content || '')}</span>
@@ -175,7 +175,7 @@ function bindSpot(card, state) {
       </div>`).join('')}
       <div class="timer-actions" style="margin-top:8px;">
         <button class="btn ghost" data-act="capture-new" style="min-height:28px;font-size:12px;">⚡ Dazu festhalten</button>
-        <button class="btn ghost" data-act="capture-all" style="min-height:28px;font-size:12px;">Alle Erfassungen →</button>
+        <button class="btn ghost" data-act="capture-all" style="min-height:28px;font-size:12px;">Erfassungen →</button>
       </div>`;
     card.querySelectorAll('[data-act="resources"], [data-act="captures"]').forEach(b => b.classList.toggle('active', b === btn));
     detail.querySelector('[data-act="capture-new"]')?.addEventListener('click', () =>

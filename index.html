@@ -43,13 +43,13 @@
     <nav class="toc" id="nav-global">
       <button type="button" class="toc-item" data-view="today" title="Heute — Tagesfokus"><span class="toc-ico" aria-hidden="true">◉</span><span class="toc-num">01</span> <span class="toc-lb">Heute</span></button>
       <button type="button" class="toc-item" data-view="overview" title="Module — alle Module im Überblick"><span class="toc-ico" aria-hidden="true">▦</span><span class="toc-num">02</span> <span class="toc-lb">Module</span></button>
-      <div class="rail-actions" role="group" aria-label="Schnellaktionen">
-        <button class="rail-fab" id="railCapture" data-capture aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" data-tip="Schnell erfassen: Frage, Fehler oder Gedanke festhalten"><span class="rail-capture-plus" aria-hidden="true">+</span><span class="rail-capture-label">Erfassen</span></button>
+      <div class="nav-quick" role="group" aria-label="Schnellaktionen">
+        <button class="nav-quick-capture" id="railCapture" data-capture aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" data-tip="Schnell erfassen: Frage, Fehler oder Gedanke festhalten"><span class="nav-quick-plus" aria-hidden="true">+</span><span class="nav-quick-label">Schnell erfassen</span></button>
       </div>
-      <button type="button" class="toc-item" data-view="weak-spots" title="Schwachstellen"><span class="toc-ico" aria-hidden="true">△</span><span class="toc-num">03</span> <span class="toc-lb">Schwachstellen</span><span class="rail-badge" id="railBadgeWeak" data-badge="weak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></button>
-      <button type="button" class="toc-item" data-view="exams-global" title="Prüfungen — alle Termine"><span class="toc-ico" aria-hidden="true">◷</span><span class="toc-num">04</span> <span class="toc-lb">Prüfungen</span><span class="rail-badge" id="railBadgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></button>
-      <div class="rail-actions" role="group" aria-label="Weitere Bereiche">
-        <button class="rail-more" id="railMore" data-open-more aria-label="Weitere Bereiche öffnen: Review, Werkzeuge, Prüfungsvorbereitung, Einstellungen" title="Weitere Bereiche: Review, Werkzeuge, Prüfungsvorbereitung, Einstellungen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
+      <button type="button" class="toc-item" data-view="weak-spots" title="Schwachstellen"><span class="toc-ico" aria-hidden="true">△</span><span class="toc-num">03</span> <span class="toc-lb">Schwachstellen</span><span class="nav-badge" id="railBadgeWeak" data-badge="weak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></button>
+      <button type="button" class="toc-item" data-view="exams-global" title="Prüfungen — alle Termine"><span class="toc-ico" aria-hidden="true">◷</span><span class="toc-num">04</span> <span class="toc-lb">Prüfungen</span><span class="nav-badge" id="railBadgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></button>
+      <div class="nav-quick" role="group" aria-label="Weitere Bereiche">
+        <button class="nav-quick-more" id="railMore" data-open-more aria-label="Weitere Bereiche öffnen: Review, Werkzeuge, Prüfungsvorbereitung, Mock-Prüfung, Erfassungen, Einstellungen" title="Weitere Bereiche: Review, Werkzeuge, Prüfungsvorbereitung, Mock-Prüfung, Erfassungen, Einstellungen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
       </div>
     </nav>
     <div class="sidebar-overflow" id="sidebar-overflow" hidden>
@@ -59,14 +59,6 @@
 
     <div class="toc-label mod-label">Module</div>
     <div id="nav-modules"></div>
-    <div id="tree-nav" class="tree-nav" hidden></div>
-
-    <div class="sidebar-footer">
-      <button class="cmd-trigger" id="cmd-trigger" aria-label="Befehlspalette öffnen">
-        <span>Befehl ausführen</span>
-        <kbd id="kbd-hint">⌘K</kbd>
-      </button>
-    </div>
   </aside>
 
   <main class="main" id="main" role="main" tabindex="-1">
@@ -90,7 +82,7 @@
         <button class="sheet-item" data-route="tools"><span aria-hidden="true">⚒</span> Werkzeuge</button>
         <button class="sheet-item" data-route="exam-prep"><span aria-hidden="true">⧉</span> Prüfungsvorbereitung</button>
         <button class="sheet-item" data-route="mock-exam"><span aria-hidden="true">⏱</span> Mock-Prüfung</button>
-        <button class="sheet-item" data-route="captures"><span aria-hidden="true">⚡</span> Alle Erfassungen</button>
+        <button class="sheet-item" data-route="captures"><span aria-hidden="true">⚡</span> Erfassungen</button>
         <button class="sheet-item" data-route="settings"><span aria-hidden="true">⚙</span> Einstellungen</button>
       </div>
       <button class="btn ghost sheet-close" id="more-close">Schließen</button>
@@ -138,6 +130,6 @@
   <button class="btn ghost" id="toast-undo" style="display:none">Rückgängig</button>
 </div>
 
-<script type="module" src="js/app.js"></script>
+<script type="module" src="js/app.js?v=20261025"></script>
 </body>
 </html>

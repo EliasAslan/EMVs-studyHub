@@ -12,7 +12,6 @@ import { NAV_LAYOUTS, getNavLayout } from '../utils/navLayout.js';
 /** Tiny schematic of each navigation layout for the picker (decorative). */
 function layoutPreview(id) {
   switch (id) {
-    case 'tree': return '<i class="nl-bar nl-wide nl-lines"></i><i class="nl-page"></i>';
     case 'mega': return '<i class="nl-top"></i><i class="nl-drop"></i><i class="nl-page"></i>';
     case 'dock': return '<i class="nl-page"></i><i class="nl-pill"></i>';
     case 'mobile': return '<i class="nl-phonetop"></i><i class="nl-page"></i><i class="nl-tabs"></i>';

@@ -125,7 +125,7 @@ function renderAttention(state, moduleId) {
       + ` — ältester: „${escapeHtml(((oldest.text || oldest.title) || '').slice(0, 60))}“ (W${oldest.week})</div>`);
   }
   return `
-    <div class="section-label">Nächste Schritte</div>
+    <h2 class="section-label">Nächste Schritte</h2>
     ${bits.length
       ? `<div class="card" style="margin-bottom: 24px; display: grid; gap: 8px; font-size: 14px; line-height: 1.6;">${bits.join('')}</div>`
       : `<p class="today-empty-line" style="margin-bottom: 24px;">Alles im Rhythmus — keine offenen Punkte.</p>`}
@@ -245,14 +245,13 @@ export function openReviewModal(review = null, preset = {}) {
         </div>
 
         <hr class="rule" style="margin: 20px 0;">
-        <div class="section-label">Fakten dieser Woche</div>
+        <h3 class="section-label">Fakten dieser Woche</h3>
         <div id="review-evidence"></div>
 
         <div id="review-attention"></div>
 
         <hr class="rule" style="margin: 20px 0;">
-        <div class="section-label">Drei Fragen · ca. 5 Minuten</div>
-
+        <h3 class="section-label">Drei Fragen · ca. 5 Minuten</h3>
         ${QUESTIONS.map(q => `
           <div class="field-row">
             <label>${q.label}</label>

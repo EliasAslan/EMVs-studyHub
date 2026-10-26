@@ -47,7 +47,7 @@ export function renderAuthPanel(container) {
       Deine Lerndaten bleiben standardmäßig lokal im Browser. Mit den manuellen Aktionen unten kannst du sie gezielt in Supabase hochladen oder aus der Cloud übernehmen. Anmeldung allein synchronisiert keine Daten.
     </p>
     <div id="supabase-sync-panel" style="margin-top:16px; border-top:1px solid var(--rule-2); padding-top:12px; max-width:560px;" hidden>
-      <div class="section-label">Cloud-Synchronisation</div>
+      <h3 class="section-label">Cloud-Synchronisation</h3>
       <p style="font-size:13px; color:var(--ink-2); max-width:58ch;">
         localStorage bleibt der Standard. Sync läuft automatisch (Anmeldung, alle 25s nach Speichern, App-Hintergrund, Tab-Wechsel).
         Die Buttons unten sind für manuellen Force-Sync / Recovery.

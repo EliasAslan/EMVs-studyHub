@@ -105,7 +105,7 @@ function paintObjectiveGroups(el, state, moduleId) {
   host.innerHTML = GROUP_ORDER
     .filter(g => groups[g].length)
     .map(g => `
-      <div class="section-label" style="margin-top: 28px;">${GROUP_TITLES[g]} · ${groups[g].length}</div>
+      <h2 class="section-label" style="margin-top: 28px;">${GROUP_TITLES[g]} · ${groups[g].length}</h2>
       <p class="today-empty-line" style="margin-bottom: 12px;">${GROUP_NOTES[g]}</p>
       <div class="hz-list">${groups[g].map(o => renderObjectiveCard(o, state)).join('')}</div>
     `).join('') || `<p class="today-empty-line">Noch keine Lernziele — lege oben das erste an.</p>`;
@@ -120,8 +120,7 @@ function renderObjectiveCard(obj, state) {
   const reviewCount = (obj.reviewHistory || []).length;
   const due = r.key === 'due';
   return `
-    <div class="hz-item obj-card ${due ? 'obj-due' : ''}" data-id="${obj.id}" role="link" tabindex="0"
-         aria-label="Verlauf öffnen: ${escapeHtml(obj.title)}" title="Verlauf öffnen">
+    <div class="hz-item obj-card ${due ? 'obj-due' : ''}" data-id="${obj.id}">
       <div class="hz-head">
         <div class="hz-num">LZ ${obj.number ?? '–'}</div>
         <span class="badge rhythm rhythm-${r.key}">${escapeHtml(r.label)}</span>
@@ -140,10 +139,10 @@ function renderObjectiveCard(obj, state) {
         ${reviewCount ? `<span class="obj-meta-item" title="Abgeschlossene Reviews">${reviewCount}× reviewt</span>` : ''}
       </div>
       <div class="obj-actions">
-        <span class="obj-open-hint">Verlauf öffnen →</span>
+        <button type="button" class="obj-open-hint" data-open-history aria-label="Verlauf öffnen: ${escapeHtml(obj.title)}">Verlauf öffnen →</button>
         <span class="obj-tools">
-          <button class="edit-btn" title="Details bearbeiten">✎</button>
-          <button class="delete-btn" title="Löschen">✕</button>
+          <button class="edit-btn" title="Details bearbeiten" aria-label="Details bearbeiten">✎</button>
+          <button class="delete-btn" title="Löschen" aria-label="Lernziel löschen">✕</button>
         </span>
       </div>
     </div>
@@ -155,18 +154,7 @@ function bindObjectiveCard(item, state) {
   const obj = state.learningObjectives.find(o => o.id === id);
   if (!obj) return;
 
-  const open = (e) => {
-    if (e?.target?.closest('.confidence-dot') || e?.target?.closest('button') || e?.target?.closest('select')) return;
-    openObjectiveHistory(id);
-  };
-  item.addEventListener('click', open);
-  item.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      if (e.target.closest('.confidence-dot')) return;
-      e.preventDefault();
-      openObjectiveHistory(id);
-    }
-  });
+  item.querySelector('[data-open-history]')?.addEventListener('click', () => openObjectiveHistory(id));
 
   item.querySelectorAll('.confidence-dot').forEach(dot => {
     const set = () => {
@@ -285,7 +273,7 @@ function historyBodyHtml(state, obj) {
     </div>
 
     ${resourceUsage.length ? `
-      <div class="section-label" style="margin-top:24px;">Verknüpfte Ressourcen · ${resourceUsage.length}</div>
+      <h3 class="section-label" style="margin-top:24px;">Verknüpfte Ressourcen · ${resourceUsage.length}</h3>
       <div class="obj-hist-res">
         ${resourceUsage.map(({ res, uses, last }) => `
           <div class="obj-hist-res-row">
@@ -296,7 +284,7 @@ function historyBodyHtml(state, obj) {
       </div>` : ''}
 
     ${exams.length ? `
-      <div class="section-label" style="margin-top:24px;">Prüfungen mit diesem Ziel · ${exams.length}</div>
+      <h3 class="section-label" style="margin-top:24px;">Prüfungen mit diesem Ziel · ${exams.length}</h3>
       <div class="obj-hist-res">
         ${exams.map(e => {
           const g = getExamGrade(e);
@@ -305,7 +293,7 @@ function historyBodyHtml(state, obj) {
         }).join('')}
       </div>` : ''}
 
-    <div class="section-label" style="margin-top:24px;">Zeitleiste · ${timeline.length} Ereignisse</div>
+    <h3 class="section-label" style="margin-top:24px;">Zeitleiste · ${timeline.length} Ereignisse</h3>
     <div class="obj-timeline">
       ${timeline.map(ev => `
         <div class="obj-tl-row ${ev.future ? 'future' : ''}">

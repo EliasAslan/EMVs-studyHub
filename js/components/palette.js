@@ -62,7 +62,7 @@ export function initPalette() {
       const d = DESTINATIONS[id];
       add({ label: d.label, aliases: NAV_ALIASES[id], group: 'navigation', action: () => goTo(id), shortcut: d.key });
     });
-    add({ label: 'Erfassen', aliases: ['capture', 'notiz', 'frage', 'fehler', 'gedanke'], group: 'navigation', action: () => openQuickCapture() });
+    add({ label: 'Schnell erfassen', aliases: ['capture', 'notiz', 'frage', 'fehler', 'gedanke'], group: 'navigation', action: () => openQuickCapture() });
 
     // Module-specific
     state.modules.forEach(m => {
@@ -204,7 +204,6 @@ export function initPalette() {
   }
   
   // Event listeners
-  document.getElementById('cmd-trigger').addEventListener('click', open);
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
   input.addEventListener('input', e => build(e.target.value));
   input.addEventListener('keydown', e => {

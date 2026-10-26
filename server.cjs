@@ -32,9 +32,11 @@ const securityHeaders = {
 };
 
 const cacheHeaders = {
-  // Short cache for static assets
-  '.js': { 'Cache-Control': 'public, max-age=3600, must-revalidate' },
-  '.css': { 'Cache-Control': 'public, max-age=3600, must-revalidate' },
+  // Local dev: always revalidate so edits show up on reload instead of
+  // being masked by an hour-old cached module for the rest of the session.
+  '.html': { 'Cache-Control': 'no-cache' },
+  '.js': { 'Cache-Control': 'no-cache' },
+  '.css': { 'Cache-Control': 'no-cache' },
   '.png': { 'Cache-Control': 'public, max-age=86400' },
   '.svg': { 'Cache-Control': 'public, max-age=86400' },
   '.json': { 'Cache-Control': 'no-cache' },

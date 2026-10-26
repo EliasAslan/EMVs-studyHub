@@ -70,20 +70,6 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined') 
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }
 
-/** Returns true if the sidebar is in an expanded (tree-like) state. */
-export function isSidebarExpanded() {
-  try {
-    return getNavLayout(window.EMVS.getState()) === 'tree';
-  } catch {
-    return false;
-  }
-}
-
-/** Expand/collapse the sidebar by switching to/from 'tree'. */
-export function setSidebarExpanded(expanded) {
-  setNavLayout(expanded ? 'tree' : 'dock');
-}
-
 /**
  * Persist a layout choice and apply it immediately (no reload).
  * Unknown ids are ignored. Choosing Bento opens its launchpad right away:
@@ -110,14 +96,14 @@ function goModule(id, tab) {
 
 /**
  * Apply the active layout to the shell: body hook for CSS, the `expanded`
- * (labeled) sidebar class for tree and context, and mobile.
+ * (labeled) sidebar class for context and mobile.
  */
 function applyNavLayout(layout) {
   try {
     document.body.dataset.navlayout = layout;
   } catch {}
   const sidebarEl = document.getElementById('sidebar');
-  sidebarEl?.classList.toggle('expanded', ['tree', 'context', 'mobile'].includes(layout));
+  sidebarEl?.classList.toggle('expanded', ['context', 'mobile'].includes(layout));
   // railToggle removed: layout switching now done via Settings
 }
 

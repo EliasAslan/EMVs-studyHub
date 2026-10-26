@@ -38,9 +38,9 @@ export function renderModuleHomeSection(state, m) {
   el.className = 'mod-home';
   el.innerHTML = `
     ${renderExamSection(state, m, exam)}
-    <div class="section-label" style="margin-top: 24px;">Weiterlernen</div>
+    <h2 class="section-label" style="margin-top: 24px;">Weiterlernen</h2>
     ${renderContinue(m, weak)}
-    <div class="section-label" style="margin-top: 24px;">Fortschritt</div>
+    <h2 class="section-label" style="margin-top: 24px;">Fortschritt</h2>
     <div class="stat-list">
       <div class="stat-row">
         <span class="stat-label">Lernziele gemeistert</span>
@@ -56,12 +56,12 @@ export function renderModuleHomeSection(state, m) {
       </div>
     </div>
     ${projection ? `
-      <div class="section-label" style="margin-top: 24px;">Prognose</div>
+      <h2 class="section-label" style="margin-top: 24px;">Prognose</h2>
       <div class="projection">${renderProjectionText(projection, m.targetGrade ?? 5.0)}</div>
     ` : ''}
     ${spots.length ? renderSpots(state, m, spots) : ''}
     ${renderLastSession(state, m, lastSession)}
-    ${todos.length ? renderTodos(state, m, todos) : ''}
+    ${todos.length ? renderTodos(state, todos) : ''}
     ${notes.length ? renderNotes(state, notes) : ''}
   `;
 
@@ -76,7 +76,7 @@ function goTab(m, tab) {
 function renderExamSection(state, m, exam) {
   if (!exam) {
     return `
-      <div class="section-label">Nächste Prüfung</div>
+      <h2 class="section-label">Nächste Prüfung</h2>
       <p class="today-empty-line">Keine Prüfung eingetragen.</p>
       <div class="btn-row" style="margin-top: 12px;">
         <button class="btn" data-goto="material">Prüfung eintragen</button>
@@ -84,7 +84,7 @@ function renderExamSection(state, m, exam) {
   }
   const cd = formatCountdown(exam.date);
   return `
-    <div class="section-label">Nächste Prüfung</div>
+    <h2 class="section-label">Nächste Prüfung</h2>
     <div class="mod-exam">
       <div class="mod-exam-name">${escapeHtml(exam.name)}</div>
       <div class="mod-exam-meta">${escapeHtml(formatDate(exam.date))}${exam.weight ? ` · ${escapeHtml(String(exam.weight))} %` : ''}
@@ -126,7 +126,7 @@ function renderLastSession(state, m, s) {
     .map(id => state.learningObjectives.find(o => o.id === id)?.number)
     .filter(n => n !== undefined && n !== null);
   return `
-    <div class="section-label" style="margin-top: 24px;">Letzte Sitzung</div>
+    <h2 class="section-label" style="margin-top: 24px;">Letzte Sitzung</h2>
     <div class="today-session" role="link" tabindex="0" data-goto-session>
       <span class="today-session-when">${escapeHtml(relativeDay(s.startTime))}</span>
       <span class="today-session-dur">${escapeHtml(String(s.duration ?? 0))} Min</span>
@@ -137,7 +137,7 @@ function renderLastSession(state, m, s) {
 
 function renderSpots(state, m, spots) {
   return `
-    <div class="section-label" style="margin-top: 24px;">Braucht Aufmerksamkeit</div>
+    <h2 class="section-label" style="margin-top: 24px;">Braucht Aufmerksamkeit</h2>
     <div class="list">
       ${spots.map(({ objective: o, breakdown: b }) => `
         <div class="list-item mod-spot" role="link" tabindex="0" data-open-history="${o.id}">
@@ -148,12 +148,12 @@ function renderSpots(state, m, spots) {
           <span class="badge ${b.level === 'hoch' ? 'in-progress' : 'todo'}">${escapeHtml(b.level)}</span>
         </div>`).join('')}
     </div>
-    <a href="#/schwach?module=${encodeURIComponent(m.id)}" class="today-prompt-link" data-weak-all>Alle Schwachstellen →</a>`;
+    <button type="button" class="today-prompt-link" data-weak-all>Alle Schwachstellen →</button>`;
 }
 
 function renderNotes(state, notes) {
   return `
-    <div class="section-label" style="margin-top: 24px;">Notizen</div>
+    <h2 class="section-label" style="margin-top: 24px;">Notizen</h2>
     <div class="list">
       ${notes.map(c => `
         <div class="list-item mod-note" role="link" tabindex="0" data-open-capture="${c.id}">
@@ -165,9 +165,9 @@ function renderNotes(state, notes) {
     </div>`;
 }
 
-function renderTodos(state, m, todos) {
+function renderTodos(state, todos) {
   return `
-    <div class="section-label" style="margin-top: 24px;">To-do</div>
+    <h2 class="section-label" style="margin-top: 24px;">To-do</h2>
     <div class="list">
       ${todos.map(p => `
         <div class="list-item mod-todo" data-todo="${p.id}">
@@ -179,7 +179,7 @@ function renderTodos(state, m, todos) {
           </div>
         </div>`).join('')}
     </div>
-    <a href="#/modul/${encodeURIComponent(m.id)}/plan" class="today-prompt-link" data-goto-plan>Zum Plan →</a>`;
+    <button type="button" class="today-prompt-link" data-goto="plan">Zum Plan →</button>`;
 }
 
 function renderProjectionText(projection, target) {
@@ -219,13 +219,8 @@ function wireModuleHome(el, state, m) {
   el.querySelector('[data-goto-session]')?.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTab(m, 'sessions'); }
   });
-  el.querySelector('[data-goto-plan]')?.addEventListener('click', e => {
-    e.preventDefault();
-    goTab(m, 'plan');
-  });
-  el.querySelector('[data-weak-all]')?.addEventListener('click', e => {
-    e.preventDefault();
-    navigate('weak-spots', { qs: `?module=${encodeURIComponent(m.id)}` });
+  el.querySelector('[data-weak-all]')?.addEventListener('click', () => {
+    navigate('weak-spots', { module: m.id });
   });
   el.querySelectorAll('[data-start-session]').forEach(b =>
     b.addEventListener('click', () => startSessionFor(m.id, b.dataset.startSession)));

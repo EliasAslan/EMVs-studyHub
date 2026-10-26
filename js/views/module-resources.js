@@ -148,7 +148,7 @@ function usageBadge(state, res) {
 function renderResourceCard(res, state) {
   const objectives = state.learningObjectives.filter(o => res.linkedObjectiveIds?.includes(o.id));
   return `
-    <div class="res-card" data-id="${res.id}" role="link" tabindex="0" title="Verlauf öffnen">
+    <div class="res-card" data-id="${res.id}">
       <div class="res-card-top">
         <div class="res-focus" title="Priorität: ${res.focus === '70' ? 'High-Yield' : 'Advanced'}">${escapeHtml(res.focus)}</div>
         <div class="res-main">
@@ -169,8 +169,8 @@ function renderResourceCard(res, state) {
           </div>
         </div>
         <div class="res-actions">
-          <button class="edit-btn" data-act="edit" title="Bearbeiten">✎</button>
-          <button class="delete-btn" data-act="delete" title="Löschen">✕</button>
+          <button class="edit-btn" data-act="edit" title="Bearbeiten" aria-label="Ressource bearbeiten: ${escapeHtml(res.name)}">✎</button>
+          <button class="delete-btn" data-act="delete" title="Löschen" aria-label="Ressource löschen: ${escapeHtml(res.name)}">✕</button>
         </div>
       </div>
       <div class="res-quick">
@@ -178,7 +178,7 @@ function renderResourceCard(res, state) {
         ${res.understood
           ? `<button class="btn ghost" data-act="reopen" title="Verstanden-Markierung zurücknehmen">Wieder offen</button>`
           : `<button class="btn ghost" data-act="understood" title="Explizit: ich habe das verstanden">Verstanden ✓</button>`}
-        <span class="res-open-hint">Verlauf öffnen →</span>
+        <button type="button" class="res-open-hint" data-act="history" aria-label="Verlauf öffnen: ${escapeHtml(res.name)}">Verlauf öffnen →</button>
       </div>
     </div>
   `;
@@ -189,15 +189,8 @@ function bindResourceCard(card, el, state, moduleId) {
   const res = state.resources.find(r => r.id === id);
   if (!res) return;
 
-  card.addEventListener('click', e => {
-    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.res-obj-chip')) return;
+  card.querySelector('[data-act="history"]')?.addEventListener('click', () => {
     openResourceHistory(id, () => paintResourceList(el, state, moduleId));
-  });
-  card.addEventListener('keydown', e => {
-    if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button') && e.target === card) {
-      e.preventDefault();
-      openResourceHistory(id, () => paintResourceList(el, state, moduleId));
-    }
   });
 
   card.querySelectorAll('.res-obj-chip').forEach(chip => chip.addEventListener('click', e => {
@@ -328,7 +321,7 @@ function resourceHistoryHtml(state, res) {
       </div>
     </div>
 
-    <div class="section-label" style="margin-top:24px;">Verknüpfte Lernziele · ${objectives.length}</div>
+    <h3 class="section-label" style="margin-top:24px;">Verknüpfte Lernziele · ${objectives.length}</h3>
     ${objectives.length ? `<div class="obj-hist-res">${objectives.map(o => {
       const r = rhythmOf(o);
       return `<div class="obj-hist-res-row">
@@ -338,7 +331,7 @@ function resourceHistoryHtml(state, res) {
       </div>`;
     }).join('')}</div>` : `<p class="today-empty-line">Noch kein Lernziel verknüpft — über Bearbeiten zuordnen.</p>`}
 
-    <div class="section-label" style="margin-top:24px;">Zeitleiste · ${events.length} Ereignisse</div>
+    <h3 class="section-label" style="margin-top:24px;">Zeitleiste · ${events.length} Ereignisse</h3>
     <div class="obj-timeline">
       ${events.map(ev => `
         <div class="obj-tl-row">

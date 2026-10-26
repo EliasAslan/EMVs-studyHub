@@ -4,20 +4,20 @@
  * No hero countdown, no percentage stats, no streaks, no red, no shaming.
  */
 
-import { escapeHtml, daysUntil, getNextExam, getWeakestObjective, getMostOverdueObjective, getRiskiestObjective, riskReasons, getRecentSessions, relativeDay, getDailyPrompt, getDueObjectives, rhythmOf, getCurrentWeekNumber, hasWeeklyReview } from '../utils/helpers.js';
+import { escapeHtml, daysUntil, getRecentSessions, relativeDay, getDailyPrompt, getCurrentWeekNumber, hasWeeklyReview, buildReviewQueue } from '../utils/helpers.js';
+import { recordReview } from '../services/store.js';
 import { getOpenPlanItems, getRecentCaptures } from '../utils/navigation.js';
 import { navigate } from './router.js';
 import { openSessionModal } from './module-sessions.js';
 import { openModuleModal } from './settings.js';
-import { openObjectiveModal, openObjectiveHistory } from './module-objectives.js';
+import { openObjectiveHistory } from './module-objectives.js';
 import { openCaptureModal } from './captures.js';
 
 export function renderToday(state) {
   const now = new Date();
   const dateLine = now.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const plan = buildTodayPlan(state);
-  const { focus, nextUp, weak, due, dueCount } = plan;
+  const queue = buildReviewQueue(state, { now: now.getTime() });
   const closestExams = closestTests(state, 3);
   const recent = getRecentSessions(state, 3);
   const prompt = getDailyPrompt(now);
@@ -27,50 +27,65 @@ export function renderToday(state) {
   const reviewDue = state.modules.length > 0 &&
     !hasWeeklyReview(state, reviewWeek, now.getFullYear(), state.settings.currentModuleId);
 
+  // Visible items: hero (idx 0) + up to 3 collapsed rows (idx 1-3)
+  const visibleCount = Math.min(queue.length, 4);
+  const tailCount = queue.length - visibleCount;
+
   const el = document.createElement('div');
   el.innerHTML = `
     <div class="eyebrow">Heute · ${escapeHtml(dateLine)}</div>
     <h1 class="page-title today-title">Was jetzt <em>zählt.</em></h1>
 
-    <div class="section-label">Jetzt</div>
-    ${renderFocus(focus, state)}
+    ${queue.length ? `
+      <h2 class="section-label">Im Faden · ${visibleCount} von ${queue.length}</h2>
+      <div class="queue">${queue.slice(0, visibleCount).map((item, idx) => renderQueueItem(item, state, idx)).join('')}</div>
+      ${tailCount > 0 ? `<p class="queue-tail">… ${tailCount} weitere folgen heute</p>` : ''}
+    ` : !state.modules.length ? `
+      <div class="today-focus">
+        <div class="today-focus-label">Noch nichts da</div>
+        <div class="today-focus-title">Lege dein erstes Modul an.</div>
+        <div class="today-focus-context">Module, Lernziele und Prüfungen verwalten sich danach fast von allein.</div>
+        <div class="timer-actions mt-2">
+          <button class="btn primary" data-action="new-module">＋ Erstes Modul erstellen</button>
+        </div>
+      </div>
+    ` : `
+      <div class="today-focus">
+        <div class="today-focus-label">Bereit</div>
+        <div class="today-focus-title">Alles im Rhythmus.</div>
+        <div class="today-focus-context">Kein Review fällig — vertiefe einen Verlauf oder protokolliere eine freie Sitzung.</div>
+      </div>
+    `}
 
-    ${nextUp.length ? `
-      <div class="section-label" style="margin-top: 24px;">Als Nächstes</div>
-      <div class="nextup-list">${nextUp.map(n => renderNextUp(n, state)).join('')}</div>
-    ` : ''}
-
-    <div class="section-label" style="margin-top: 24px;">Nächste Prüfungen</div>
+    <h2 class="section-label mt-3">Nächste Prüfungen</h2>
     ${renderClosestExams(closestExams, state)}
-
-    ${dueCount ? `
-      <div class="section-label" style="margin-top: 28px;">Wieder fällig · ${dueCount}</div>
-      ${due.length ? `
-        <p class="today-empty-line" style="margin-bottom: 12px;">Zuerst vergessen: Verstandenes kehrt im Rhythmus zurück — kein Häkchen, sondern ein Wiedersehen.</p>
-        <div class="today-due-list">${due.map(o => renderDueRow(o, state)).join('')}</div>
-      ` : '<p class="today-empty-line">Die fälligen Lernziele sind bereits oben eingeordnet.</p>'}
-    ` : ''}
-
-    ${weak ? `
-      <div class="section-label" style="margin-top: 28px;">Schwaches Signal</div>
-      ${renderWeak(weak, state)}
-      <a href="#/schwach" class="today-prompt-link" id="today-weak-all">Alle Schwachstellen →</a>
-    ` : ''}
 
     <hr class="rule today-rule">
 
-    <div class="section-label">Zuletzt aktiv</div>
-    ${renderRecent(recent, state)}
-
-    ${todos.length ? `
-      <div class="section-label" style="margin-top: 28px;">To-do · ${todos.length}</div>
-      <div class="today-todos">${todos.map(p => renderTodoRow(p, state)).join('')}</div>
-    ` : ''}
-
-    ${notes.length ? `
-      <div class="section-label" style="margin-top: 28px;">Notizen</div>
-      <div class="today-notes">${notes.map(c => renderNoteRow(c, state)).join('')}</div>
-    ` : ''}
+    <h2 class="section-label">Am Rand</h2>
+    <div class="am-rand">
+      ${recent.length ? `
+        <div class="am-rand-row" data-am-rand="recent">
+          <span class="am-rand-label">Zuletzt aktiv ${recent.length}</span>
+          <button class="btn ghost am-rand-expand" data-am-rand-target="recent" aria-expanded="false">alle →</button>
+        </div>
+        <div class="am-rand-panel" id="am-rand-recent" hidden>${renderRecent(recent, state)}</div>
+      ` : ''}
+      ${todos.length ? `
+        <div class="am-rand-row" data-am-rand="todos">
+          <span class="am-rand-label">To-do ${todos.length}</span>
+          <button class="btn ghost am-rand-expand" data-am-rand-target="todos" aria-expanded="false">alle →</button>
+        </div>
+        <div class="am-rand-panel" id="am-rand-todos" hidden><div class="today-todos">${todos.map(p => renderTodoRow(p, state)).join('')}</div></div>
+      ` : ''}
+      ${notes.length ? `
+        <div class="am-rand-row" data-am-rand="notes">
+          <span class="am-rand-label">Notizen ${notes.length}</span>
+          <button class="btn ghost am-rand-expand" data-am-rand-target="notes" aria-expanded="false">alle →</button>
+        </div>
+        <div class="am-rand-panel" id="am-rand-notes" hidden><div class="today-notes">${notes.map(c => renderNoteRow(c, state)).join('')}</div></div>
+      ` : ''}
+    </div>
 
     <hr class="rule today-rule">
 
@@ -90,59 +105,21 @@ export function renderToday(state) {
     </div>
   `;
 
-  // Fokus: start session (pre-filled sheet)
-  el.querySelector('#today-start-session')?.addEventListener('click', () => {
-    const obj = focus?.objective;
-    if (!obj) return;
-    startSessionFor(obj);
-  });
-
-  // Fokus empty states
-  el.querySelector('#today-new-objective')?.addEventListener('click', () => {
-    const modId = state.settings.currentModuleId || state.modules[0]?.id || null;
-    openObjectiveModal(null, modId);
-  });
+  // Empty state handlers
   el.querySelectorAll('[data-action="new-module"]').forEach(b =>
     b.addEventListener('click', () => openModuleModal())
   );
 
   // Activity rows → jump to that module's sessions.
-  // Due rows (data-obj) open the objective history instead.
-  el.querySelectorAll('.today-session:not(.today-due)').forEach(row => {
-    const open = () => {
+  el.querySelectorAll('.today-session[data-module]').forEach(row => {
+    row.addEventListener('click', () => {
       const st = window.EMVS.getState();
       st.settings.currentModuleId = row.dataset.module;
       window.EMVS.save();
       window.EMVS.renderSidebar();
       navigate('module', { id: row.dataset.module, tab: 'sessions' });
-    };
-    row.addEventListener('click', open);
-    row.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
   });
-
-  el.querySelectorAll('.today-due').forEach(row => {
-    const id = row.dataset.obj;
-    const open = () => openObjectiveHistory(id);
-    row.addEventListener('click', e => {
-      if (e.target.closest('button')) return;
-      open();
-    });
-    row.addEventListener('keydown', e => {
-      if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')) { e.preventDefault(); open(); }
-    });
-  });
-  el.querySelectorAll('.today-due-history').forEach(b =>
-    b.addEventListener('click', e => { e.stopPropagation(); openObjectiveHistory(b.dataset.obj); })
-  );
-  el.querySelectorAll('.today-due-start').forEach(b =>
-    b.addEventListener('click', e => {
-      e.stopPropagation();
-      const obj = window.EMVS.getState().learningObjectives.find(o => o.id === b.dataset.obj);
-      if (obj) startSessionFor(obj);
-    })
-  );
 
   // To-do rows: toggle in place, row opens the module plan.
   el.querySelectorAll('[data-todo-toggle]').forEach(btn =>
@@ -158,102 +135,137 @@ export function renderToday(state) {
       btn.closest('.today-todo')?.classList.toggle('is-done', item.done);
       window.EMVS.toast?.show(item.done ? 'Festgehalten' : 'Wieder offen');
     }));
-  el.querySelectorAll('.today-todo').forEach(row => {
-    const open = () => {
+  el.querySelectorAll('[data-todo-open]').forEach(btn =>
+    btn.addEventListener('click', () => {
       const st = window.EMVS.getState();
-      if (row.dataset.todoModule) {
-        st.settings.currentModuleId = row.dataset.todoModule;
+      if (btn.dataset.todoOpen) {
+        st.settings.currentModuleId = btn.dataset.todoOpen;
         window.EMVS.save();
         window.EMVS.renderSidebar();
       }
-      navigate('module', { id: row.dataset.todoModule || st.settings.currentModuleId, tab: 'plan' });
-    };
-    row.addEventListener('click', e => {
-      if (e.target.closest('[data-todo-toggle]')) return;
-      open();
-    });
-    row.addEventListener('keydown', e => {
-      if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-todo-toggle]')) { e.preventDefault(); open(); }
-    });
-  });
+      navigate('module', { id: btn.dataset.todoOpen || st.settings.currentModuleId, tab: 'plan' });
+    }));
 
   // Notes rows open the capture editor.
-  el.querySelectorAll('.today-note').forEach(row => {
-    const open = () => {
+  el.querySelectorAll('[data-capture]').forEach(row => {
+    row.addEventListener('click', () => {
       const c = window.EMVS.getState().captures.find(x => x.id === row.dataset.capture);
       if (c) openCaptureModal(c);
-    };
-    row.addEventListener('click', open);
-    row.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
   });
 
   el.querySelector('#today-review-now')?.addEventListener('click', () => navigate('weekly-review'));
 
-  // Weak signal → full ranked list
-  el.querySelector('#today-weak-all')?.addEventListener('click', e => {
-    e.preventDefault();
-    navigate('weak-spots');
-  });
+  // Exam strip + "Alle Prüfungen" go through the router (focus/scroll reset).
+  el.querySelectorAll('[data-goto-exams]').forEach(b =>
+    b.addEventListener('click', () => navigate('exams-global')));
 
-  // Next-up actions
-  el.querySelectorAll('[data-next-obj]').forEach(b =>
-    b.addEventListener('click', () => {
-      const obj = window.EMVS.getState().learningObjectives.find(o => o.id === b.dataset.nextObj);
-      if (obj) startSessionFor(obj);
+  // Queue actions
+  el.querySelectorAll('.q-start').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const obj = window.EMVS.getState().learningObjectives.find(o => o.id === btn.dataset.obj);
+      if (obj) startSessionFor(obj, (session, isNew) => {
+        // After session saved, show outcome choice for this objective
+        const st = window.EMVS.getState();
+        st.settings.todayReviewOutcome = obj.id;
+        window.EMVS.save();
+        window.EMVS.refresh('today-review-outcome', { objectiveId: obj.id });
+      });
     })
   );
-  el.querySelectorAll('[data-next-hist]').forEach(b =>
-    b.addEventListener('click', () => openObjectiveHistory(b.dataset.nextHist))
+  el.querySelectorAll('.q-skip').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      // Skip adds to skipIds and re-renders
+      const st = window.EMVS.getState();
+      const skipIds = new Set(st.settings.todaySkipIds || []);
+      skipIds.add(btn.dataset.obj);
+      st.settings.todaySkipIds = Array.from(skipIds);
+      window.EMVS.save();
+      window.EMVS.refresh('today-queue-skip', { skipIds: st.settings.todaySkipIds });
+    })
   );
+  el.querySelectorAll('.q-history').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openObjectiveHistory(btn.dataset.obj);
+    })
+  );
+  // Outcome choice buttons
+  el.querySelectorAll('.q-outcome-solid, .q-outcome-shaky, .q-outcome-lost, .q-outcome-defer').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const objId = btn.dataset.obj;
+      const outcome = btn.dataset.outcome;
+      const st = window.EMVS.getState();
+      const obj = st.learningObjectives.find(o => o.id === objId);
+      if (!obj) return;
+      
+      if (outcome === 'defer') {
+        // Just clear the outcome flag and re-render
+        delete st.settings.todayReviewOutcome;
+        window.EMVS.save();
+        window.EMVS.refresh('today-outcome-defer');
+        return;
+      }
+      
+      // Record the review using the existing ladder
+      const entry = recordReview(obj, outcome);
+      window.EMVS.save();
+      
+      // Show toast with the existing phrasing
+      const interval = entry.interval;
+      const nextIn = interval === 1 ? 'morgen' : `in ${interval} Tagen`;
+      const phrases = {
+        solid: 'Review: sitzt',
+        shaky: 'Review: wackelig',
+        lost: 'Review: verloren'
+      };
+      window.EMVS.toast?.show(`${phrases[outcome]} — nächstes Review ${nextIn}`);
+      
+      // Clear outcome flag and advance (re-render will show next card)
+      delete st.settings.todayReviewOutcome;
+      // Also clear any skipIds for this objective since it's now reviewed
+      if (st.settings.todaySkipIds) {
+        st.settings.todaySkipIds = st.settings.todaySkipIds.filter(id => id !== objId);
+      }
+      window.EMVS.save();
+      window.EMVS.refresh('today-outcome-recorded', { objectiveId: objId, outcome });
+    })
+  );
+  // q-card click/keyboard -> start review
+  el.querySelector('.q-card')?.addEventListener('click', e => {
+    if (e.target.closest('button')) return;
+    if (e.target.closest('.confidence-dot')) return;
+    const objId = e.currentTarget.dataset.obj;
+    const obj = window.EMVS.getState().learningObjectives.find(o => o.id === objId);
+    if (obj) startSessionFor(obj);
+  });
+  el.querySelector('.q-card')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.target.closest('button')) return;
+      if (e.target.closest('.confidence-dot')) return;
+      const objId = e.currentTarget.dataset.obj;
+      const obj = window.EMVS.getState().learningObjectives.find(o => o.id === objId);
+      if (obj) startSessionFor(obj);
+    }
+  });
+
+  // Am Rand expandable panels
+  el.querySelectorAll('.am-rand-expand').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const target = btn.dataset.amRandTarget;
+      const panel = el.querySelector(`#am-rand-${target}`);
+      const isOpen = !panel.hidden;
+      panel.hidden = !isOpen;
+      btn.setAttribute('aria-expanded', String(!isOpen));
+    });
+  });
 
   return el;
-}
-
-/**
- * Build one de-duplicated daily plan. Higher-priority recommendations own an
- * objective first; the due list shows only remaining items, while dueCount
- * always reflects the full queue.
- */
-export function buildTodayPlan(state) {
-  const focus = pickFocus(state);
-  const nextUp = pickNextUp(state, focus);
-  const recommended = new Set([focus?.objective?.id, ...nextUp.map(n => n.objective.id)].filter(Boolean));
-  const weak = getRiskiestObjective(state, [...recommended]);
-  if (weak) recommended.add(weak.id);
-  const allDue = getDueObjectives(state);
-  const due = allDue.filter(o => !recommended.has(o.id)).slice(0, 5);
-  return { focus, nextUp, weak, due, dueCount: allDue.length };
-}
-
-/** Secondary recommendations never repeat the primary focus objective. */
-function pickNextUp(state, focus) {
-  const out = [];
-  const focusId = focus?.objective?.id;
-  const due = getDueObjectives(state).filter(o => o.id !== focusId).slice(0, 1);
-  due.forEach(o => out.push({ kind: 'due', objective: o }));
-  if (out.length < 2) {
-    const excl = [focusId, ...out.map(n => n.objective.id)].filter(Boolean);
-    const r = getRiskiestObjective(state, excl);
-    if (r) out.push({ kind: 'weak', objective: r });
-  }
-  return out.slice(0, 2);
-}
-
-function renderNextUp(n, state) {
-  const m = moduleOf(state, n.objective.moduleId);
-  const tag = n.kind === 'due' ? 'Fällig' : 'Schwach';
-  return `
-    <div class="nextup-row">
-      <span class="badge nextup-tag">${tag}</span>
-      <span class="nextup-title">${escapeHtml(n.objective.title)}</span>
-      <span class="nextup-meta">LZ ${escapeHtml(String(n.objective.number ?? '–'))}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
-      <span class="nextup-actions">
-        <button class="btn ghost nextup-btn" data-next-hist="${n.objective.id}">Verlauf</button>
-        <button class="btn ghost nextup-btn" data-next-obj="${n.objective.id}">▶</button>
-      </span>
-    </div>`;
 }
 
 /** Closest tests sorted by date, then weight. */
@@ -270,123 +282,103 @@ function closestTests(state, n = 3) {
 function renderClosestExams(list, state) {
   if (!list.length) return `<p class="today-empty-line">Keine Prüfung eingetragen — lege unter Prüfungen die nächste an.</p>`;
   return `
-    <div class="exam-strip" role="list">
+    <div class="exam-strip">
       ${list.map(e => {
         const m = moduleOf(state, e.moduleId);
         const d = daysUntil(e.date);
         const when = d === null ? '' : d < 0 ? 'überschritten' : d === 0 ? 'heute' : d === 1 ? 'morgen' : `in ${d} Tagen`;
         const urgent = d !== null && d <= 14;
         return `
-          <a class="exam-chip ${urgent ? 'urgent' : ''}" role="listitem" href="#/pruefungen">
+          <button type="button" class="exam-chip ${urgent ? 'urgent' : ''}" data-goto-exams>
             <span class="exam-chip-name">${escapeHtml(e.name)}</span>
             <span class="exam-chip-meta">${m ? `Modul ${escapeHtml(m.code)} · ` : ''}${escapeHtml(when)}${e.weight ? ` · ${escapeHtml(String(e.weight))}%` : ''}</span>
-          </a>`;
+          </button>`;
       }).join('')}
     </div>
-    <a href="#/pruefungen" class="today-prompt-link">Alle Prüfungen →</a>`;
-}
-
-/**
- * Fokus priority: most overdue review → weakest objective → empty state.
- */
-function pickFocus(state) {
-  const overdue = getMostOverdueObjective(state);
-  if (overdue) {
-    const due = overdue.reviewSchedule.nextReview;
-    const days = Math.max(0, Math.floor((Date.now() - due) / 86400000));
-    const understood = overdue.status === 'done' ? ' · einst verstanden' : '';
-    return {
-      kind: 'overdue',
-      objective: overdue,
-      label: 'Überfälliges Review',
-      context: (days === 0
-        ? 'Review ist heute fällig'
-        : days === 1 ? 'Review ist seit gestern fällig' : `Review ist seit ${days} Tagen fällig`) + understood
-    };
-  }
-  const weak = getWeakestObjective(state);
-  if (weak) {
-    return {
-      kind: 'weakest',
-      objective: weak,
-      label: 'Schwächstes Lernziel',
-      context: `Confidence ${weak.confidence ?? 0}/5`
-    };
-  }
-  return null;
+    <button type="button" class="today-prompt-link" data-goto-exams>Alle Prüfungen →</button>`;
 }
 
 function moduleOf(state, moduleId) {
   return state.modules.find(m => m.id === moduleId);
 }
 
-function renderExamLine(state, exam) {
-  if (!exam) return `<span class="today-exam-quiet">Keine Prüfung eingetragen</span>`;
-  const m = moduleOf(state, exam.moduleId);
-  const d = daysUntil(exam.date);
-  const when = d === null ? '' : d < 0 ? 'überschritten' : d === 0 ? 'heute' : d === 1 ? 'morgen' : `in ${d} Tagen`;
-  return `<span class="today-exam-name">${escapeHtml(exam.name)}</span>
-    <span class="today-exam-meta">${m ? `Modul ${escapeHtml(m.code)} · ` : ''}${escapeHtml(when)}${exam.weight ? ` · ${escapeHtml(String(exam.weight))} %` : ''}</span>`;
-}
+/**
+ * Render a single queue item.
+ * First item (idx 0) is the q-card; next 2-3 are collapsed q-rows.
+ * If state.settings.todayReviewOutcome matches this objective, shows the outcome choice.
+ */
+function renderQueueItem(item, state, idx) {
+  const obj = item.objective;
+  const m = moduleOf(state, obj.moduleId);
+  const isHero = idx === 0;
+  const isCollapsedRow = idx > 0 && idx <= 3;
+  const kindLabel = kindToLabel(item.kind);
 
-function renderFocus(focus, state) {
-  if (!focus?.objective) {
-    if (!state.modules.length) {
-      return `
-        <div class="today-focus">
-          <div class="today-focus-label">Noch nichts da</div>
-          <div class="today-focus-title">Lege dein erstes Modul an.</div>
-          <div class="today-focus-context">Module, Lernziele und Prüfungen verwalten sich danach fast von allein.</div>
-          <div class="timer-actions" style="margin-top: 16px;">
-            <button class="btn primary" data-action="new-module">＋ Erstes Modul erstellen</button>
-          </div>
-        </div>`;
-    }
+  // Check if we should show the outcome choice for this objective
+  const showOutcome = state.settings.todayReviewOutcome === obj.id;
+
+  // Confidence dots markup (copied from module-objectives.js pattern)
+  const confidence = obj.confidence ?? 0;
+  const dots = [1, 2, 3, 4, 5].map(n => `
+    <div class="confidence-dot ${n <= confidence ? 'on' : ''}" data-n="${n}" data-obj="${obj.id}"
+         title="Confidence ${n}/5" role="button" tabindex="0" aria-label="Confidence ${n}"></div>
+  `).join('');
+
+  if (showOutcome) {
+    // Outcome choice - "Wie saß das?"
     return `
-      <div class="today-focus">
-        <div class="today-focus-label">Bereit</div>
-        <div class="today-focus-title">Alles im Rhythmus.</div>
-        <div class="today-focus-context">Kein Review fällig — vertiefe einen Verlauf oder protokolliere eine freie Sitzung.</div>
-        <div class="timer-actions" style="margin-top: 16px;">
-          <button class="btn primary" id="today-new-objective">＋ Lernziel erstellen</button>
+      <div class="q-card q-outcome" data-obj="${obj.id}" data-kind="${item.kind}">
+        <div class="q-card-eyebrow">${escapeHtml(kindLabel)}</div>
+        <div class="q-card-title">${escapeHtml(obj.title)}</div>
+        <div class="q-card-outcome-question">Wie saß das?</div>
+        <div class="q-card-outcome-actions">
+          <button class="btn primary q-outcome-solid" data-obj="${obj.id}" data-outcome="solid">Sitzt</button>
+          <button class="btn q-outcome-shaky" data-obj="${obj.id}" data-outcome="shaky">Wackelig</button>
+          <button class="btn ghost q-outcome-lost" data-obj="${obj.id}" data-outcome="lost">Verloren</button>
+          <button class="btn ghost q-outcome-defer" data-obj="${obj.id}" data-outcome="defer">Später</button>
         </div>
       </div>`;
   }
-  const obj = focus.objective;
-  const m = moduleOf(state, obj.moduleId);
-  return `
-    <div class="today-focus">
-      <div class="today-focus-label">${escapeHtml(focus.label)}${m ? ` · Modul ${escapeHtml(m.code)}` : ''}</div>
-      <div class="today-focus-title">${escapeHtml(obj.title)}</div>
-      <div class="today-focus-context">${escapeHtml(focus.context)}${m ? ` · ${escapeHtml(m.title)}` : ''}</div>
-      <div class="timer-actions" style="margin-top: 16px;">
-        <button class="btn primary" id="today-start-session">▶ Session starten</button>
-      </div>
-    </div>`;
+
+  if (isHero) {
+    // q-card - expanded view
+    return `
+      <div class="q-card" data-obj="${obj.id}" data-kind="${item.kind}">
+        <div class="q-card-eyebrow">${escapeHtml(kindLabel)}</div>
+        <div class="q-card-title">${escapeHtml(obj.title)}</div>
+        <div class="q-card-meta">
+          <span>LZ ${escapeHtml(String(obj.number ?? '–'))}${m ? ` · Modul ${escapeHtml(m.code)}` : ''}</span>
+          <span class="q-card-confidence" aria-label="Confidence ${confidence}/5">${dots}</span>
+        </div>
+        <div class="q-card-reason">${escapeHtml(item.reason)}</div>
+        <div class="q-card-actions">
+          <button class="btn primary q-start" data-obj="${obj.id}">▶ Review starten</button>
+          <button class="btn ghost q-skip" data-obj="${obj.id}">Überspringen</button>
+          <button class="btn ghost q-history" data-obj="${obj.id}">Verlauf</button>
+        </div>
+      </div>`;
+  } else if (isCollapsedRow) {
+    // Collapsed q-row
+    return `
+      <div class="q-row" data-obj="${obj.id}" data-kind="${item.kind}">
+        <span class="q-row-kind">${escapeHtml(kindLabel)}</span>
+        <span class="q-row-title">${escapeHtml(obj.title)}</span>
+        <span class="q-row-meta">LZ ${escapeHtml(String(obj.number ?? '–'))}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
+      </div>`;
+  } else {
+    // Hidden beyond the first 4 - will be counted in the tail
+    return '';
+  }
 }
 
-function renderWeak(obj, state) {
-  const m = moduleOf(state, obj.moduleId);
-  return `
-    <div class="today-weak">
-      <div class="today-weak-title">${escapeHtml(obj.title)}</div>
-      <div class="today-weak-meta">LZ ${escapeHtml(String(obj.number ?? '–'))}${m ? ` · Modul ${escapeHtml(m.code)}` : ''} · ${escapeHtml(riskReasons(state, obj).join(' · '))}</div>
-    </div>`;
-}
-
-function renderDueRow(obj, state) {
-  const m = moduleOf(state, obj.moduleId);
-  const r = rhythmOf(obj);
-  return `
-    <div class="today-session today-due" role="link" tabindex="0" data-obj="${obj.id}">
-      <span class="today-session-when">${escapeHtml(r.detail)}</span>
-      <span class="today-session-objs">LZ ${escapeHtml(String(obj.number ?? '–'))}${m ? ` · ${escapeHtml(m.code)}` : ''}${obj.status === 'done' ? ' · verstanden' : ''}</span>
-      <span class="today-session-note" style="flex-basis:100%;">${escapeHtml(obj.title)}</span>
-      <span class="today-due-actions">
-        <button class="btn ghost today-due-history" data-obj="${obj.id}">Verlauf →</button>
-        <button class="btn ghost today-due-start" data-obj="${obj.id}">▶ Session</button>
-      </span>
-    </div>`;
+function kindToLabel(kind) {
+  switch (kind) {
+    case 'overdue': return 'Überfällig';
+    case 'weakest': return 'Schwächstes';
+    case 'due': return 'Fällig';
+    case 'weak': return 'Schwach';
+    default: return kind;
+  }
 }
 
 function objectiveNumbers(state, session) {
@@ -405,12 +397,12 @@ function renderRecent(recent, state) {
       ${recent.map(s => {
         const m = moduleOf(state, s.moduleId);
         return `
-          <div class="today-session" role="link" tabindex="0" data-module="${s.moduleId || ''}">
+          <button type="button" class="today-session" data-module="${s.moduleId || ''}">
             <span class="today-session-when">${escapeHtml(relativeDay(s.startTime))}</span>
             <span class="today-session-dur">${escapeHtml(String(s.duration ?? 0))} Min</span>
             <span class="today-session-objs">${escapeHtml(objectiveNumbers(state, s))}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
             ${s.note ? `<span class="today-session-note">${escapeHtml(s.note.slice(0, 80))}${s.note.length > 80 ? '…' : ''}</span>` : ''}
-          </div>`;
+          </button>`;
       }).join('')}
     </div>`;
 }
@@ -418,28 +410,32 @@ function renderRecent(recent, state) {
 function renderTodoRow(p, state) {
   const m = moduleOf(state, p.moduleId);
   return `
-    <div class="today-session today-todo" role="link" tabindex="0" data-todo-module="${p.moduleId || ''}">
+    <div class="today-session today-todo">
       <button class="todo-check" data-todo-toggle="${p.id}" role="checkbox" aria-checked="false"
         aria-label="Aufgabe abhaken: ${escapeHtml(p.text.slice(0, 60))}">✓</button>
       <span class="today-session-note" style="flex-basis: auto; flex: 1;">${escapeHtml(p.text)}</span>
       <span class="today-session-objs">W${escapeHtml(String(p.week ?? '–'))}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
+      <button class="btn ghost" data-todo-open="${escapeHtml(p.moduleId || '')}" aria-label="Zum Modulplan">Plan →</button>
     </div>`;
 }
 
 function renderNoteRow(c, state) {
   const m = moduleOf(state, c.moduleId);
   return `
-    <div class="today-session today-note" role="link" tabindex="0" data-capture="${c.id}">
+    <button type="button" class="today-session today-note" data-capture="${c.id}">
       <span class="today-session-when">${escapeHtml(relativeDay(c.timestamp || c.createdAt))}</span>
       <span class="today-session-note" style="flex-basis:100%;">${escapeHtml(String(c.content || '').slice(0, 120))}${String(c.content || '').length > 120 ? '…' : ''}</span>
       <span class="today-session-objs">${escapeHtml(c.type || '')}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
-    </div>`;
+    </button>`;
 }
 
-function startSessionFor(obj) {
+function startSessionFor(obj, onSave) {
   const st = window.EMVS.getState();
   st.settings.currentModuleId = obj.moduleId;
   window.EMVS.save();
   window.EMVS.renderSidebar();
-  openSessionModal(null, obj.moduleId, { linkedObjectiveIds: [obj.id], duration: 25 });
+  openSessionModal(null, obj.moduleId, { linkedObjectiveIds: [obj.id], duration: 25, onSave });
 }
+
+/** Re-export for back-compat (tests, other views). */
+export { buildTodayPlan } from '../utils/helpers.js';

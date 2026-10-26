@@ -123,7 +123,10 @@ export function navigate(view, params = {}) {
       setHash(`#/modul/${params.id}/${tab}`);
       return;
     }
-    setHash(hash + (params.qs || ''));
+    const qs = params.module
+      ? `?module=${encodeURIComponent(params.module)}`
+      : (params.qs || '');
+    setHash(hash + qs);
     return;
   }
   if (!VIEWS[view]) {
@@ -143,6 +146,10 @@ function setHash(hash) {
     routeFromHash();
   } else {
     location.hash = hash;
+    // Fallback: some browsers (or headless environments) don't fire hashchange
+    // for programmatic hash changes. Call routeFromHash directly to ensure
+    // the view renders even if the event doesn't fire.
+    routeFromHash();
   }
 }
 

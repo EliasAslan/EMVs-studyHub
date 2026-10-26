@@ -163,12 +163,12 @@ export function openPdfReview(task) {
     title: `Entwurf prüfen — ${t.title}`,
     body: `
     <p class="pdf-note">${objs.length} Lernziel${objs.length !== 1 ? 'e' : ''}${ress.length ? `, ${ress.length} Ressource${ress.length !== 1 ? 'n' : ''}` : ''} aus dem PDF vorgeschlagen. Abgewähltes wird nicht übernommen — nichts wird automatisch gespeichert. Änderungen bleiben erhalten, auch wenn du zwischendurch woanders weiterarbeitest.</p>
-    <div class="section-label">Lernziele</div>
+    <h3 class="section-label">Lernziele</h3>
     <ul class="pdf-draft-list" id="pdf-obj-list">
       ${objs.map((o, i) => draftItemHtml('obj', o, i)).join('')}
     </ul>
     ${ress.length ? `
-      <div class="section-label" style="margin-top: 16px;">Ressourcen</div>
+      <h3 class="section-label" style="margin-top: 16px;">Ressourcen</h3>
       <ul class="pdf-draft-list" id="pdf-res-list">
         ${ress.map((r, i) => draftItemHtml('res', r, i)).join('')}
       </ul>` : ''}

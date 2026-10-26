@@ -6,7 +6,7 @@ import { escapeHtml, formatDate, daysUntil, getNextExam, getWeakestObjective, ge
 import { partitionOverviewModules, objectiveProgressPercent } from '../utils/dashboard.js';
 import { navigate } from './router.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { generateId, getDemoSeedData } from '../services/store.js';
+import { generateId } from '../services/store.js';
 import { openObjectiveHistory } from './module-objectives.js';
 import { openSessionModal } from './module-sessions.js';
 import { openModuleModal as openSettingsModuleModal, importBackup } from './settings.js';
@@ -14,35 +14,28 @@ import { openPdfImport } from './pdf-import.js';
 
 export function renderOverview(state) {
   const el = document.createElement('div');
-  const { visible, demo, hiddenTests } = partitionOverviewModules(state.modules);
+  const { visible, hiddenTests } = partitionOverviewModules(state.modules);
   const showTests = el.dataset.showTests === '1';
 
-  if (!visible.length && !demo.length && !hiddenTests.length) {
+  if (!visible.length && !hiddenTests.length) {
     el.innerHTML = `
       <div class="eyebrow">Übersicht</div>
       <h1 class="page-title">Dein Studium,<br><em>auf einen Blick.</em></h1>
-      <p class="page-lede">Noch keine Module angelegt. Starte leer, importiere ein Backup — oder sieh dir zuerst ein Beispiel an.</p>
+      <p class="page-lede">Noch keine Module angelegt. Starte leer, importiere ein Backup oder lege ein Modul aus einem PDF an.</p>
       <div class="empty-actions">
         <button class="btn primary" id="create-first-module">＋ Erstes Modul erstellen</button>
         <button class="btn" id="create-from-pdf">Modul aus PDF (lokale KI)</button>
         <button class="btn" id="import-backup">Backup importieren</button>
-        <button class="btn" id="explore-sample">Beispielmodul erkunden</button>
       </div>
       <p class="empty-hint">PDFs und Links kannst du später pro Modul unter Material als Ressource ablegen.</p>
     `;
-    el.querySelector('#create-first-module').addEventListener('click', () => openModuleModal());
+    el.querySelector('#create-first-module').addEventListener('click', () => openSettingsModuleModal());
     el.querySelector('#create-from-pdf').addEventListener('click', () => openPdfImport());
     el.querySelector('#import-backup').addEventListener('click', () => importBackup());
-    el.querySelector('#explore-sample').addEventListener('click', () => exploreSampleModule());
     return el;
   }
 
   const cards = visible.map(m => renderModuleCard(state, m)).join('');
-  const demoSection = demo.length ? `
-    <div class="section-label ov-demo-label">Beispiel · Demo-Daten, bleiben lokal</div>
-    <p class="ov-demo-note">Zum Ausprobieren — wird nicht synchronisiert und zählt nicht zu deinem Stand.</p>
-    <div class="ov-list">${demo.map(m => renderModuleCard(state, m, true)).join('')}</div>
-  ` : '';
   const testNote = hiddenTests.length && !showTests ? `
     <div class="ov-testnote">
       <span>${hiddenTests.length} Testmodul${hiddenTests.length !== 1 ? 'e' : ''} ausgeblendet (z. B. Sync-Tests).</span>
@@ -50,7 +43,7 @@ export function renderOverview(state) {
     </div>
   ` : '';
   const testCards = hiddenTests.length && showTests ? `
-    <div class="section-label ov-demo-label">Testmodule · ausgeblendete Sync-/Testdaten</div>
+    <h2 class="section-label">Testmodule · ausgeblendete Sync-/Testdaten</h2>
     <div class="ov-list">${hiddenTests.map(m => renderModuleCard(state, m, true)).join('')}</div>
   ` : '';
 
@@ -59,7 +52,6 @@ export function renderOverview(state) {
     <h1 class="page-title">Dein Studium,<br><em>auf einen Blick.</em></h1>
     <p class="page-lede">${visible.length} Modul${visible.length !== 1 ? 'e' : ''}. „Weiterlernen“ setzt direkt beim nächsten Ziel an.</p>
     <div class="ov-list">${cards}</div>
-    ${demoSection}
     ${testNote}
     ${testCards}
   `;
@@ -88,7 +80,7 @@ function examLine(state, m) {
   return `<span class="ov-countdown${urgent ? ' ov-countdown-urgent' : ''}">${escapeHtml(exam.name)} · ${escapeHtml(formatDate(exam.date))} · ${escapeHtml(when)}</span>`;
 }
 
-function renderModuleCard(state, m, isDemo = false) {
+function renderModuleCard(state, m) {
   const stats = getModuleStats(state, m.id);
   const weak = getWeakestObjective(state, m.id);
   const pct = objectiveProgressPercent(stats.objectivesDone, stats.objectivesTotal);
@@ -98,9 +90,9 @@ function renderModuleCard(state, m, isDemo = false) {
     : 'Zeit für eine Mock-Prüfung';
 
   return `
-    <article class="card ov-item${isDemo ? ' ov-demo' : ''}" data-module="${m.id}" role="link" tabindex="0" aria-label="Modul ${escapeHtml(m.code)}: ${escapeHtml(m.title)} öffnen">
+    <article class="card ov-item" data-module="${m.id}">
       <div class="ov-head">
-        <span class="ov-code">Modul ${escapeHtml(m.code)}${isDemo ? ' · Beispiel' : ''}</span>
+        <span class="ov-code">Modul ${escapeHtml(m.code)}</span>
         ${examLine(state, m)}
       </div>
       <h2 class="ov-title">${escapeHtml(m.title)}</h2>
@@ -151,21 +143,6 @@ function setCurrentModule(id) {
 }
 
 function wireModuleCards(root) {
-  root.querySelectorAll('.ov-item').forEach(card => {
-    const open = () => {
-      if (!setCurrentModule(card.dataset.module)) return;
-      navigate('module-home');
-    };
-    card.addEventListener('click', e => {
-      if (e.target.closest('button')) return;
-      open();
-    });
-    card.addEventListener('keydown', e => {
-      if (e.target.closest('button')) return;
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-    });
-  });
-
   root.querySelectorAll('[data-open-module]').forEach(b =>
     b.addEventListener('click', e => {
       e.stopPropagation();
@@ -199,30 +176,4 @@ function wireModuleCards(root) {
       openSessionModal(null, obj.moduleId, { linkedObjectiveIds: [obj.id], duration: 25 });
     })
   );
-}
-
-/**
- * Sample explorer for new users. Strictly additive: only runs on a truly
- * empty dataset (no modules at all). Never touches existing user data.
- */
-function exploreSampleModule() {
-  const st = window.EMVS.getState();
-  if (st.modules.length) {
-    window.EMVS.toast?.show('Du hast bereits Module — das Beispiel ist nur für den leeren Start gedacht');
-    return;
-  }
-  const demo = getDemoSeedData();
-  window.EMVS.setState(JSON.parse(JSON.stringify(demo)));
-  if (!window.EMVS.save()) {
-    window.EMVS.toast?.show('Beispiel konnte nicht gespeichert werden');
-    return;
-  }
-  window.EMVS.renderSidebar();
-  navigate('today');
-  window.EMVS.toast?.show('Beispielmodul geladen — lösche es jederzeit in den Einstellungen');
-}
-
-function openModuleModal() {
-  // Single creation flow, shared with settings (code/title/grade editor lives there).
-  openSettingsModuleModal();
 }

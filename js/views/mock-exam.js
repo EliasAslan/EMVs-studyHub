@@ -131,7 +131,7 @@ function renderSetup(state, m) {
     <h1 class="page-title">Mock-Prüfung</h1>
     <p class="page-lede">Ein fokussierter Durchgang: eine Frage pro Lernziel, auf Zeit, aus dem Kopf. Das Ergebnis wird als Mock (0&nbsp;%) festgehalten — Diagnose ja, Notendruck nein.</p>
     ${objectives.length ? `
-      <div class="section-label">Lernziele · schwächste zuerst</div>
+      <h2 class="section-label">Lernziele · schwächste zuerst</h2>
       <div class="mock-objlist">
         ${sorted.map(o => `
           <label class="mock-objrow">
@@ -141,7 +141,7 @@ function renderSetup(state, m) {
             <span class="badge">Confidence ${o.confidence ?? 0}/5</span>
           </label>`).join('')}
       </div>
-      <div class="section-label" style="margin-top:24px;">Dauer</div>
+      <h2 class="section-label" style="margin-top:24px;">Dauer</h2>
       <div class="mock-durations" role="group" aria-label="Dauer wählen">
         ${MOCK_DURATIONS.map(d => `
           <label class="badge mock-dur ${d === 25 ? 'active' : ''}">
@@ -444,7 +444,7 @@ function renderResult(state, m) {
       ${strong.length ? `<span class="badge rate-strong active">${strong.length}× stark</span>` : ''}
     </div>
 
-    <div class="section-label">Aufschlüsselung</div>
+    <h2 class="section-label">Aufschlüsselung</h2>
     <div class="exam-obj-list">
       ${oids.map(oid => {
         const o = objOf(oid);

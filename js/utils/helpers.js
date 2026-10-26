@@ -817,3 +817,130 @@ export const CAPTURE_TYPE_LABELS = {
 export const OBJECTIVE_STATUSES = ['todo', 'in-progress', 'done'];
 export const RESOURCE_STATUSES = ['todo', 'in-progress', 'done'];
 export const PLAN_ITEM_TYPES = ['task', 'milestone', 'review'];
+
+/**
+ * Build the de-duplicated daily plan. Higher-priority recommendations own an
+ * objective first; the due list shows only remaining items, while dueCount
+ * always reflects the full queue.
+ * Moved from today.js to be DOM-free and testable.
+ */
+export function buildTodayPlan(state) {
+  const focus = pickFocus(state);
+  const nextUp = pickNextUp(state, focus);
+  const recommended = new Set([focus?.objective?.id, ...nextUp.map(n => n.objective.id)].filter(Boolean));
+  const weak = getRiskiestObjective(state, [...recommended]);
+  if (weak) recommended.add(weak.id);
+  const allDue = getDueObjectives(state);
+  const due = allDue.filter(o => !recommended.has(o.id)).slice(0, 5);
+  return { focus, nextUp, weak, due, dueCount: allDue.length };
+}
+
+/** Secondary recommendations never repeat the primary focus objective. */
+function pickNextUp(state, focus) {
+  const out = [];
+  const focusId = focus?.objective?.id;
+  const due = getDueObjectives(state).filter(o => o.id !== focusId).slice(0, 1);
+  due.forEach(o => out.push({ kind: 'due', objective: o }));
+  if (out.length < 2) {
+    const excl = [focusId, ...out.map(n => n.objective.id)].filter(Boolean);
+    const r = getRiskiestObjective(state, excl);
+    if (r) out.push({ kind: 'weak', objective: r });
+  }
+  return out.slice(0, 2);
+}
+
+/**
+ * Fokus priority: most overdue review → weakest objective → empty state.
+ * Moved from today.js to be DOM-free and testable.
+ */
+export function pickFocus(state) {
+  const overdue = getMostOverdueObjective(state);
+  if (overdue) {
+    const due = overdue.reviewSchedule.nextReview;
+    const days = Math.max(0, Math.floor((Date.now() - due) / 86400000));
+    const understood = overdue.status === 'done' ? ' · einst verstanden' : '';
+    return {
+      kind: 'overdue',
+      objective: overdue,
+      label: 'Überfälliges Review',
+      context: (days === 0
+        ? 'Review ist heute fällig'
+        : days === 1 ? 'Review ist seit gestern fällig' : `Review ist seit ${days} Tagen fällig`) + understood
+    };
+  }
+  const weak = getWeakestObjective(state);
+  if (weak) {
+    return {
+      kind: 'weakest',
+      objective: weak,
+      label: 'Schwächstes Lernziel',
+      context: `Confidence ${weak.confidence ?? 0}/5`
+    };
+  }
+  return null;
+}
+
+/**
+ * Build the ordered review queue for "Der Faden".
+ * Wraps buildTodayPlan so ordering/de-dup stays single-sourced.
+ * Returns ordered array of items:
+ *   { objective, kind: 'overdue'|'weakest'|'due'|'weak', reason }
+ * skipIds moves skipped objectives to the END of the queue (re-queue, never drop).
+ * dueCount is unchanged by skips (the honest total stays intact).
+ */
+export function buildReviewQueue(state, { now = Date.now(), skipIds = [] } = {}) {
+  const plan = buildTodayPlan(state);
+  const queue = [];
+
+  // Helper to derive reason string
+  function deriveReason(obj, kind) {
+    if (kind === 'overdue' || kind === 'due') {
+      const r = rhythmOf(obj, now);
+      return r.detail;
+    }
+    if (kind === 'weakest' || kind === 'weak') {
+      return riskReasons(state, obj).join(' · ');
+    }
+    return '';
+  }
+
+  // Order: focus (overdue) → nextUp (due) → nextUp (weak) → weak → due
+  if (plan.focus?.objective) {
+    queue.push({
+      objective: plan.focus.objective,
+      kind: plan.focus.kind,
+      reason: deriveReason(plan.focus.objective, plan.focus.kind)
+    });
+  }
+  for (const n of plan.nextUp) {
+    queue.push({
+      objective: n.objective,
+      kind: n.kind,
+      reason: deriveReason(n.objective, n.kind)
+    });
+  }
+  if (plan.weak) {
+    queue.push({
+      objective: plan.weak,
+      kind: 'weak',
+      reason: deriveReason(plan.weak, 'weak')
+    });
+  }
+  for (const obj of plan.due) {
+    queue.push({
+      objective: obj,
+      kind: 'due',
+      reason: deriveReason(obj, 'due')
+    });
+  }
+
+  // Move skipped to end (re-queue)
+  if (skipIds.length) {
+    const skipSet = new Set(skipIds);
+    const skipped = queue.filter(item => skipSet.has(item.objective.id));
+    const remaining = queue.filter(item => !skipSet.has(item.objective.id));
+    return [...remaining, ...skipped];
+  }
+
+  return queue;
+}

@@ -231,10 +231,7 @@ export async function uploadLocalData(client, localState, opts = {}) {
     throw err;
   }
 
-  // Demo/example content stays local: only genuine user records (plus demo
-  // parents genuinely referenced by them, for FK safety) enter the dataset.
-  // The single upload route guarantees uniform exclusion everywhere.
-  // (Demo exclusion removed — no demo seed data exists anymore)
+  // One dataset for every table keeps the upload route uniform across callers.
   const dataset = toCloudDataset(localState);
   const ledger = [];
   for (const collection of UPLOAD_ORDER) {

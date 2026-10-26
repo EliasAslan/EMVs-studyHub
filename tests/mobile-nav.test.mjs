@@ -64,13 +64,13 @@ await test('capture is a secondary action, not a primary navigation destination'
   // Verify no rail-specific controls remain
   assert.ok(!html.includes('id="railToggle"'), 'rail collapse control removed');
   assert.ok(!html.includes('id="ws-close"'), 'workspace close control removed');
-  // Capture appears in rail-fab (sidebar), dockCapture (dock), tabCapture (mobile), more sheet
+  // Capture appears in nav-quick-capture (sidebar), dockCapture (dock), tabCapture (mobile), more sheet
   assert.ok(html.includes('id="railCapture"') && html.includes('data-capture'), 'sidebar capture exists');
   assert.ok(html.includes('id="dockCapture"') && html.includes('data-capture'), 'dock capture exists');
   assert.ok(html.includes('id="tabCapture"') && html.includes('data-capture'), 'mobile tabbar capture exists');
-  assert.ok(/id="railCapture"[^>]*data-capture[^>]*>[\s\S]*?rail-capture-label/.test(html), 'rail capture has an explicit label in sidebar');
-  const railFab = css.match(/\.rail-fab\s*\{([^}]*)\}/);
-  assert.ok(railFab && /background:\s*transparent/.test(railFab[1]), 'rail capture is not filled with the accent color');
+  assert.ok(/id="railCapture"[^>]*data-capture[^>]*>[\s\S]*?nav-quick-label/.test(html), 'nav-quick capture has an explicit label in sidebar');
+  const navQuickCapture = css.match(/\.nav-quick-capture\s*\{([^}]*)\}/);
+  assert.ok(navQuickCapture && /background:\s*transparent/.test(navQuickCapture[1]), 'nav-quick capture is not filled with the accent color');
   const dockCapture = css.match(/#dockCapture\s*\{([^}]*)\}/);
   assert.ok(dockCapture && /background:\s*transparent/.test(dockCapture[1]), 'dock capture is a secondary outlined action');
   assert.ok(/\.tab-fab-plus\s*\{[^}]*background:\s*transparent/.test(css), 'mobile capture no longer uses a prominent filled pill');
