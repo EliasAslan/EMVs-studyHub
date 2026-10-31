@@ -4,11 +4,11 @@
  * No hero countdown, no percentage stats, no streaks, no red, no shaming.
  */
 
-import { escapeHtml, daysUntil, getRecentSessions, relativeDay, getDailyPrompt, getCurrentWeekNumber, hasWeeklyReview, buildReviewQueue } from '../utils/helpers.js';
-import { recordReview } from '../services/store.js';
+import { escapeHtml, daysUntil, getRecentSessions, relativeDay, getDailyPrompt, getCurrentWeekNumber, hasWeeklyReview, buildReviewQueue, normalizeTodaySkips, riskReasons } from '../utils/helpers.js';
+import { recordReview, pushCapped, ensureObjectiveFields } from '../services/store.js';
 import { getOpenPlanItems, getRecentCaptures } from '../utils/navigation.js';
 import { navigate } from './router.js';
-import { openSessionModal } from './module-sessions.js';
+import { startPomodoroFor } from './module-sessions.js';
 import { openModuleModal } from './settings.js';
 import { openObjectiveHistory } from './module-objectives.js';
 import { openCaptureModal } from './captures.js';
@@ -17,7 +17,18 @@ export function renderToday(state) {
   const now = new Date();
   const dateLine = now.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const queue = buildReviewQueue(state, { now: now.getTime() });
+  // Skips expire at midnight; dropping stale ids keeps the queue honest.
+  if (normalizeTodaySkips(state, now.getTime())) window.EMVS.save();
+  // An outcome flag can outlive its objective (deleted on another view/tab).
+  const pendingOutcome = state.settings.todayReviewOutcome;
+  if (pendingOutcome && !state.learningObjectives.some(o => o.id === pendingOutcome)) {
+    delete state.settings.todayReviewOutcome;
+    window.EMVS.save();
+  }
+  const queue = buildReviewQueue(state, {
+    now: now.getTime(),
+    skipIds: state.settings.todaySkipIds || []
+  });
   const closestExams = closestTests(state, 3);
   const recent = getRecentSessions(state, 3);
   const prompt = getDailyPrompt(now);
@@ -160,25 +171,39 @@ export function renderToday(state) {
   el.querySelectorAll('[data-goto-exams]').forEach(b =>
     b.addEventListener('click', () => navigate('exams-global')));
 
+  const objectiveById = (id) =>
+    window.EMVS.getState().learningObjectives.find(o => o.id === id);
+
+  // One review-start path: start the Pomodoro first. The outcome card appears
+  // after the round is logged, so the review loop cannot be bypassed by
+  // clicking the card instead of the button.
+  const beginReview = (obj) => {
+    if (!obj) return;
+    const st = window.EMVS.getState();
+    st.settings.currentModuleId = obj.moduleId;
+    window.EMVS.save();
+    window.EMVS.renderSidebar();
+    startPomodoroFor({
+      moduleId: obj.moduleId,
+      linkedObjectiveIds: [obj.id],
+      minutes: 25,
+      reviewObjectiveId: obj.id,
+    });
+  };
+
   // Queue actions
   el.querySelectorAll('.q-start').forEach(btn =>
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      const obj = window.EMVS.getState().learningObjectives.find(o => o.id === btn.dataset.obj);
-      if (obj) startSessionFor(obj, (session, isNew) => {
-        // After session saved, show outcome choice for this objective
-        const st = window.EMVS.getState();
-        st.settings.todayReviewOutcome = obj.id;
-        window.EMVS.save();
-        window.EMVS.refresh('today-review-outcome', { objectiveId: obj.id });
-      });
+      beginReview(objectiveById(btn.dataset.obj));
     })
   );
   el.querySelectorAll('.q-skip').forEach(btn =>
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      // Skip adds to skipIds and re-renders
+      // Skip adds to today's skipIds and re-renders
       const st = window.EMVS.getState();
+      normalizeTodaySkips(st);
       const skipIds = new Set(st.settings.todaySkipIds || []);
       skipIds.add(btn.dataset.obj);
       st.settings.todaySkipIds = Array.from(skipIds);
@@ -203,10 +228,17 @@ export function renderToday(state) {
       if (!obj) return;
       
       if (outcome === 'defer') {
-        // Just clear the outcome flag and re-render
+        // "Später" means today, not "never": add the objective to today's
+        // skipIds so the queue re-queues it at the end instead of leaving it
+        // as the first card forever. Same day-scoping as Überspringen.
+        normalizeTodaySkips(st);
+        const skipIds = new Set(st.settings.todaySkipIds || []);
+        skipIds.add(objId);
+        st.settings.todaySkipIds = Array.from(skipIds);
         delete st.settings.todayReviewOutcome;
         window.EMVS.save();
-        window.EMVS.refresh('today-outcome-defer');
+        window.EMVS.toast?.show('Review verschoben — heute nicht mehr angesagt');
+        window.EMVS.refresh('today-outcome-defer', { skipIds: st.settings.todaySkipIds });
         return;
       }
       
@@ -234,23 +266,45 @@ export function renderToday(state) {
       window.EMVS.refresh('today-outcome-recorded', { objectiveId: objId, outcome });
     })
   );
-  // q-card click/keyboard -> start review
-  el.querySelector('.q-card')?.addEventListener('click', e => {
-    if (e.target.closest('button')) return;
-    if (e.target.closest('.confidence-dot')) return;
-    const objId = e.currentTarget.dataset.obj;
-    const obj = window.EMVS.getState().learningObjectives.find(o => o.id === objId);
-    if (obj) startSessionFor(obj);
+  // Confidence dots: edit in place, no session, no re-render.
+  el.querySelectorAll('.q-card .confidence-dot').forEach(dot => {
+    const set = () => {
+      const obj = objectiveById(dot.dataset.obj);
+      if (!obj) return;
+      const n = Number(dot.dataset.n);
+      obj.confidence = obj.confidence === n ? Math.max(0, n - 1) : n;
+      obj.confidenceHistory = obj.confidenceHistory || [];
+      pushCapped(obj.confidenceHistory, { value: obj.confidence, timestamp: Date.now() });
+      ensureObjectiveFields(obj);
+      obj.lastTouched = Date.now();
+      obj.updatedAt = Date.now();
+      window.EMVS.save();
+      const card = dot.closest('.q-card');
+      card?.querySelectorAll('.confidence-dot').forEach(d => {
+        const on = Number(d.dataset.n) <= obj.confidence;
+        d.classList.toggle('on', on);
+        d.setAttribute('aria-pressed', String(on));
+      });
+      card?.querySelector('.q-card-confidence')?.setAttribute('aria-label', `Confidence ${obj.confidence}/5`);
+      // Weak cards print the risk reasons (including confidence) in the body.
+      const reasonLine = card?.querySelector('.q-card-reason');
+      if (reasonLine && (card.dataset.kind === 'weak' || card.dataset.kind === 'weakest')) {
+        reasonLine.textContent = riskReasons(window.EMVS.getState(), obj, Date.now()).join(' · ');
+      }
+    };
+    dot.addEventListener('click', e => { e.stopPropagation(); set(); });
+    dot.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); set(); }
+    });
   });
-  el.querySelector('.q-card')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      if (e.target.closest('button')) return;
-      if (e.target.closest('.confidence-dot')) return;
-      const objId = e.currentTarget.dataset.obj;
-      const obj = window.EMVS.getState().learningObjectives.find(o => o.id === objId);
-      if (obj) startSessionFor(obj);
-    }
+
+  // Background click is a shortcut for the primary action. The outcome card
+  // must not start a second session, and nested buttons/dots keep their own
+  // action. No keydown trap here: the card itself is not focusable, and
+  // cancelling Enter/Space on bubbled events would break the buttons inside it.
+  el.querySelector('.q-card:not(.q-outcome)')?.addEventListener('click', e => {
+    if (e.target.closest('button, .confidence-dot')) return;
+    beginReview(objectiveById(e.currentTarget.dataset.obj));
   });
 
   // Am Rand expandable panels
@@ -317,11 +371,13 @@ function renderQueueItem(item, state, idx) {
   // Check if we should show the outcome choice for this objective
   const showOutcome = state.settings.todayReviewOutcome === obj.id;
 
-  // Confidence dots markup (copied from module-objectives.js pattern)
+  // Interactive confidence rating (same contract as module-objectives.js:
+  // tapping the current value lowers it by one).
   const confidence = obj.confidence ?? 0;
   const dots = [1, 2, 3, 4, 5].map(n => `
-    <div class="confidence-dot ${n <= confidence ? 'on' : ''}" data-n="${n}" data-obj="${obj.id}"
-         title="Confidence ${n}/5" role="button" tabindex="0" aria-label="Confidence ${n}"></div>
+    <span class="confidence-dot ${n <= confidence ? 'on' : ''}" data-n="${n}" data-obj="${obj.id}"
+          title="Confidence ${n}/5" role="button" tabindex="0" aria-label="Confidence ${n}/5"
+          aria-pressed="${n <= confidence ? 'true' : 'false'}"></span>
   `).join('');
 
   if (showOutcome) {
@@ -348,7 +404,7 @@ function renderQueueItem(item, state, idx) {
         <div class="q-card-title">${escapeHtml(obj.title)}</div>
         <div class="q-card-meta">
           <span>LZ ${escapeHtml(String(obj.number ?? '–'))}${m ? ` · Modul ${escapeHtml(m.code)}` : ''}</span>
-          <span class="q-card-confidence" aria-label="Confidence ${confidence}/5">${dots}</span>
+          <span class="q-card-confidence" role="group" aria-label="Confidence ${confidence}/5">${dots}</span>
         </div>
         <div class="q-card-reason">${escapeHtml(item.reason)}</div>
         <div class="q-card-actions">
@@ -427,14 +483,6 @@ function renderNoteRow(c, state) {
       <span class="today-session-note" style="flex-basis:100%;">${escapeHtml(String(c.content || '').slice(0, 120))}${String(c.content || '').length > 120 ? '…' : ''}</span>
       <span class="today-session-objs">${escapeHtml(c.type || '')}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
     </button>`;
-}
-
-function startSessionFor(obj, onSave) {
-  const st = window.EMVS.getState();
-  st.settings.currentModuleId = obj.moduleId;
-  window.EMVS.save();
-  window.EMVS.renderSidebar();
-  openSessionModal(null, obj.moduleId, { linkedObjectiveIds: [obj.id], duration: 25, onSave });
 }
 
 /** Re-export for back-compat (tests, other views). */

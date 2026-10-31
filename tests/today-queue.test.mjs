@@ -13,7 +13,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildReviewQueue, buildTodayPlan, pickFocus } from '../js/utils/helpers.js';
+import { buildReviewQueue, buildTodayPlan, pickFocus, normalizeTodaySkips } from '../js/utils/helpers.js';
 
 let passed = 0;
 let failed = 0;
@@ -180,6 +180,18 @@ await test('skipIds re-queues at end, never drops', async () => {
   assert.equal(queue[1].objective.id, 'skip-me');
 });
 
+await test('defer outcome: skipIds re-queue at end of queue', async () => {
+  const now = Date.now();
+  const a = makeObjective({ id: 'd-1', reviewSchedule: { nextReview: now - 1000, interval: 1, reviewCount: 1 }, status: 'done' });
+  const b = makeObjective({ id: 'd-2', reviewSchedule: { nextReview: now - 2000, interval: 1, reviewCount: 1 }, status: 'done' });
+  const state = makeState([], [a, b]);
+  const deferred = buildReviewQueue(state, { now, skipIds: ['d-1'] });
+  assert.equal(deferred.length, 2);
+  assert.equal(deferred[0].objective.id, 'd-2');
+  assert.equal(deferred[1].objective.id, 'd-1');
+  assert.equal(deferred[1].kind, 'due');
+});
+
 await test('dueCount unchanged by skips', async () => {
   const now = Date.now();
   const overdue = makeObjective({
@@ -280,6 +292,32 @@ await test('nextUp never repeats focus objective', async () => {
   const plan = buildTodayPlan(state);
   const allIds = [plan.focus?.objective?.id, ...plan.nextUp.map(n => n.objective.id)].filter(Boolean);
   assert.equal(new Set(allIds).size, allIds.length);
+});
+
+await test('skips expire when the calendar day changes', async () => {
+  const state = makeState();
+  state.settings.todaySkipIds = ['a', 'b'];
+  state.settings.todaySkipDate = '2026-10-24';
+
+  const changed = normalizeTodaySkips(state, new Date(2026, 9, 25, 10, 0).getTime());
+  assert.equal(changed, true);
+  assert.deepEqual(state.settings.todaySkipIds, []);
+  assert.equal(state.settings.todaySkipDate, '2026-10-25');
+
+  // Same day: skips survive.
+  state.settings.todaySkipIds = ['c'];
+  assert.equal(normalizeTodaySkips(state, new Date(2026, 9, 25, 23, 0).getTime()), false);
+  assert.deepEqual(state.settings.todaySkipIds, ['c']);
+});
+
+await test('skipped objectives are re-queued at the end', async () => {
+  const now = Date.now();
+  const a = makeObjective({ id: 'a', reviewSchedule: { nextReview: now - 2 * 86400000, interval: 1, reviewCount: 1 }, status: 'done' });
+  const b = makeObjective({ id: 'b', reviewSchedule: { nextReview: now - 86400000, interval: 1, reviewCount: 1 }, status: 'done' });
+  const state = makeState([], [a, b]);
+
+  assert.deepEqual(buildReviewQueue(state).map(i => i.objective.id), ['a', 'b']);
+  assert.deepEqual(buildReviewQueue(state, { skipIds: ['a'] }).map(i => i.objective.id), ['b', 'a']);
 });
 
 await test('queue header total matches the queue, not the due count', async () => {

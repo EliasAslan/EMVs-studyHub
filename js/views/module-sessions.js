@@ -1,24 +1,51 @@
 /**
- * Module Sessions View - Study session logging and history with persistent timer
+ * Module Sessions View - Study session logging and history with a persistent
+ * Pomodoro. The timer itself lives in services/pomodoroEngine.js; this view
+ * only renders and controls it, so the floating widget and this page always
+ * show the same state.
  */
 
-import { escapeHtml, escapeAttr, formatDateTime } from '../utils/helpers.js';
+import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal } from '../components/modal.js';
-import { generateId, saveTimerState, loadTimerState, clearTimerState, updateObjectiveHistory, recalculateObjectiveHistory } from '../services/store.js';
+import { generateId, updateObjectiveHistory, recalculateObjectiveHistory } from '../services/store.js';
+import {
+  startPomodoro,
+  getPomodoro,
+  subscribePomodoro,
+  pausePomodoro,
+  resumePomodoro,
+  chooseBreak,
+  skipBreak,
+  startNextRound,
+  stopPomodoro,
+  getPendingLog,
+  clearPendingLog,
+} from '../services/pomodoroEngine.js';
+import {
+  POMODORO_DEFAULTS,
+  PHASE,
+  STATUS,
+  formatClock,
+  remainingMs,
+  progressPct,
+  phaseLabel,
+  roundLabel,
+  recommendedBreakType,
+} from '../services/pomodoro.js';
 import { openQuickCapture } from './captures.js';
 
 export function renderModuleSessions(state) {
   const moduleId = state.settings.currentModuleId;
   const m = state.modules.find(x => x.id === moduleId);
   if (!m) return document.createElement('div');
-  
+
   const sessions = state.studySessions
     .filter(s => s.moduleId === moduleId)
     .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-  
+
   const objectives = state.learningObjectives.filter(o => o.moduleId === moduleId);
   const resources = state.resources.filter(r => r.moduleId === moduleId);
-  
+
   // Group by date
   const byDate = {};
   sessions.forEach(s => {
@@ -26,28 +53,20 @@ export function renderModuleSessions(state) {
     if (!byDate[date]) byDate[date] = [];
     byDate[date].push(s);
   });
-  
-  // Check for running / paused timer (same module only)
-  const timerState = loadTimerState();
-  const isTimerRunning = !!(timerState && timerState.moduleId === moduleId && timerState.running);
-  const isTimerPaused = !!(timerState && timerState.moduleId === moduleId && !timerState.running && (timerState.pausedTime || 0) > 0);
-  const timerElapsed = isTimerRunning
-    ? Math.floor(((timerState.pausedTime || 0) + Date.now() - timerState.startTime) / 1000)
-    : (isTimerPaused ? Math.floor((timerState.pausedTime || 0) / 1000) : 0);
-  
+
   const el = document.createElement('div');
   el.innerHTML = `
     <div class="eyebrow">Sitzungen · Modul ${escapeHtml(m.code)}</div>
     <h1 class="page-title">Lernsitzungen</h1>
-    <p class="page-lede">${sessions.length} Sitzungen protokolliert. Timer läuft im Hintergrund, auch bei Seitenneuladen.</p>
-    
-    ${renderTimerUI(isTimerRunning, timerElapsed, isTimerPaused, timerState?.plannedMinutes)}
-    
+    <p class="page-lede">${sessions.length} Sitzungen protokolliert. Das Pomodoro läuft im Hintergrund — auch bei Seitenwechsel und Neuladen.</p>
+
+    <div id="pomodoro-panel"></div>
+
     <div class="mt-3 timer-actions">
       <button class="btn primary" id="log-session">＋ Sitzung manuell protokollieren</button>
       <button class="btn" id="quick-capture" title="Frage, Fehler, Gedanke festhalten — Timer läuft weiter">⚡ Schnell erfassen</button>
     </div>
-    
+
     ${Object.keys(byDate).length ? Object.entries(byDate).map(([date, daySessions]) => `
       <div class="card" style="margin-bottom: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
@@ -60,25 +79,36 @@ export function renderModuleSessions(state) {
       <div class="card empty-state">
         <div class="icon">⏱️</div>
         <h3>Noch keine Sitzungen</h3>
-        <p>Logge deine erste Lernsitzung oder nutze den Timer.</p>
+        <p>Logge deine erste Lernsitzung oder nutze das Pomodoro.</p>
       </div>
     `}
   `;
-  
-  // Timer event handlers
-  setupTimerHandlers(el, moduleId, state);
-  
+
+  // Pomodoro panel: render now, then follow the shared engine.
+  const panel = el.querySelector('#pomodoro-panel');
+  updatePomodoroPanel(panel, getPomodoro(), moduleId, true);
+  setTimeout(() => {
+    if (!el.isConnected) return;
+    let active = true;
+    let unsub = () => {};
+    unsub = subscribePomodoro(({ state: timerState }) => {
+      if (!active) return;
+      if (!el.isConnected) { active = false; unsub(); return; }
+      updatePomodoroPanel(panel, timerState, moduleId);
+    });
+  }, 0);
+
   // Session item handlers
   el.querySelectorAll('.session-item').forEach(item => {
     const id = item.dataset.id;
     const session = sessions.find(s => s.id === id);
     if (!session) return;
-    
+
     item.querySelector('.edit-btn')?.addEventListener('click', e => {
       e.stopPropagation();
       openSessionModal(session, moduleId);
     });
-    
+
     item.querySelector('.delete-btn')?.addEventListener('click', e => {
       e.stopPropagation();
       if (confirm('Sitzung wirklich löschen?')) {
@@ -95,208 +125,238 @@ export function renderModuleSessions(state) {
       }
     });
   });
-  
+
   // Log session button
   el.querySelector('#log-session')?.addEventListener('click', () => openSessionModal(null, moduleId));
 
   // Fast capture: overlay-only, never touches the timer or the view.
   el.querySelector('#quick-capture')?.addEventListener('click', () => openQuickCapture({ moduleId }));
-  
+
   return el;
 }
 
-function renderTimerUI(isRunning, elapsedSeconds, isPaused = false, plannedMinutes = null) {
-  const elapsed = (isRunning || isPaused) ? elapsedSeconds : 0;
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
-  const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  
-  if (isRunning) {
+function renderPomodoroPanel(state) {
+  if (!state) {
     return `
-      <div class="card" style="margin-bottom: 16px; border-color: var(--accent); background: var(--accent-soft);">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 16px;">
-            <span style="font-family: var(--mono); font-size: 32px; color: var(--accent); font-variant-numeric: tabular-nums;" id="timer-display">${timeStr}</span>
-            <span style="color: var(--ink-2); font-size: 14px;">Timer läuft…${plannedMinutes ? ` (geplant: ${plannedMinutes} Min)` : ''}</span>
+      <div class="card pomo-idle-card">
+        <div class="pomo-session-head">
+          <div>
+            <div class="pomo-phase">Bereit</div>
+            <div class="pomo-time">${POMODORO_DEFAULTS.workMinutes}:00</div>
           </div>
-          <div class="timer-actions">
-            <button class="btn solid-accent" id="timer-pause">⏸ Pausieren</button>
-            <button class="btn solid-red" id="timer-stop">⏹ Stoppen & loggen</button>
-          </div>
+          <div class="pomo-round">Pomodoro</div>
         </div>
-      </div>
-    `;
+        <p class="pomo-hint">Starte eine Fokusrunde. Pause und nächste Runde wählst du danach selbst.</p>
+        <div class="timer-actions">
+          <button class="btn primary" data-start-minutes="15">▶ 15 Min</button>
+          <button class="btn primary" data-start-minutes="25">▶ 25 Min</button>
+          <button class="btn" data-start-minutes="45">▶ 45 Min</button>
+          <button class="btn" data-start-custom>▶ Benutzerdefiniert</button>
+        </div>
+      </div>`;
   }
 
-  if (isPaused) {
-    return `
-      <div class="card" style="margin-bottom: 16px; border-color: var(--blue); background: var(--blue-soft);">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 16px;">
-            <span style="font-family: var(--mono); font-size: 32px; color: var(--blue); font-variant-numeric: tabular-nums;" id="timer-display">${timeStr}</span>
-            <span style="color: var(--ink-2); font-size: 14px;">Timer pausiert${plannedMinutes ? ` (geplant: ${plannedMinutes} Min)` : ''}</span>
-          </div>
-          <div class="timer-actions">
-            <button class="btn primary" id="timer-resume">▶ Fortsetzen</button>
-            <button class="btn solid-red" id="timer-stop">⏹ Stoppen & loggen</button>
-            <button class="btn" id="timer-discard">Verwerfen</button>
-          </div>
-        </div>
+  const paused = state.status === STATUS.paused;
+  const pending = state.pendingLog;
+  const recommended = recommendedBreakType(state);
+  const phase = phaseLabel(state);
+  const round = roundLabel(state);
+  const pendingMinutes = pending?.duration;
+
+  let actions = '';
+  if (state.phase === PHASE.work && state.status !== STATUS.workDone) {
+    actions = `
+      <div class="timer-actions">
+        <button class="btn primary" data-pomo-toggle>${paused ? '▶ Fortsetzen' : '⏸ Pausieren'}</button>
+        <button class="btn solid-red" data-pomo-stop>⏹ Stoppen &amp; loggen</button>
       </div>
-    `;
-  }
-  
-  return `
-    <div class="card" style="margin-bottom: 16px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 16px;">
-          <span style="font-family: var(--mono); font-size: 32px; color: var(--ink-3); font-variant-numeric: tabular-nums;">00:00</span>
-          <span style="color: var(--ink-2); font-size: 14px;">Bereit</span>
-        </div>
+      <p class="pomo-hint">Beim Stoppen wird die Sitzung geloggt.</p>`;
+  } else if (state.phase === PHASE.work && state.status === STATUS.workDone) {
+    actions = `
+      ${pending ? `<p class="pomo-note">Sitzung über ${pendingMinutes} Min wartet auf dich.</p>
+        <div class="timer-actions"><button class="btn primary" data-pomo-log>Jetzt loggen</button></div>` : ''}
+      <div class="pomo-choice">
+        <span class="pomo-choice-label">Welche Pause?</span>
         <div class="timer-actions">
-          <button class="btn primary" id="timer-start-15">▶ 15 Min</button>
-          <button class="btn primary" id="timer-start-25">▶ 25 Min</button>
-          <button class="btn" id="timer-start-45">▶ 45 Min</button>
-          <button class="btn" id="timer-start-custom">▶ Benutzerdefiniert</button>
+          <button class="btn" data-pomo-break="short">Kurze Pause · ${POMODORO_DEFAULTS.shortBreakMinutes} Min</button>
+          <button class="btn" data-pomo-break="long">Lange Pause · ${POMODORO_DEFAULTS.longBreakMinutes} Min${recommended === 'long' ? ' <span class="pomo-rec">Empfohlen</span>' : ''}</button>
         </div>
       </div>
-    </div>
-  `;
+      <div class="timer-actions" style="margin-top:8px;">
+        <button class="btn ghost" data-pomo-next ${pending ? 'disabled title="Zuerst die Sitzung loggen"' : ''}>Nächste Runde</button>
+      </div>`;
+  } else if (state.status === STATUS.breakDone) {
+    actions = `
+      <div class="timer-actions">
+        <button class="btn primary" data-pomo-next ${pending ? 'disabled title="Zuerst die Sitzung loggen"' : ''}>▶ Nächste Runde</button>
+      </div>
+      <div class="pomo-choice">
+        <span class="pomo-choice-label">Oder noch eine Pause?</span>
+        <div class="timer-actions">
+          <button class="btn" data-pomo-break="short">Kurze Pause · ${POMODORO_DEFAULTS.shortBreakMinutes} Min</button>
+          <button class="btn" data-pomo-break="long">Lange Pause · ${POMODORO_DEFAULTS.longBreakMinutes} Min${recommended === 'long' ? ' <span class="pomo-rec">Empfohlen</span>' : ''}</button>
+        </div>
+      </div>
+      ${pending ? `<div class="timer-actions" style="margin-top:8px;"><button class="btn" data-pomo-log>Sitzung loggen (${pendingMinutes} Min)</button></div>` : ''}`;
+  } else {
+    actions = `
+      <div class="timer-actions">
+        <button class="btn primary" data-pomo-toggle>${paused ? '▶ Fortsetzen' : '⏸ Pausieren'}</button>
+        <button class="btn" data-pomo-skip>Pause überspringen</button>
+      </div>
+      ${pending ? `<div class="timer-actions" style="margin-top:8px;"><button class="btn" data-pomo-log>Sitzung loggen (${pendingMinutes} Min)</button></div>` : ''}`;
+  }
+
+  return `
+    <div class="card pomo-session-card" data-phase="${state.phase}" data-status="${state.status}">
+      <div class="pomo-session-head">
+        <div>
+          <div class="pomo-phase">${phase}${round ? ` · ${round}` : ''}</div>
+          <div class="pomo-time" role="timer" aria-live="off" data-pomo-time>${formatClock(remainingMs(state))}</div>
+        </div>
+        <div class="pomo-round">${state.completedRounds} ${state.completedRounds === 1 ? 'Runde' : 'Runden'} geschafft</div>
+      </div>
+      <div class="pomo-bar" aria-hidden="true"><i data-pomo-bar style="width:${progressPct(state).toFixed(2)}%"></i></div>
+      ${actions}
+    </div>`;
 }
 
-function setupTimerHandlers(el, moduleId, state) {
-  // Start timer buttons
-  el.querySelector('#timer-start-15')?.addEventListener('click', () => startTimer(moduleId, 15));
-  el.querySelector('#timer-start-25')?.addEventListener('click', () => startTimer(moduleId, 25));
-  el.querySelector('#timer-start-45')?.addEventListener('click', () => startTimer(moduleId, 45));
-  el.querySelector('#timer-start-custom')?.addEventListener('click', () => startCustomTimer(moduleId));
-  
-  // Running / paused timer controls
-  el.querySelector('#timer-pause')?.addEventListener('click', () => pauseTimer(moduleId));
-  el.querySelector('#timer-resume')?.addEventListener('click', () => resumeTimer(moduleId));
-  el.querySelector('#timer-stop')?.addEventListener('click', () => stopTimer(moduleId, state));
-  el.querySelector('#timer-discard')?.addEventListener('click', () => {
-    if (confirm('Pausierten Timer verwerfen?')) {
-      clearTimerState();
-      stopTimerDisplayUpdate();
-      navigate('module-sessions');
+function updatePomodoroPanel(panel, state, moduleId, force = false) {
+  if (!panel) return;
+  const key = state
+    ? `${state.phase}|${state.status}|${state.completedRounds}|${state.pendingLog ? 'pending' : 'clear'}`
+    : 'idle';
+  if (!force && panel.dataset.pomoKey === key) {
+    const time = panel.querySelector('[data-pomo-time]');
+    if (time && state) time.textContent = formatClock(remainingMs(state));
+    const bar = panel.querySelector('[data-pomo-bar]');
+    if (bar && state) bar.style.width = `${progressPct(state).toFixed(2)}%`;
+    return;
+  }
+  panel.dataset.pomoKey = key;
+  panel.innerHTML = renderPomodoroPanel(state);
+  wirePomodoroPanel(panel, moduleId);
+}
+
+function wirePomodoroPanel(root, moduleId) {
+  root.querySelectorAll('[data-start-minutes]').forEach(btn => {
+    btn.addEventListener('click', () => startTimer(moduleId, parseInt(btn.dataset.startMinutes, 10)));
+  });
+  root.querySelector('[data-start-custom]')?.addEventListener('click', () => startCustomTimer(moduleId));
+
+  root.querySelector('[data-pomo-toggle]')?.addEventListener('click', () => {
+    const state = getPomodoro();
+    if (state?.status === STATUS.paused) resumePomodoro();
+    else pausePomodoro();
+  });
+  root.querySelector('[data-pomo-stop]')?.addEventListener('click', () => {
+    const snapshot = stopPomodoro();
+    if (snapshot) openSessionAfterTimer(snapshot);
+  });
+  root.querySelector('[data-pomo-log]')?.addEventListener('click', () => {
+    const pending = getPendingLog();
+    if (pending) openSessionAfterTimer(pending);
+  });
+  root.querySelectorAll('[data-pomo-break]').forEach(btn => {
+    btn.addEventListener('click', () => chooseBreak(btn.dataset.pomoBreak));
+  });
+  root.querySelector('[data-pomo-skip]')?.addEventListener('click', () => skipBreak());
+  root.querySelector('[data-pomo-next]')?.addEventListener('click', () => {
+    const result = startNextRound();
+    if (!result.ok && result.reason === 'pendingLog') {
+      window.EMVS.toast?.show('Bitte zuerst die Sitzung loggen');
+      if (result.pendingLog) openSessionAfterTimer(result.pendingLog);
     }
   });
-  
-  // Update display if timer is running
-  const timerState = loadTimerState();
-  if (timerState && timerState.moduleId === moduleId && timerState.running) {
-    startTimerDisplayUpdate(moduleId);
-  }
 }
 
-let timerDisplayInterval = null;
+/**
+ * Start a Pomodoro from any session entry point. Kept as a wrapper so the
+ * sidebar, palette and keyboard shortcut keep calling startTimer(moduleId, 25).
+ */
+export function startTimer(moduleId, plannedMinutes = POMODORO_DEFAULTS.workMinutes, options = {}) {
+  return startPomodoroFor({ moduleId, minutes: plannedMinutes, ...options });
+}
 
-export function startTimer(moduleId, plannedMinutes) {
-  const now = Date.now();
-  const timerState = {
+export function startPomodoroFor({
+  moduleId,
+  minutes = POMODORO_DEFAULTS.workMinutes,
+  linkedObjectiveIds = [],
+  linkedResourceIds = [],
+  reviewObjectiveId = null,
+} = {}) {
+  const result = startPomodoro({
     moduleId,
-    plannedMinutes,
-    startTime: now,
-    pausedTime: 0,
-    running: true
-  };
-  
-  saveTimerState(timerState);
-  startTimerDisplayUpdate(moduleId);
-  
-  // Re-render to show running timer UI
-  navigate('module-sessions');
-  
-  window.EMVS.toast.show(`Timer gestartet: ${plannedMinutes} Min`);
+    minutes,
+    linkedObjectiveIds,
+    linkedResourceIds,
+    reviewObjectiveId,
+  });
+  if (result.ok) {
+    window.EMVS.toast?.show(`Pomodoro gestartet: ${minutes} Min`);
+    return true;
+  }
+  if (result.reason === 'pendingLog') {
+    window.EMVS.toast?.show('Bitte zuerst die offene Sitzung loggen');
+    if (result.pendingLog) openSessionAfterTimer(result.pendingLog);
+    return false;
+  }
+  if (result.reason === 'running') {
+    window.EMVS.toast?.show('Es läuft bereits eine Sitzung');
+    window.EMVS.pomodoro?.show?.();
+    return false;
+  }
+  return false;
 }
 
 function startCustomTimer(moduleId) {
   const minutes = prompt('Dauer in Minuten:', '30');
-  const m = parseInt(minutes);
+  const m = parseInt(minutes, 10);
   if (m && m > 0 && m <= 480) {
     startTimer(moduleId, m);
   }
 }
 
-function pauseTimer(moduleId) {
-  const timerState = loadTimerState();
-  if (!timerState || !timerState.running) return;
-  
-  timerState.running = false;
-  timerState.pausedTime += Date.now() - timerState.startTime;
-  saveTimerState(timerState);
-  
-  stopTimerDisplayUpdate();
-  navigate('module-sessions');
-  window.EMVS.toast.show('Timer pausiert');
-}
+/**
+ * Open the log form for a completed or early-stopped Pomodoro round.
+ * `snapshot` is either a pendingLog from the engine or the result of
+ * stopPomodoro(). It never starts anything: saving/canceling only clears the
+ * pending session.
+ */
+export function openSessionAfterTimer(snapshot) {
+  if (!snapshot) return;
+  if (window.EMVS.modal?.isOpen?.()) {
+    window.EMVS.toast?.show('Schließe zuerst den offenen Dialog');
+    return;
+  }
 
-function resumeTimer(moduleId) {
-  const timerState = loadTimerState();
-  if (!timerState || timerState.running) return;
-  
-  timerState.running = true;
-  timerState.startTime = Date.now();
-  saveTimerState(timerState);
-  
-  startTimerDisplayUpdate(moduleId);
-  navigate('module-sessions');
-  window.EMVS.toast.show('Timer fortgesetzt');
-}
-
-function stopTimer(moduleId, state) {
-  const timerState = loadTimerState();
-  if (!timerState) return;
-  
-  const elapsedMs = timerState.running 
-    ? (timerState.pausedTime + Date.now() - timerState.startTime)
-    : timerState.pausedTime;
-  
-  const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
-  
-  // Clear timer state
-  clearTimerState();
-  stopTimerDisplayUpdate();
-  
-  // Open session modal with pre-filled duration
-  openSessionAfterTimer(moduleId, elapsedMinutes, timerState.plannedMinutes, state);
-}
-
-function openSessionAfterTimer(moduleId, actualMinutes, plannedMinutes, state) {
+  const state = window.EMVS.getState();
+  const moduleId = snapshot.moduleId || state.settings.currentModuleId;
   const objectives = state.learningObjectives.filter(o => o.moduleId === moduleId);
   const resources = state.resources.filter(r => r.moduleId === moduleId);
-  
-  const now = new Date();
-  const startTime = new Date(now.getTime() - actualMinutes * 60000);
-  
-  const session = {
-    id: generateId(),
-    moduleId,
-    startTime: startTime.toISOString(),
-    duration: actualMinutes,
-    linkedObjectiveIds: [],
-    linkedResourceIds: [],
-    note: '',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  };
-  
+  const linkedObjectiveIds = new Set(snapshot.linkedObjectiveIds || []);
+  const linkedResourceIds = new Set(snapshot.linkedResourceIds || []);
+  const startValue = toLocalInput(snapshot.startTime);
+
+  const durationLabel = `${snapshot.duration} ${snapshot.duration === 1 ? 'Minute' : 'Minuten'}`;
+  const info = snapshot.completed
+    ? `Pomodoro-Runde abgeschlossen nach ${durationLabel}. Wähle Lernziele und Ressourcen, füge optional eine Notiz hinzu.`
+    : `Timer gestoppt nach ${durationLabel}. Wähle Lernziele und Ressourcen, füge optional eine Notiz hinzu.`;
+
   openModal({
-    title: `Sitzung loggen (${actualMinutes} Min)`,
+    title: `Sitzung loggen (${snapshot.duration} Min)`,
     body: `
       <div style="margin-bottom: 16px; padding: 12px; background: var(--bg); border-radius: 4px; font-size: 13px; color: var(--ink-2);">
-        <strong>Timer gestoppt nach ${actualMinutes} Minuten</strong> (geplant: ${plannedMinutes} Min).
-        Wähle Lernziele und Ressourcen, füge optional eine Notiz hinzu.
+        <strong>${info}</strong>
       </div>
       <form id="session-form">
         <div class="field-row">
           <label>Startzeit</label>
-          <input type="datetime-local" name="startTime" value="${session.startTime.slice(0, 16)}" required>
+          <input type="datetime-local" name="startTime" value="${startValue}" required>
         </div>
         <div class="field-row">
           <label>Dauer (Minuten)</label>
-          <input type="number" name="duration" value="${actualMinutes}" min="1" max="480" required>
+          <input type="number" name="duration" value="${snapshot.duration}" min="1" max="480" required>
         </div>
         <div class="field-row">
           <label>Notiz</label>
@@ -305,14 +365,14 @@ function openSessionAfterTimer(moduleId, actualMinutes, plannedMinutes, state) {
         <div class="field-row">
           <label>Verknüpfte Lernziele</label>
           <select name="linkedObjectives" multiple style="min-height: 100px;">
-            ${objectives.map(o => `<option value="${o.id}">${o.number}: ${escapeHtml(o.title)}</option>`).join('')}
+            ${objectives.map(o => `<option value="${o.id}" ${linkedObjectiveIds.has(o.id) ? 'selected' : ''}>${o.number}: ${escapeHtml(o.title)}</option>`).join('')}
           </select>
           <small style="color: var(--ink-3);">Strg/Cmd + Klick für Mehrfachauswahl</small>
         </div>
         <div class="field-row">
           <label>Verknüpfte Ressourcen</label>
           <select name="linkedResources" multiple style="min-height: 100px;">
-            ${resources.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('')}
+            ${resources.map(r => `<option value="${r.id}" ${linkedResourceIds.has(r.id) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
           </select>
         </div>
       </form>
@@ -324,28 +384,49 @@ function openSessionAfterTimer(moduleId, actualMinutes, plannedMinutes, state) {
     onClose: () => {}
   }).then(result => {
     if (!result) {
-      window.EMVS.toast.show('Timer-Sitzung verworfen');
-      navigate('module-sessions');
+      clearPendingLog();
+      window.EMVS.toast?.show('Sitzung verworfen');
       return;
     }
-    
-    session.startTime = result.startTime;
-    session.duration = parseInt(result.duration) || actualMinutes;
-    session.note = result.note?.trim() || '';
-    session.linkedObjectiveIds = result.linkedObjectives ? (Array.isArray(result.linkedObjectives) ? result.linkedObjectives : [result.linkedObjectives]) : [];
-    session.linkedResourceIds = result.linkedResources ? (Array.isArray(result.linkedResources) ? result.linkedResources : [result.linkedResources]) : [];
-    session.updatedAt = Date.now();
-    
+
+    const session = {
+      id: generateId(),
+      moduleId,
+      startTime: result.startTime,
+      duration: parseInt(result.duration, 10) || snapshot.duration,
+      linkedObjectiveIds: result.linkedObjectives
+        ? (Array.isArray(result.linkedObjectives) ? result.linkedObjectives : [result.linkedObjectives])
+        : [],
+      linkedResourceIds: result.linkedResources
+        ? (Array.isArray(result.linkedResources) ? result.linkedResources : [result.linkedResources])
+        : [],
+      note: result.note?.trim() || '',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
     state.studySessions.push(session);
-    
-    // Update objective history
     updateObjectiveHistory(state, session);
-    
     window.EMVS.save();
-    window.EMVS.toast.show(`Sitzung geloggt: ${session.duration} min`);
-    navigate('module-sessions');
+    clearPendingLog();
+
+    if (snapshot.reviewObjectiveId) {
+      state.settings.todayReviewOutcome = snapshot.reviewObjectiveId;
+      window.EMVS.save();
+    }
+
+    window.EMVS.toast?.show(`Sitzung geloggt: ${session.duration} min`);
+
+    const view = window.EMVS.getCurrentView?.();
+    // Module tabs all report currentView === 'module'; refreshing the current
+    // module tab updates the session list (or the session counts on Home).
+    if (view === 'today') {
+      window.EMVS.refresh('pomodoro-session-logged', { sessionId: session.id, outcome: snapshot.reviewObjectiveId || null });
+    } else if (view === 'module' || view === 'module-sessions') {
+      window.EMVS.refresh('pomodoro-session-logged', { sessionId: session.id });
+    }
   });
-  
+
   setTimeout(() => {
     const form = document.getElementById('session-form');
     form?.addEventListener('submit', e => {
@@ -361,43 +442,14 @@ function openSessionAfterTimer(moduleId, actualMinutes, plannedMinutes, state) {
       }
       closeModal(data);
     });
-    
+
     document.querySelector('#modal-footer [data-action="save"]')?.addEventListener('click', () => {
       const form = document.getElementById('session-form');
       if (form) { if (typeof form.requestSubmit === 'function') form.requestSubmit(); else form.dispatchEvent(new Event('submit')); }
     });
-    
+
     document.querySelector('#modal-footer [data-action="cancel"]')?.addEventListener('click', () => closeModal());
   }, 50);
-}
-
-function startTimerDisplayUpdate(moduleId) {
-  stopTimerDisplayUpdate(); // Clear any existing
-  
-  timerDisplayInterval = setInterval(() => {
-    const timerState = loadTimerState();
-    if (!timerState || timerState.moduleId !== moduleId || !timerState.running) {
-      stopTimerDisplayUpdate();
-      navigate('module-sessions');
-      return;
-    }
-    
-    const elapsedMs = timerState.pausedTime + Date.now() - timerState.startTime;
-    const elapsed = Math.floor(elapsedMs / 1000);
-    const mins = Math.floor(elapsed / 60);
-    const secs = elapsed % 60;
-    const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    
-    const display = document.getElementById('timer-display');
-    if (display) display.textContent = timeStr;
-  }, 1000);
-}
-
-function stopTimerDisplayUpdate() {
-  if (timerDisplayInterval) {
-    clearInterval(timerDisplayInterval);
-    timerDisplayInterval = null;
-  }
 }
 
 function renderSessionItem(session, objectives, resources) {
@@ -405,17 +457,16 @@ function renderSessionItem(session, objectives, resources) {
     const o = objectives.find(x => x.id === id);
     return o ? `${o.number}` : '';
   }).filter(Boolean).join(', ') || '—';
-  
+
   const resNames = session.linkedResourceIds?.map(id => {
     const r = resources.find(x => x.id === id);
     return r ? r.name.slice(0, 20) : '';
   }).filter(Boolean).join(', ') || '—';
-  
+
   const startTime = new Date(session.startTime);
   const timeStr = startTime.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-  const dateStr = startTime.toLocaleDateString('de-CH');
   const isTimerSession = session.note === 'Timer-Sitzung' || (session.note && session.note.startsWith('Timer'));
-  
+
   return `
     <div class="session-item" data-id="${session.id}" style="display: grid; grid-template-columns: 60px 1fr auto; gap: 16px; align-items: start; padding: 12px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid var(--rule);">
       <div style="font-family: var(--mono); font-size: 12px; color: var(--ink-3); text-align: right; padding-top: 4px;">${timeStr}</div>
@@ -443,11 +494,11 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
   const modId = moduleId || state.settings.currentModuleId;
   const objectives = state.learningObjectives.filter(o => o.moduleId === modId);
   const resources = state.resources.filter(r => r.moduleId === modId);
-  
+
   const isNew = !session;
   const now = new Date();
   const defaultStart = new Date(now.getTime() - 30 * 60000); // 30 min ago
-  
+
   const s = session || {
     id: generateId(),
     moduleId: modId,
@@ -469,16 +520,16 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
     if (typeof preset.duration === 'number' && preset.duration > 0) s.duration = preset.duration;
     if (typeof preset.note === 'string') s.note = preset.note;
   }
-  
+
   const onSave = typeof preset.onSave === 'function' ? preset.onSave : null;
-  
+
   openModal({
     title: isNew ? 'Sitzung protokollieren' : 'Sitzung bearbeiten',
     body: `
       <form id="session-form">
         <div class="field-row">
           <label>Startzeit</label>
-          <input type="datetime-local" name="startTime" value="${s.startTime.slice(0, 16)}" required>
+          <input type="datetime-local" name="startTime" value="${toLocalInput(s.startTime)}" required>
         </div>
         <div class="field-row">
           <label>Dauer (Minuten)</label>
@@ -509,18 +560,14 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
     onClose: () => {}
   }).then(result => {
     if (!result) return;
-    
-    const oldSession = isNew ? null : state.studySessions.find(x => x.id === s.id);
-    const oldObjectiveIds = oldSession?.linkedObjectiveIds || [];
-    const oldDuration = oldSession?.duration || 0;
-    
+
     s.startTime = result.startTime;
-    s.duration = parseInt(result.duration) || 30;
+    s.duration = parseInt(result.duration, 10) || 30;
     s.note = result.note?.trim() || '';
     s.linkedObjectiveIds = result.linkedObjectives ? (Array.isArray(result.linkedObjectives) ? result.linkedObjectives : [result.linkedObjectives]) : [];
     s.linkedResourceIds = result.linkedResources ? (Array.isArray(result.linkedResources) ? result.linkedResources : [result.linkedResources]) : [];
     s.updatedAt = Date.now();
-    
+
     if (isNew) {
       s.moduleId = modId;
       state.studySessions.push(s);
@@ -529,16 +576,16 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
       // For edits, recalculate to handle removed objectives or duration changes
       recalculateObjectiveHistory(state);
     }
-    
+
     window.EMVS.save();
-    
+
     if (onSave) {
       onSave(s, isNew);
     } else {
       navigate('module-sessions');
     }
   });
-  
+
   setTimeout(() => {
     const form = document.getElementById('session-form');
     form?.addEventListener('submit', e => {
@@ -554,19 +601,22 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
       }
       closeModal(data);
     });
-    
+
     document.querySelector('#modal-footer [data-action="save"]')?.addEventListener('click', () => {
       const form = document.getElementById('session-form');
       if (form) { if (typeof form.requestSubmit === 'function') form.requestSubmit(); else form.dispatchEvent(new Event('submit')); }
     });
-    
+
     document.querySelector('#modal-footer [data-action="cancel"]')?.addEventListener('click', () => closeModal());
   }, 50);
 }
 
-// Make navigate available
-export function stopSessionsTimerDisplay() {
-  stopTimerDisplayUpdate();
+/** datetime-local wants local wall-clock text, not a UTC ISO string. */
+function toLocalInput(value) {
+  const d = value ? new Date(value) : new Date();
+  if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 16);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
 }
 
 function navigate(view) {

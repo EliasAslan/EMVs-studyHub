@@ -91,7 +91,8 @@ export function initPalette() {
       openObjectiveHistory(focusObjective.id);
     }, shortcut: 'F', available: !!focusObjective });
     add({ label: `Fällige Wiederholungen öffnen${dueCount ? ` · ${dueCount}` : ''}`, aliases: ['due', 'reviews', 'wiederholung'], group: 'aktion', action: () => navigate('weak-spots'), available: dueCount > 0 });
-    add({ label: 'Sitzung starten · 25 Min', aliases: ['timer', 'lernen', 'pomodoro', 'starten'], group: 'aktion', action: selectModule((id) => startTimer(id, 25)), shortcut: 'S' });
+    add({ label: 'Pomodoro starten · 25 Min', aliases: ['timer', 'lernen', 'pomodoro', 'starten', 'sitzung'], group: 'aktion', action: selectModule((id) => startTimer(id, 25)), shortcut: 'S' });
+    add({ label: 'Pomodoro anzeigen', aliases: ['timer', 'floating', 'popup', 'pomodoro'], group: 'aktion', action: () => window.EMVS.pomodoro?.show?.() });
     add({ label: 'Sitzung protokollieren', aliases: ['lernzeit', 'loggen'], group: 'aktion', action: () => openSessionModal() });
     add({ label: 'Mock-Prüfung starten', aliases: ['mock', 'simulieren'], group: 'aktion', action: () => openMockExam() });
     add({ label: 'Neues Modul erstellen', aliases: ['modul anlegen'], group: 'verwalten', action: () => openModuleModal() });

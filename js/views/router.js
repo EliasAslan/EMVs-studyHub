@@ -5,7 +5,6 @@
  * via navigate(view) for backward compatibility.
  */
 
-import { stopSessionsTimerDisplay } from './module-sessions.js';
 import { stopMockExamDisplay } from './mock-exam.js';
 import { resolveModuleTab, isModuleTabKey, getNavState, LEGACY_VIEW_TO_TAB } from '../utils/navigation.js';
 
@@ -218,10 +217,8 @@ export { currentView };
 function render() {
   const state = window.EMVS.getState();
 
-  // Cleanup previous view-specific intervals
-  if (previousView === 'module-sessions') {
-    stopSessionsTimerDisplay();
-  }
+  // Cleanup previous view-specific intervals. The Pomodoro is global and
+  // intentionally survives navigation, so it has no cleanup here.
   if (previousView === 'mock-exam') {
     stopMockExamDisplay();
   }

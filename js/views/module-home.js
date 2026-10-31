@@ -13,7 +13,7 @@ import {
 } from '../utils/helpers.js';
 import { formatCountdown, getOpenPlanItems, getRecentCaptures } from '../utils/navigation.js';
 import { navigate } from './router.js';
-import { openSessionModal } from './module-sessions.js';
+import { startPomodoroFor } from './module-sessions.js';
 import { openObjectiveHistory } from './module-objectives.js';
 import { openCaptureModal } from './captures.js';
 import { renderToday } from './today.js';
@@ -209,7 +209,11 @@ function startSessionFor(moduleId, objectiveId) {
   st.settings.currentModuleId = obj.moduleId;
   window.EMVS.save();
   window.EMVS.renderSidebar();
-  openSessionModal(null, obj.moduleId, { linkedObjectiveIds: [obj.id], duration: 25 });
+  startPomodoroFor({
+    moduleId: obj.moduleId,
+    linkedObjectiveIds: [obj.id],
+    minutes: 25,
+  });
 }
 
 function wireModuleHome(el, state, m) {

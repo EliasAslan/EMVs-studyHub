@@ -16,7 +16,7 @@ import {
 } from '../utils/helpers.js';
 import { navigate, getCurrentParams } from './router.js';
 import { openObjectiveHistory } from './module-objectives.js';
-import { openSessionModal } from './module-sessions.js';
+import { startPomodoroFor } from './module-sessions.js';
 import { openResourceHistory } from './module-resources.js';
 import { openQuickCapture } from './captures.js';
 
@@ -134,7 +134,11 @@ function bindSpot(card, state) {
     st.settings.currentModuleId = obj.moduleId;
     window.EMVS.save();
     window.EMVS.renderSidebar();
-    openSessionModal(null, obj.moduleId, { linkedObjectiveIds: [id], duration: 25 });
+    startPomodoroFor({
+      moduleId: obj.moduleId,
+      linkedObjectiveIds: [id],
+      minutes: 25,
+    });
   });
 
   card.querySelector('[data-act="resources"]')?.addEventListener('click', e => {
@@ -144,7 +148,7 @@ function bindSpot(card, state) {
     detail.dataset.kind = 'resources';
     detail.hidden = false;
     detail.innerHTML = `
-      <h3 class="section-label" style="margin: 4px 0 8px;">Verknüpfte Ressourcen · ${list.length}</h3>
+      <h2 class="section-label" style="margin: 4px 0 8px;">Verknüpfte Ressourcen · ${list.length}</h2>
       ${list.map(r => {
         const u = getResourceUsage(window.EMVS.getState(), r);
         return `<div class="obj-hist-res-row">
@@ -167,7 +171,7 @@ function bindSpot(card, state) {
     detail.dataset.kind = 'captures';
     detail.hidden = false;
     detail.innerHTML = `
-      <h3 class="section-label" style="margin: 4px 0 8px;">Fehler & Fragen · ${list.length}</h3>
+      <h2 class="section-label" style="margin: 4px 0 8px;">Fehler & Fragen · ${list.length}</h2>
       ${list.map(c => `<div class="obj-hist-res-row">
         <span>${icons[c.type] || '✎'}</span>
         <span class="obj-hist-res-name">${escapeHtml((c.content || '').length > 100 ? c.content.slice(0, 100) + '…' : c.content || '')}</span>

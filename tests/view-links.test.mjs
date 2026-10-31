@@ -33,3 +33,11 @@ if (failures > 0) {
 // navigate() understands a `module` param (used by "Alle Schwachstellen →").
 const router = readFileSync(new URL('../js/views/router.js', import.meta.url), 'utf8');
 assert.match(router, /params\.module/, 'navigate() reads params.module');
+
+// A newly created module opens in its Ziele tab, not the settings list.
+const settingsView = readFileSync(new URL('../js/views/settings.js', import.meta.url), 'utf8');
+assert.match(
+  settingsView,
+  /navigate\('module', \{ id: m\.id, tab: 'ziele' \}\)/,
+  'creating a module navigates to its Ziele tab'
+);

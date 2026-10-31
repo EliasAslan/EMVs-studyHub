@@ -120,15 +120,6 @@ export const MEGA_MENUS = [
   ] },
 ];
 
-/** Modules hold their pages in tabs; the tree's "chapters" are these tabs. */
-export const TREE_CHAPTERS = [
-  { tab: 'home', label: 'Home' },
-  { tab: 'ziele', label: 'Lernziele' },
-  { tab: 'plan', label: 'Plan' },
-  { tab: 'sessions', label: 'Sitzungen' },
-  { tab: 'material', label: 'Material' },
-];
-
 /**
  * Title + subtitle for the contextual mobile header.
  * Module pages show the module code with the tab as subtitle.

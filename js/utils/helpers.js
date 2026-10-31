@@ -317,8 +317,7 @@ export function getPlanReality(state, moduleId, now = new Date()) {
  * resurface here instead of disappearing ("things marked done first
  * are often forgotten first").
  */
-export function getMostOverdueObjective(state) {
-  const now = Date.now();
+export function getMostOverdueObjective(state, now = Date.now()) {
   const overdue = state.learningObjectives
     .filter(o => o.reviewSchedule?.nextReview && o.reviewSchedule.nextReview < now)
     .sort((a, b) => a.reviewSchedule.nextReview - b.reviewSchedule.nextReview);
@@ -729,19 +728,19 @@ export function getWeakSpots(state, { moduleId = null, limit = 20, now = Date.no
     .slice(0, limit);
 }
 
-export function scoreObjectiveRisk(state, obj) {
-  return getWeaknessBreakdown(state, obj).score;
+export function scoreObjectiveRisk(state, obj, now = Date.now()) {
+  return getWeaknessBreakdown(state, obj, now).score;
 }
 
-export function riskReasons(state, obj) {
+export function riskReasons(state, obj, now = Date.now()) {
   const reasons = [];
   reasons.push(`Confidence ${obj.confidence ?? 0}/5`);
   const touched = obj.lastTouched || obj.updatedAt || obj.createdAt;
   if (touched) {
-    const days = Math.floor((Date.now() - touched) / 86400000);
+    const days = Math.floor((now - touched) / 86400000);
     reasons.push(days <= 0 ? 'heute berührt' : days === 1 ? 'gestern berührt' : `vor ${days} Tagen berührt`);
   }
-  const { signals } = getWeaknessBreakdown(state, obj);
+  const { signals } = getWeaknessBreakdown(state, obj, now);
   for (const s of signals) {
     if (s.key === 'confidence' || s.key === 'stale') continue; // already covered above
     reasons.push(s.label);
@@ -753,10 +752,10 @@ export function riskReasons(state, obj) {
  * Riskiest non-done objective across all modules, optionally
  * excluding ids (so Today can show a different card than Fokus).
  */
-export function getRiskiestObjective(state, excludeIds = []) {
+export function getRiskiestObjective(state, excludeIds = [], now = Date.now()) {
   const list = state.learningObjectives.filter(o => o.status !== 'done' && !excludeIds.includes(o.id));
   if (!list.length) return null;
-  return [...list].sort((a, b) => scoreObjectiveRisk(state, b) - scoreObjectiveRisk(state, a))[0];
+  return [...list].sort((a, b) => scoreObjectiveRisk(state, b, now) - scoreObjectiveRisk(state, a, now))[0];
 }
 
 /**
@@ -824,26 +823,26 @@ export const PLAN_ITEM_TYPES = ['task', 'milestone', 'review'];
  * always reflects the full queue.
  * Moved from today.js to be DOM-free and testable.
  */
-export function buildTodayPlan(state) {
-  const focus = pickFocus(state);
-  const nextUp = pickNextUp(state, focus);
+export function buildTodayPlan(state, now = Date.now()) {
+  const focus = pickFocus(state, now);
+  const nextUp = pickNextUp(state, focus, now);
   const recommended = new Set([focus?.objective?.id, ...nextUp.map(n => n.objective.id)].filter(Boolean));
-  const weak = getRiskiestObjective(state, [...recommended]);
+  const weak = getRiskiestObjective(state, [...recommended], now);
   if (weak) recommended.add(weak.id);
-  const allDue = getDueObjectives(state);
+  const allDue = getDueObjectives(state, null, now);
   const due = allDue.filter(o => !recommended.has(o.id)).slice(0, 5);
   return { focus, nextUp, weak, due, dueCount: allDue.length };
 }
 
 /** Secondary recommendations never repeat the primary focus objective. */
-function pickNextUp(state, focus) {
+function pickNextUp(state, focus, now = Date.now()) {
   const out = [];
   const focusId = focus?.objective?.id;
-  const due = getDueObjectives(state).filter(o => o.id !== focusId).slice(0, 1);
+  const due = getDueObjectives(state, null, now).filter(o => o.id !== focusId).slice(0, 1);
   due.forEach(o => out.push({ kind: 'due', objective: o }));
   if (out.length < 2) {
     const excl = [focusId, ...out.map(n => n.objective.id)].filter(Boolean);
-    const r = getRiskiestObjective(state, excl);
+    const r = getRiskiestObjective(state, excl, now);
     if (r) out.push({ kind: 'weak', objective: r });
   }
   return out.slice(0, 2);
@@ -853,11 +852,11 @@ function pickNextUp(state, focus) {
  * Fokus priority: most overdue review → weakest objective → empty state.
  * Moved from today.js to be DOM-free and testable.
  */
-export function pickFocus(state) {
-  const overdue = getMostOverdueObjective(state);
+export function pickFocus(state, now = Date.now()) {
+  const overdue = getMostOverdueObjective(state, now);
   if (overdue) {
     const due = overdue.reviewSchedule.nextReview;
-    const days = Math.max(0, Math.floor((Date.now() - due) / 86400000));
+    const days = Math.max(0, Math.floor((now - due) / 86400000));
     const understood = overdue.status === 'done' ? ' · einst verstanden' : '';
     return {
       kind: 'overdue',
@@ -889,7 +888,7 @@ export function pickFocus(state) {
  * dueCount is unchanged by skips (the honest total stays intact).
  */
 export function buildReviewQueue(state, { now = Date.now(), skipIds = [] } = {}) {
-  const plan = buildTodayPlan(state);
+  const plan = buildTodayPlan(state, now);
   const queue = [];
 
   // Helper to derive reason string
@@ -899,7 +898,7 @@ export function buildReviewQueue(state, { now = Date.now(), skipIds = [] } = {})
       return r.detail;
     }
     if (kind === 'weakest' || kind === 'weak') {
-      return riskReasons(state, obj).join(' · ');
+      return riskReasons(state, obj, now).join(' · ');
     }
     return '';
   }
@@ -943,4 +942,25 @@ export function buildReviewQueue(state, { now = Date.now(), skipIds = [] } = {})
   }
 
   return queue;
+}
+
+/**
+ * Day-scope the "skip for today" list.
+ *
+ * Skips are meant to last for the current day only; without a stored day they
+ * would silently accumulate forever. Returns true when the stored state
+ * changed, so the caller can persist it. Mutates `state.settings` by design —
+ * it is the app's single settings store, and this keeps the reset rule out of
+ * the DOM views.
+ */
+export function normalizeTodaySkips(state, now = Date.now()) {
+  if (!state?.settings) return false;
+  const d = new Date(now);
+  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (state.settings.todaySkipDate === day) return false;
+
+  const hadSkips = Array.isArray(state.settings.todaySkipIds) && state.settings.todaySkipIds.length > 0;
+  state.settings.todaySkipDate = day;
+  if (hadSkips) state.settings.todaySkipIds = [];
+  return true;
 }

@@ -36,9 +36,16 @@ import { goTo, showShortcuts, kbdLabel } from './components/nav/shared.js';
 import { shortcutMap } from './utils/navigation.js';
 import { navigate, VIEWS, getCurrentView, routeFromHash } from './views/router.js';
 import { openQuickCapture } from './views/captures.js';
-import { startTimer } from './views/module-sessions.js';
+import { startTimer, openSessionAfterTimer } from './views/module-sessions.js';
 import { openObjectiveHistory } from './views/module-objectives.js';
 import { getMostOverdueObjective, getWeakestObjective } from './utils/helpers.js';
+import {
+  initPomodoro,
+  getPomodoro,
+  hasPomodoro,
+  resetPomodoro,
+} from './services/pomodoroEngine.js';
+import { initPomodoroWidget, showPomodoroWidget } from './components/pomodoroWidget.js';
 
 // Import views to register them
 import './views/index.js';
@@ -54,11 +61,22 @@ window.EMVS = {
   generateId,
   exportData: () => exportData(state),
   importData: (json) => importData(json),
-  clearAll: () => { state = clearAll(); renderSidebar(); navigate('today'); }
+  clearAll: () => {
+    resetPomodoro();
+    state = clearAll();
+    renderSidebar();
+    navigate('today');
+  }
 };
 // Pick up navigate registered during router module evaluation
 window.EMVS.navigate = navigate;
 window.EMVS.renderSidebar = renderSidebar;
+// The floating timer can be recalled from the palette or other chrome.
+window.EMVS.pomodoro = {
+  show: showPomodoroWidget,
+  isActive: hasPomodoro,
+  state: getPomodoro,
+};
 // Re-render the current view in place (used by in-place flows like Today's
 // review outcome, which must not navigate away or reset the route).
 window.EMVS.refresh = () => {
@@ -86,6 +104,10 @@ function init() {
   initPalette();
   initTabbar();
   initLayoutChrome();
+
+  // Global Pomodoro: one engine + one floating widget, independent of routes.
+  initPomodoro();
+  initPomodoroWidget({ onLogRequest: openSessionAfterTimer });
 
   // Set platform-aware keyboard hint (⌘K on Mac, Strg+K on Windows/Linux)
   const kbdHint = document.getElementById('kbd-hint');
@@ -166,6 +188,7 @@ function init() {
       const st = window.EMVS.getState();
       const moduleId = st.settings.currentModuleId || st.modules[0]?.id;
       if (moduleId) startTimer(moduleId, 25);
+      else window.EMVS.toast?.show('Lege zuerst ein Modul an');
     }
     else if (key === 'q') {
       const st = window.EMVS.getState();

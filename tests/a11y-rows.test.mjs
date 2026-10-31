@@ -45,4 +45,20 @@ assert.match(today, /<button type="button" class="today-session" data-module=/, 
 assert.match(today, /<button type="button" class="today-session today-note" data-capture=/, 'note rows are buttons');
 assert.ok(!today.includes('today-due" role='), 'due rows are non-interactive');
 
+// Keyboard: a bubbling keydown trap must not cancel Enter/Space on the
+// buttons inside the hero card. The card itself is not focusable.
+assert.ok(!today.includes("'.q-card')?.addEventListener('keydown'"), 'hero card has no keydown trap');
+
+// Today's confidence dots are real controls, not dead tab stops: every dot
+// is wired to a handler and exposes its pressed state.
+assert.ok(today.includes("el.querySelectorAll('.q-card .confidence-dot')"), 'confidence dots are wired');
+assert.match(today, /confidence-dot[^>]*role="button"/, 'confidence dots are buttons');
+assert.match(today, /aria-pressed=/, 'confidence dots expose their state');
+
+// Clicking the hero background and pressing "Review starten" must take the
+// same path (session → outcome card), and the outcome card must not restart.
+assert.ok(today.includes('beginReview(objectiveById(btn.dataset.obj))'), 'review button uses the shared start path');
+assert.ok(today.includes('beginReview(objectiveById(e.currentTarget.dataset.obj))'), 'card click uses the shared start path');
+assert.ok(today.includes(".q-card:not(.q-outcome)"), 'outcome card does not start a second session');
+
 console.log('ok - row interaction contract (no nested interactive rows, icon buttons labelled)');

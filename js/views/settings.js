@@ -21,7 +21,21 @@ function layoutPreview(id) {
   }
 }
 import { getLocalAISettings, checkConnection, describeLocalAIError } from '../services/localAI.js';
+import {
+  getPomodoroPrefs,
+  updatePomodoroPrefs,
+  notificationStatus,
+  requestNotificationPermission,
+  sendTestNotification,
+} from '../services/pomodoroEngine.js';
 import { openPdfImport } from './pdf-import.js';
+
+const NOTIFY_LABELS = {
+  granted: 'Erlaubt',
+  denied: 'Blockiert',
+  default: 'Noch nicht erlaubt',
+  unsupported: 'Nicht unterstützt',
+};
 
 export function renderSettings(state) {
   const moduleId = state.settings.currentModuleId;
@@ -29,6 +43,8 @@ export function renderSettings(state) {
   const ai = getLocalAISettings(state);
   const siteOrigin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://em-vs-study-hub.vercel.app';
   const navLayout = getNavLayout(state);
+  const pomoPrefs = getPomodoroPrefs();
+  const notify = notificationStatus();
   
   const el = document.createElement('div');
   el.innerHTML = `
@@ -200,6 +216,34 @@ export function renderSettings(state) {
     
     <div class="settings-section">
       <details class="settings-group">
+      <summary class="settings-group-summary"><span>Pomodoro</span><span class="settings-summary-hint">Benachrichtigungen und Ton</span></summary>
+      <div class="settings-group-content">
+      <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch; margin-bottom: 16px;">
+        Fokusrunden und Pausen laufen manuell. Bei Rundenende kannst du die Sitzung loggen und danach selbst eine kurze oder lange Pause wählen.
+      </p>
+      <div class="field-row">
+        <label>Browser-Benachrichtigungen</label>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <span id="pomo-notify-status" class="badge">${NOTIFY_LABELS[notify] || notify}</span>
+          <button class="btn" id="pomo-notify-enable" type="button" ${notify === 'granted' || notify === 'unsupported' ? 'hidden' : ''}>
+            ${notify === 'denied' ? 'Browser-Einstellungen prüfen' : 'Benachrichtigungen erlauben'}
+          </button>
+          <button class="btn ghost" id="pomo-notify-test" type="button" ${notify === 'granted' ? '' : 'hidden'}>Test senden</button>
+        </div>
+        <small style="color: var(--ink-3);">Benachrichtigungen erscheinen, solange Study Hub in einem Tab geöffnet ist.</small>
+      </div>
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); margin-top: 8px;">
+        <input type="checkbox" id="pomo-sound" ${pomoPrefs.sound ? 'checked' : ''}>
+        <span>Ton und Vibration bei Rundenende</span>
+      </label>
+    </div>
+      </details>
+    </div>
+
+    <hr class="rule">
+
+    <div class="settings-section">
+      <details class="settings-group">
       <summary class="settings-group-summary"><span>Daten</span><span class="settings-summary-hint">Backup und Zurücksetzen</span></summary>
       <div class="settings-group-content">
       <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch; margin-bottom: 16px;">
@@ -271,6 +315,50 @@ export function renderSettings(state) {
         opt.classList.toggle('selected', opt.querySelector('input')?.checked === true);
       });
     });
+  });
+
+  // Pomodoro notifications and sound. The permission prompt is only useful
+  // from a user gesture, hence the explicit button (plus the first start).
+  const notifyStatusEl = el.querySelector('#pomo-notify-status');
+  const notifyBtn = el.querySelector('#pomo-notify-enable');
+  const notifyTest = el.querySelector('#pomo-notify-test');
+  const syncNotifyStatus = () => {
+    const status = notificationStatus();
+    if (notifyStatusEl) notifyStatusEl.textContent = NOTIFY_LABELS[status] || status;
+    if (notifyBtn) {
+      notifyBtn.hidden = status === 'granted' || status === 'unsupported';
+      notifyBtn.textContent = status === 'denied' ? 'Browser-Einstellungen prüfen' : 'Benachrichtigungen erlauben';
+    }
+    if (notifyTest) notifyTest.hidden = status !== 'granted';
+  };
+  syncNotifyStatus();
+  notifyBtn?.addEventListener('click', async () => {
+    const status = notificationStatus();
+    if (status === 'denied') {
+      window.EMVS.toast?.show('Im Browser blockiert — Website-Einstellungen öffnen und Benachrichtigungen erlauben');
+      return;
+    }
+    if (status === 'unsupported') {
+      window.EMVS.toast?.show('Dieser Browser unterstützt keine Benachrichtigungen');
+      return;
+    }
+    notifyBtn.disabled = true;
+    const result = await requestNotificationPermission(true);
+    notifyBtn.disabled = false;
+    syncNotifyStatus();
+    window.EMVS.toast?.show(result === 'granted'
+      ? 'Benachrichtigungen aktiviert'
+      : 'Benachrichtigungen nicht erlaubt');
+  });
+  notifyTest?.addEventListener('click', () => {
+    const status = sendTestNotification();
+    if (status !== 'granted') {
+      window.EMVS.toast?.show('Benachrichtigungen sind nicht erlaubt');
+    }
+  });
+  el.querySelector('#pomo-sound')?.addEventListener('change', e => {
+    updatePomodoroPrefs({ sound: e.target.checked });
+    window.EMVS.toast?.show(e.target.checked ? 'Ton bei Rundenende aktiviert' : 'Ton bei Rundenende aus');
   });
 
   // Local AI (Ollama) settings
@@ -401,8 +489,6 @@ export function openModuleModal(module = null) {
           <label>Zielnote</label>
           <input type="number" name="targetGrade" value="${m.targetGrade ?? 5.0}" step="0.1" min="1" max="6" style="max-width: 120px;">
         </div>
-      </details>
-    </div>
       </form>
     `,
     footer: `
@@ -421,14 +507,15 @@ export function openModuleModal(module = null) {
     
     if (isNew) {
       state.modules.push(m);
-      if (!state.settings.currentModuleId) {
-        state.settings.currentModuleId = m.id;
-      }
+      state.settings.currentModuleId = m.id;
     }
     
     window.EMVS.save();
     window.EMVS.renderSidebar();
-    navigate('settings');
+    // A newly created module opens straight into its working tab; editing an
+    // existing one returns to the settings list.
+    if (isNew) navigate('module', { id: m.id, tab: 'ziele' });
+    else navigate('settings');
   });
   
   setTimeout(() => {
@@ -493,8 +580,8 @@ export function importBackup() {
 }
 
 // Make navigate available
-function navigate(view) {
-  window.EMVS.navigate?.(view);
+function navigate(view, params) {
+  window.EMVS.navigate?.(view, params);
 }
 
 /**

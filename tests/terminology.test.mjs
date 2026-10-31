@@ -44,6 +44,11 @@ for (const label of ['Heute', 'Module', 'Prüfungen', 'Review', 'Werkzeuge', 'Pr
   assert.ok(index.includes(label), `index.html uses "${label}"`);
 }
 
+// The tabbar labels are rendered from the registry, not hand-maintained HTML.
+const tabbar = read('../js/components/tabbar.js');
+assert.ok(tabbar.includes('DESTINATIONS'), 'tabbar reads the destination registry');
+assert.ok(tabbar.includes('dest?.short || dest?.label'), 'tabbar uses short/label from DESTINATIONS');
+
 // Capture action has one name; the page has another.
 assert.ok(index.includes('>Schnell erfassen</span>'), 'sidebar capture action says "Schnell erfassen"');
 assert.ok(!index.includes('>Erfassen</span>'), 'no bare "Erfassen" action label');

@@ -21,7 +21,7 @@ import {
   reopenObjective, unlinkObjectiveEverywhere, pushCapped, deleteWithTombstone,
 } from '../services/store.js';
 import { refresh, registerPatcher } from './router.js';
-import { openSessionModal } from './module-sessions.js';
+import { startPomodoroFor } from './module-sessions.js';
 
 const GROUP_ORDER = ['due', 'active', 'resting', 'fresh'];
 const GROUP_TITLES = {
@@ -328,7 +328,12 @@ function bindHistoryBody(state, objId) {
   act('session', () => {
     const obj = window.EMVS.getState().learningObjectives.find(o => o.id === objId);
     closeModal();
-    openSessionModal(null, obj?.moduleId, { linkedObjectiveIds: [objId], duration: 25 });
+    if (!obj) return;
+    startPomodoroFor({
+      moduleId: obj.moduleId,
+      linkedObjectiveIds: [obj.id],
+      minutes: 25,
+    });
   });
   act('understood', async () => {
     const st = window.EMVS.getState();

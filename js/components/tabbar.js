@@ -9,11 +9,22 @@ import { navigate, getCurrentView } from '../views/router.js';
 import { openQuickCapture } from '../views/captures.js';
 import { trapFocus, releaseTrap } from './focusTrap.js';
 import { getDueObjectives } from '../utils/helpers.js';
+import { DESTINATIONS } from '../utils/navigation.js';
 
 let moreTrap = null;
 let moreTrigger = null;
 
 export function initTabbar() {
+  // Labels come from the destination registry, so the tabbar cannot drift
+  // from the command palette or the rail. `short` is the documented
+  // column-width exception ("Schwach" for "Schwachstellen").
+  document.querySelectorAll('#tabbar .tab[data-route]').forEach(t => {
+    const dest = DESTINATIONS[t.dataset.route];
+    const label = dest?.short || dest?.label;
+    const span = t.querySelector('.tab-lb');
+    if (label && span) span.textContent = label;
+  });
+
   document.querySelectorAll('#tabbar .tab[data-route], #dock [data-route]').forEach(t => {
     t.addEventListener('click', () => navigate(t.dataset.route));
   });

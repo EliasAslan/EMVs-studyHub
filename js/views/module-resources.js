@@ -16,7 +16,7 @@ import { generateId, ensureResourceFields, markResourceUsed, setResourceUndersto
 import { RESOURCE_TYPES } from '../utils/helpers.js';
 import { getResourceUsage, formatLastUsed, rhythmOf } from '../utils/helpers.js';
 import { refresh, registerPatcher } from './router.js';
-import { openSessionModal } from './module-sessions.js';
+import { startPomodoroFor } from './module-sessions.js';
 import { openObjectiveHistory } from './module-objectives.js';
 
 // Filter state lives at module level so repaints (list-only) keep it.
@@ -391,7 +391,13 @@ function bindResourceHistory(resourceId, onChange) {
     const st = window.EMVS.getState();
     const res = st.resources.find(r => r.id === resourceId);
     closeModal();
-    openSessionModal(null, res?.moduleId, { linkedResourceIds: [resourceId], linkedObjectiveIds: [...(res?.linkedObjectiveIds || [])], duration: 25 });
+    if (!res) return;
+    startPomodoroFor({
+      moduleId: res.moduleId,
+      linkedResourceIds: [resourceId],
+      linkedObjectiveIds: [...(res.linkedObjectiveIds || [])],
+      minutes: 25,
+    });
   });
   act('edit', () => {
     const st = window.EMVS.getState();

@@ -1091,6 +1091,41 @@ export function clearTimerState() {
 }
 
 /**
+ * Pomodoro widget preferences (viewport position, minimized state, sound).
+ * Kept separate from user data: these are device-level UI choices, not
+ * synced study content.
+ */
+export const POMODORO_PREFS_KEY = 'emvs_pomodoro_prefs_v1';
+
+export const DEFAULT_POMODORO_PREFS = Object.freeze({
+  left: null,
+  top: null,
+  minimized: false,
+  sound: true,
+  notificationsAsked: false,
+});
+
+export function loadPomodoroPrefs() {
+  try {
+    const raw = activeAdapter.getItem(POMODORO_PREFS_KEY);
+    if (!raw || typeof raw !== 'object') return { ...DEFAULT_POMODORO_PREFS };
+    return { ...DEFAULT_POMODORO_PREFS, ...raw };
+  } catch (e) {
+    console.error('Failed to load Pomodoro preferences:', e);
+    return { ...DEFAULT_POMODORO_PREFS };
+  }
+}
+
+export function savePomodoroPrefs(prefs) {
+  try {
+    return activeAdapter.setItem(POMODORO_PREFS_KEY, prefs);
+  } catch (e) {
+    console.error('Failed to save Pomodoro preferences:', e);
+    return false;
+  }
+}
+
+/**
  * Remove all references to a deleted objective from linked entities.
  * Called on explicit objective delete (user-confirmed): resources, sessions,
  * exams (links + per-objective diagnosis entries, re-synced), plan items keep

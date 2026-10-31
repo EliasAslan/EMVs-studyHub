@@ -8,7 +8,7 @@ import { navigate } from './router.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { generateId } from '../services/store.js';
 import { openObjectiveHistory } from './module-objectives.js';
-import { openSessionModal } from './module-sessions.js';
+import { startPomodoroFor } from './module-sessions.js';
 import { openModuleModal as openSettingsModuleModal, importBackup } from './settings.js';
 import { openPdfImport } from './pdf-import.js';
 
@@ -173,7 +173,11 @@ function wireModuleCards(root) {
       st.settings.currentModuleId = obj.moduleId;
       window.EMVS.save();
       window.EMVS.renderSidebar();
-      openSessionModal(null, obj.moduleId, { linkedObjectiveIds: [obj.id], duration: 25 });
+      startPomodoroFor({
+        moduleId: obj.moduleId,
+        linkedObjectiveIds: [obj.id],
+        minutes: 25,
+      });
     })
   );
 }

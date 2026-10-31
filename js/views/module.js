@@ -12,7 +12,6 @@ import { renderModuleSessions } from './module-sessions.js';
 import { renderModuleResources } from './module-resources.js';
 import { renderModuleExams } from './module-exams.js';
 import { renderModuleHomeSection } from './module-home.js';
-import { renderToday } from './today.js';
 
 export function renderModule(state, params = {}) {
   const m = state.modules.find(x => x.id === params.id)

@@ -1,6 +1,6 @@
 /**
- * Tests for the data behind the ten navigation styles: destination
- * registry, context modes, mega menu, tree model, bento data.
+ * Tests for the data behind the navigation styles: destination registry,
+ * context modes, mega menu, bento data.
  * Pure Node, no DOM.  Run: node tests/nav-styles.test.mjs  (or: npm test)
  */
 
@@ -9,7 +9,7 @@ import {
   DESTINATIONS, CONTEXT_MODES, MEGA_MENUS, shortcutMap, destinationIdFor,
   contextModeFor, resolveContextMode, routeTitle, getBreadcrumb,
 } from '../js/utils/navigation.js';
-import { buildNavTree, getBentoData, getUpcomingExams, getRecentActivity, relativeTime } from '../js/utils/navData.js';
+import { getBentoData, getUpcomingExams, getRecentActivity, relativeTime } from '../js/utils/navData.js';
 import { getSeedData } from '../js/services/store.js';
 
 let passed = 0;
@@ -91,40 +91,6 @@ await test('routeTitle and breadcrumb describe the current page', async () => {
   assert.deepEqual(trail.map(c => c.label), ['Module', `Modul ${mod.code}`, 'Plan']);
   assert.deepEqual(getBreadcrumb('module', { id: mod.id, tab: 'home' }, state).map(c => c.label), ['Module', `Modul ${mod.code}`]);
   assert.deepEqual(getBreadcrumb('settings').map(c => c.label), ['Einstellungen']);
-});
-
-await test('tree: subjects → chapters → topics with stable ids', async () => {
-  // Create test state with a module and objectives
-  const state = getSeedData();
-  state.modules.push({ id: 'm1', code: 'DB1', title: 'Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: 1, updatedAt: 1 });
-  state.learningObjectives.push(
-    { id: 'o1', moduleId: 'm1', number: 1, title: 'Ziel 1', description: '', status: 'todo', confidence: 3, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: null, createdAt: 1, updatedAt: 1, sessionHistory: [] },
-    { id: 'o2', moduleId: 'm1', number: 2, title: 'Ziel 2', description: '', status: 'todo', confidence: 2, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: null, createdAt: 1, updatedAt: 1, sessionHistory: [] },
-    { id: 'o3', moduleId: 'm1', number: 3, title: 'Ziel 3', description: '', status: 'todo', confidence: 1, notes: '', confidenceHistory: [], lastTouched: 1, lastReviewed: null, totalStudyTime: 0, reviewHistory: [], reviewSchedule: null, createdAt: 1, updatedAt: 1, sessionHistory: [] }
-  );
-  const tree = buildNavTree(state);
-  assert.equal(tree.length, 1);
-  const subject = tree[0];
-  assert.equal(subject.type, 'subject');
-  assert.deepEqual(subject.children.map(c => c.tab), ['home', 'ziele', 'plan', 'sessions', 'material']);
-  const ziele = subject.children.find(c => c.tab === 'ziele');
-  assert.equal(ziele.children.length, 3);
-  assert.ok(ziele.children.every(c => c.type === 'topic' && c.kind === 'objective'));
-  const ids = [];
-  (function walk(n) { ids.push(n.id); (n.children || []).forEach(walk); })(subject);
-  assert.equal(new Set(ids).size, ids.length, 'node ids are unique');
-  assert.deepEqual(buildNavTree({ modules: [] }), []);
-});
-
-await test('tree: long topic lists are capped and report what was left out', async () => {
-  const state = getSeedData();
-  state.modules.push({ id: 'm1', code: 'DB1', title: 'Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: 1, updatedAt: 1 });
-  const modId = 'm1';
-  state.learningObjectives = Array.from({ length: 75 }, (_, i) => ({ id: `o${i}`, moduleId: modId, number: i + 1, title: `Ziel ${i + 1}`, status: 'todo' }));
-  const ziele = buildNavTree(state)[0].children.find(c => c.tab === 'ziele');
-  assert.equal(ziele.count, 75);
-  assert.equal(ziele.children.length, 60);
-  assert.equal(ziele.more, 15);
 });
 
 await test('bento: upcoming exams are future-only, soonest first, invalid dates skipped', async () => {
