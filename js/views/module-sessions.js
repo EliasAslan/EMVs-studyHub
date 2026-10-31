@@ -54,11 +54,31 @@ export function renderModuleSessions(state) {
     byDate[date].push(s);
   });
 
+  const pendingReviewId = state.settings.pendingReviewObjectiveId;
+  const pendingReviewObj = pendingReviewId
+    ? state.learningObjectives.find(o => o.id === pendingReviewId)
+    : null;
+
   const el = document.createElement('div');
   el.innerHTML = `
     <div class="eyebrow">Sitzungen · Modul ${escapeHtml(m.code)}</div>
     <h1 class="page-title">Lernsitzungen</h1>
     <p class="page-lede">${sessions.length} Sitzungen protokolliert. Das Pomodoro läuft im Hintergrund — auch bei Seitenwechsel und Neuladen.</p>
+
+    ${pendingReviewObj ? `
+      <div class="card" style="margin-bottom: 16px; border-left: 3px solid var(--accent);">
+        <div class="pomo-session-head">
+          <div>
+            <div class="pomo-phase">Review fällig</div>
+            <div style="font-size: 15px; font-weight: 600; color: var(--ink); margin-top: 4px;">${escapeHtml(pendingReviewObj.title || 'Lernziel ' + pendingReviewObj.number)}</div>
+          </div>
+        </div>
+        <p class="pomo-hint" style="margin-top: 8px;">Starte eine Fokusrunde für diesen Review. Pause und nächste Runde wählst du danach selbst.</p>
+        <div class="timer-actions" style="margin-top: 12px;">
+          <button class="btn primary" id="start-review-pomodoro">▶ Pomodoro starten (25 Min)</button>
+        </div>
+      </div>
+    ` : ''}
 
     <div id="pomodoro-panel"></div>
 
@@ -124,6 +144,23 @@ export function renderModuleSessions(state) {
         if (!el.querySelector('.session-item')) navigate('module-sessions');
       }
     });
+  });
+
+  // Review Pomodoro start (carried over from Today, no auto-start)
+  el.querySelector('#start-review-pomodoro')?.addEventListener('click', () => {
+    if (!pendingReviewObj) return;
+    const reviewId = pendingReviewObj.id;
+    const st = window.EMVS.getState();
+    delete st.settings.pendingReviewObjectiveId;
+    window.EMVS.save();
+    startPomodoroFor({
+      moduleId,
+      linkedObjectiveIds: [reviewId],
+      minutes: 25,
+      reviewObjectiveId: reviewId,
+    });
+    // Re-render so the review banner disappears once the round has started.
+    window.EMVS.refresh?.();
   });
 
   // Log session button

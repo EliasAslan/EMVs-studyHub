@@ -129,7 +129,7 @@ function bubbleMarkup(state) {
       ? 'Pause'
       : (state.phase === PHASE.work ? 'Fokus' : 'Pause');
   return `
-    <button type="button" class="pomo-bubble" data-pomo-bubble aria-label="Pomodoro ${phaseLabel(state)} — ${timeText(state)} — vergrößern">
+    <button type="button" class="pomo-bubble" data-pomo-bubble title="Pomodoro vergrößern" aria-label="Pomodoro ${phaseLabel(state)} — ${timeText(state)} — vergrößern">
       <span class="pomo-bubble-time" data-pomo-time>${timeText(state)}</span>
       <span class="pomo-bubble-label">${label}</span>
       <span class="sr-only" role="status" aria-live="polite">${liveText(state)}</span>

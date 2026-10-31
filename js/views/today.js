@@ -177,18 +177,17 @@ export function renderToday(state) {
   // One review-start path: start the Pomodoro first. The outcome card appears
   // after the round is logged, so the review loop cannot be bypassed by
   // clicking the card instead of the button.
+  // Review is not auto-started: the user lands on the Pomodoro page and
+  // presses start themselves. The pending review objective is carried along
+  // so the start button links the round to that review.
   const beginReview = (obj) => {
     if (!obj) return;
     const st = window.EMVS.getState();
     st.settings.currentModuleId = obj.moduleId;
+    st.settings.pendingReviewObjectiveId = obj.id;
     window.EMVS.save();
     window.EMVS.renderSidebar();
-    startPomodoroFor({
-      moduleId: obj.moduleId,
-      linkedObjectiveIds: [obj.id],
-      minutes: 25,
-      reviewObjectiveId: obj.id,
-    });
+    navigate('module', { id: obj.moduleId, tab: 'sessions' });
   };
 
   // Queue actions
