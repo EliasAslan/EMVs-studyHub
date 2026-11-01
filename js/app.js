@@ -45,7 +45,12 @@ import {
   hasPomodoro,
   resetPomodoro,
 } from './services/pomodoroEngine.js';
-import { initPomodoroWidget, showPomodoroWidget } from './components/pomodoroWidget.js';
+import {
+  initPomodoroWidget,
+  showPomodoroWidget,
+  minimizePomodoroWidget,
+  hidePomodoroWidget,
+} from './components/pomodoroWidget.js';
 
 // Import views to register them
 import './views/index.js';
@@ -74,6 +79,8 @@ window.EMVS.renderSidebar = renderSidebar;
 // The floating timer can be recalled from the palette or other chrome.
 window.EMVS.pomodoro = {
   show: showPomodoroWidget,
+  minimize: minimizePomodoroWidget,
+  hide: hidePomodoroWidget,
   isActive: hasPomodoro,
   state: getPomodoro,
 };

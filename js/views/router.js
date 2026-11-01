@@ -15,6 +15,7 @@ let currentParams = {};
 
 const LEGACY_TO_HASH = {
   'today': '#/heute',
+  'focus': '#/fokus',
   'overview': '#/module',
   'weak-spots': '#/schwach',
   'exams-global': '#/pruefungen',
@@ -34,6 +35,7 @@ const LEGACY_TO_HASH = {
 
 const HASH_TO_VIEW = {
   '/heute': 'today',
+  '/fokus': 'focus',
   '/module': 'overview',
   '/schwach': 'weak-spots',
   '/pruefungen': 'exams-global',

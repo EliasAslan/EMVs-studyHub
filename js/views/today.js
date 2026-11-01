@@ -8,7 +8,6 @@ import { escapeHtml, daysUntil, getRecentSessions, relativeDay, getDailyPrompt, 
 import { recordReview, pushCapped, ensureObjectiveFields } from '../services/store.js';
 import { getOpenPlanItems, getRecentCaptures } from '../utils/navigation.js';
 import { navigate } from './router.js';
-import { startPomodoroFor } from './module-sessions.js';
 import { openModuleModal } from './settings.js';
 import { openObjectiveHistory } from './module-objectives.js';
 import { openCaptureModal } from './captures.js';
@@ -184,10 +183,11 @@ export function renderToday(state) {
     if (!obj) return;
     const st = window.EMVS.getState();
     st.settings.currentModuleId = obj.moduleId;
+    st.settings.currentModuleId = obj.moduleId;
     st.settings.pendingReviewObjectiveId = obj.id;
     window.EMVS.save();
     window.EMVS.renderSidebar();
-    navigate('module', { id: obj.moduleId, tab: 'sessions' });
+    navigate('focus');
   };
 
   // Queue actions

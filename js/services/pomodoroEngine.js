@@ -35,6 +35,7 @@ let intervalId = null;
 let completionTimer = null;
 let audioCtx = null;
 let initialized = false;
+let stopDraft = null;
 const subscribers = new Set();
 
 function ensurePrefs() {
@@ -147,6 +148,7 @@ function showNotification(title, body) {
     });
     n.onclick = () => {
       try { window.focus(); } catch {}
+      try { window.EMVS?.navigate?.('focus'); } catch {}
       n.close();
     };
   } catch {}
@@ -261,8 +263,11 @@ export function startPomodoro(options = {}) {
     ...options,
     completedRounds: existing?.completedRounds || 0,
   });
-  // A manual start should present the timer, even if it was minimized before.
-  if (ensurePrefs().minimized) updatePomodoroPrefs({ minimized: false });
+  stopDraft = null;
+  // A manual start should present the timer, even if it was minimized or hidden.
+  if (ensurePrefs().minimized || ensurePrefs().hidden) {
+    updatePomodoroPrefs({ minimized: false, hidden: false });
+  }
   persist();
   ensureAudio();
   maybeRequestNotifications();
@@ -335,16 +340,62 @@ export function startNextRound() {
   return { ok: true, state: current };
 }
 
-/** Stop a focus round early and return the session snapshot for logging. */
-export function stopPomodoro() {
+/**
+ * Begin an early stop without losing the round.
+ *
+ * The timer pauses and a draft snapshot is handed to the log form. Saving the
+ * form finalizes it; dismissing the form puts the user back into the paused
+ * round instead of silently throwing the elapsed time away.
+ */
+export function beginStopPomodoro() {
   if (!current) return null;
   const snapshot = stopWorkEarly(current, Date.now());
   if (!snapshot) return null;
+  const wasRunning = current.status === STATUS.running;
+  if (wasRunning) {
+    current = pauseTimerState(current, Date.now());
+    persist();
+    stopTicking();
+  }
+  snapshot.wasRunning = wasRunning;
+  stopDraft = { snapshot, wasRunning };
+  emit('stop-begin');
+  return snapshot;
+}
+
+/** Cancel the log form and keep the paused round. */
+export function cancelStopPomodoro() {
+  if (!stopDraft) return false;
+  const wasRunning = stopDraft.wasRunning;
+  stopDraft = null;
+  if (wasRunning && current?.status === STATUS.paused) {
+    current = resumeTimerState(current, Date.now());
+    persist();
+    ensureAudio();
+    startTicking();
+  }
+  emit('stop-cancel');
+  return true;
+}
+
+/** Finalize an early stop after the session has been saved. */
+export function completeStopPomodoro() {
+  if (!stopDraft) return false;
+  stopDraft = null;
   current = null;
   persist();
   stopTicking();
-  emit('stop');
-  return snapshot;
+  emit('stop-complete');
+  return true;
+}
+
+export function hasStopDraft() {
+  return !!stopDraft;
+}
+
+/** Backwards-compatible alias: stopping now begins the safe stop flow. */
+export function stopPomodoro() {
+  return beginStopPomodoro();
 }
 
 export function getPendingLog() {
@@ -364,6 +415,7 @@ export function dismissPomodoro(force = false) {
   if (!current) return false;
   if (current.pendingLog && !force) return false;
   current = null;
+  stopDraft = null;
   persist();
   stopTicking();
   emit('dismiss');
@@ -373,6 +425,7 @@ export function dismissPomodoro(force = false) {
 /** Reset on app data reset. */
 export function resetPomodoro() {
   current = null;
+  stopDraft = null;
   persist();
   stopTicking();
   emit('reset');

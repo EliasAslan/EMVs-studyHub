@@ -29,6 +29,7 @@ export const DEFAULT_MODULE_TAB = 'home';
  */
 export const DESTINATIONS = {
   'today': { label: 'Heute', ico: '◉', view: 'today', key: '1', hint: 'Tagesfokus' },
+  'focus': { label: 'Fokus', ico: '◐', view: 'focus', key: '9', hint: 'Pomodoro-Fokusraum' },
   'overview': { label: 'Module', ico: '▦', view: 'overview', key: '2', hint: 'Alle Module im Überblick' },
   'weak-spots': { label: 'Schwachstellen', short: 'Schwach', ico: '△', view: 'weak-spots', key: '3', hint: 'Fällige Wiederholungen' },
   'exams-global': { label: 'Prüfungen', ico: '◷', view: 'exams-global', key: '4', hint: 'Alle Termine' },
@@ -69,7 +70,7 @@ export const CONTEXT_MODES = [
   { id: 'learn', label: 'Lernen', ico: '◈', lede: 'Stoff verstehen und einordnen',
     items: ['overview', 'module:home', 'module:ziele', 'module:material', 'tools'] },
   { id: 'practice', label: 'Üben', ico: '✦', lede: 'Abfragen und Prüfungen trainieren',
-    items: ['exam-prep', 'mock-exam', 'module:sessions'] },
+    items: ['focus', 'exam-prep', 'mock-exam', 'module:sessions'] },
   { id: 'plan', label: 'Planen', ico: '❏', lede: 'Heute, Woche und Termine',
     items: ['today', 'module:plan', 'exams-global'] },
   { id: 'review', label: 'Wiederholen', ico: '↻', lede: 'Schwachstellen und Rückblick',
@@ -104,6 +105,7 @@ export function resolveContextMode(destId, stored) {
  */
 export const MEGA_MENUS = [
   { id: 'heute', label: 'Heute', dest: 'today' },
+  { id: 'fokus', label: 'Fokus', dest: 'focus' },
   { id: 'lernen', label: 'Lernen', groups: [
     { title: 'Fächer', kind: 'modules' },
     { title: 'Aktuelles Modul', items: ['module:home', 'module:ziele', 'module:material'] },

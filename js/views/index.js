@@ -4,6 +4,7 @@
 
 import { registerView, navigate, getCurrentView } from './router.js';
 import { renderToday } from './today.js';
+import { renderFocus } from './focus.js';
 import { renderOverview } from './overview.js';
 import { renderModuleObjectives } from './module-objectives.js';
 import { renderModuleResources } from './module-resources.js';
@@ -26,6 +27,7 @@ import { renderModule } from './module.js';
 // "module" is the consolidated module detail (Home + Ziele/Plan/Sessions/Material).
 // Legacy module-* views stay registered for back-compat.
 registerView('today', renderToday);
+registerView('focus', renderFocus);
 registerView('overview', renderOverview);
 registerView('module', renderModule);
 registerView('module-objectives', renderModuleObjectives);

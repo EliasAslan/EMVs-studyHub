@@ -138,7 +138,7 @@ assert.equal(formatClock(59_500), '01:00');
 
 // Entry points that start a session must use the shared Pomodoro.
 const views = [
-  'js/views/today.js',
+  'js/views/focus.js',
   'js/views/module-home.js',
   'js/views/module-objectives.js',
   'js/views/module-resources.js',
@@ -150,6 +150,10 @@ for (const file of views) {
   assert.ok(src.includes('startPomodoroFor'), `${file}: starts a Pomodoro`);
   assert.ok(!src.includes('openSessionModal'), `${file}: no immediate log modal start`);
 }
+const today = readFileSync(new URL('../js/views/today.js', import.meta.url), 'utf8');
+assert.ok(today.includes('pendingReviewObjectiveId'), 'today carries the review objective');
+assert.ok(today.includes("navigate('focus')"), 'today opens the focus room instead of auto-starting');
+assert.ok(!today.includes('startPomodoroFor'), 'today never starts a round by itself');
 const sharedEntries = [
   'js/components/nav/index.js',
   'js/components/nav/context.js',
@@ -164,5 +168,19 @@ const router = readFileSync(new URL('../js/views/router.js', import.meta.url), '
 assert.ok(!router.includes('stopSessionsTimerDisplay'), 'router must not stop the global Pomodoro');
 const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 assert.ok(app.includes('initPomodoroWidget'), 'app mounts the floating widget');
+
+// The safe stop flow must keep the round until the log is saved.
+const engine = readFileSync(new URL('../js/services/pomodoroEngine.js', import.meta.url), 'utf8');
+assert.ok(engine.includes('export function beginStopPomodoro'), 'engine pauses before logging');
+assert.ok(engine.includes('export function cancelStopPomodoro'), 'engine can restore the paused round');
+assert.ok(engine.includes('export function completeStopPomodoro'), 'engine finalizes only after saving');
+const sessions = readFileSync(new URL('../js/views/module-sessions.js', import.meta.url), 'utf8');
+assert.ok(sessions.includes('cancelStopPomodoro()'), 'canceling the log keeps the round');
+assert.ok(sessions.includes('completeStopPomodoro()'), 'saving the log finalizes the round');
+
+// The focus room is a real route, not just a Sessions tab.
+assert.ok(router.includes("'/fokus': 'focus'"), 'router maps #/fokus');
+const navigation = readFileSync(new URL('../js/utils/navigation.js', import.meta.url), 'utf8');
+assert.ok(navigation.includes("'focus': { label: 'Fokus'"), 'focus is a destination');
 
 console.log('ok - Pomodoro state machine and entry points');

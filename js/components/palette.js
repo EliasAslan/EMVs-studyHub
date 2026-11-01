@@ -48,7 +48,8 @@ export function initPalette() {
     // Global navigation — labels and shortcut keys come from the shared
     // destination registry, so the palette can never advertise a wrong key.
     const NAV_ALIASES = {
-      'today': ['start', 'übersicht', 'fokus'],
+      'today': ['start', 'übersicht', 'tagesfokus'],
+      'focus': ['pomodoro', 'timer', 'fokusraum', 'fokus', 'lernen'],
       'overview': ['module', 'fächer', 'alle module'],
       'weak-spots': ['schwach', 'probleme', 'fällig', 'wiederholen'],
       'exams-global': ['prüfung', 'examen', 'termine'],
@@ -93,6 +94,7 @@ export function initPalette() {
     add({ label: `Fällige Wiederholungen öffnen${dueCount ? ` · ${dueCount}` : ''}`, aliases: ['due', 'reviews', 'wiederholung'], group: 'aktion', action: () => navigate('weak-spots'), available: dueCount > 0 });
     add({ label: 'Pomodoro starten · 25 Min', aliases: ['timer', 'lernen', 'pomodoro', 'starten', 'sitzung'], group: 'aktion', action: selectModule((id) => startTimer(id, 25)), shortcut: 'S' });
     add({ label: 'Pomodoro anzeigen', aliases: ['timer', 'floating', 'popup', 'pomodoro'], group: 'aktion', action: () => window.EMVS.pomodoro?.show?.() });
+    add({ label: 'Pomodoro ausblenden', aliases: ['timer', 'floating', 'popup', 'ausblenden', 'randlasche'], group: 'aktion', action: () => window.EMVS.pomodoro?.hide?.() });
     add({ label: 'Sitzung protokollieren', aliases: ['lernzeit', 'loggen'], group: 'aktion', action: () => openSessionModal() });
     add({ label: 'Mock-Prüfung starten', aliases: ['mock', 'simulieren'], group: 'aktion', action: () => openMockExam() });
     add({ label: 'Neues Modul erstellen', aliases: ['modul anlegen'], group: 'verwalten', action: () => openModuleModal() });

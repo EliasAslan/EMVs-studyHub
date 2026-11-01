@@ -1101,6 +1101,7 @@ export const DEFAULT_POMODORO_PREFS = Object.freeze({
   left: null,
   top: null,
   minimized: false,
+  hidden: false,
   sound: true,
   notificationsAsked: false,
 });

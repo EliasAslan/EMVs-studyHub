@@ -10,28 +10,12 @@ import { openModal, closeModal } from '../components/modal.js';
 import { generateId, updateObjectiveHistory, recalculateObjectiveHistory } from '../services/store.js';
 import {
   startPomodoro,
-  getPomodoro,
-  subscribePomodoro,
-  pausePomodoro,
-  resumePomodoro,
-  chooseBreak,
-  skipBreak,
-  startNextRound,
-  stopPomodoro,
-  getPendingLog,
+  completeStopPomodoro,
+  cancelStopPomodoro,
   clearPendingLog,
 } from '../services/pomodoroEngine.js';
-import {
-  POMODORO_DEFAULTS,
-  PHASE,
-  STATUS,
-  formatClock,
-  remainingMs,
-  progressPct,
-  phaseLabel,
-  roundLabel,
-  recommendedBreakType,
-} from '../services/pomodoro.js';
+import { POMODORO_DEFAULTS } from '../services/pomodoro.js';
+import { mountPomodoroPanel } from '../components/pomodoroPanel.js';
 import { openQuickCapture } from './captures.js';
 
 export function renderModuleSessions(state) {
@@ -66,17 +50,12 @@ export function renderModuleSessions(state) {
     <p class="page-lede">${sessions.length} Sitzungen protokolliert. Das Pomodoro läuft im Hintergrund — auch bei Seitenwechsel und Neuladen.</p>
 
     ${pendingReviewObj ? `
-      <div class="card" style="margin-bottom: 16px; border-left: 3px solid var(--accent);">
-        <div class="pomo-session-head">
-          <div>
-            <div class="pomo-phase">Review fällig</div>
-            <div style="font-size: 15px; font-weight: 600; color: var(--ink); margin-top: 4px;">${escapeHtml(pendingReviewObj.title || 'Lernziel ' + pendingReviewObj.number)}</div>
-          </div>
+      <div class="focus-intent focus-intent--compact">
+        <div>
+          <div class="pomo-phase">Review fällig</div>
+          <div class="focus-intent-title">${escapeHtml(pendingReviewObj.title || 'Lernziel ' + pendingReviewObj.number)}</div>
         </div>
-        <p class="pomo-hint" style="margin-top: 8px;">Starte eine Fokusrunde für diesen Review. Pause und nächste Runde wählst du danach selbst.</p>
-        <div class="timer-actions" style="margin-top: 12px;">
-          <button class="btn primary" id="start-review-pomodoro">▶ Pomodoro starten (25 Min)</button>
-        </div>
+        <button type="button" class="pomo-btn primary" id="open-review-focus">Im Fokusraum starten</button>
       </div>
     ` : ''}
 
@@ -104,19 +83,14 @@ export function renderModuleSessions(state) {
     `}
   `;
 
-  // Pomodoro panel: render now, then follow the shared engine.
-  const panel = el.querySelector('#pomodoro-panel');
-  updatePomodoroPanel(panel, getPomodoro(), moduleId, true);
-  setTimeout(() => {
-    if (!el.isConnected) return;
-    let active = true;
-    let unsub = () => {};
-    unsub = subscribePomodoro(({ state: timerState }) => {
-      if (!active) return;
-      if (!el.isConnected) { active = false; unsub(); return; }
-      updatePomodoroPanel(panel, timerState, moduleId);
-    });
-  }, 0);
+  // Compact Pomodoro status. The full focus room lives at #/fokus.
+  mountPomodoroPanel(el.querySelector('#pomodoro-panel'), {
+    moduleId,
+    variant: 'compact',
+    onStart: (minutes) => startPomodoroFor({ moduleId, minutes }),
+    onLogRequest: openSessionAfterTimer,
+    onOpenFocus: () => window.EMVS.navigate?.('focus'),
+  });
 
   // Session item handlers
   el.querySelectorAll('.session-item').forEach(item => {
@@ -146,21 +120,9 @@ export function renderModuleSessions(state) {
     });
   });
 
-  // Review Pomodoro start (carried over from Today, no auto-start)
-  el.querySelector('#start-review-pomodoro')?.addEventListener('click', () => {
-    if (!pendingReviewObj) return;
-    const reviewId = pendingReviewObj.id;
-    const st = window.EMVS.getState();
-    delete st.settings.pendingReviewObjectiveId;
-    window.EMVS.save();
-    startPomodoroFor({
-      moduleId,
-      linkedObjectiveIds: [reviewId],
-      minutes: 25,
-      reviewObjectiveId: reviewId,
-    });
-    // Re-render so the review banner disappears once the round has started.
-    window.EMVS.refresh?.();
+  // Review intent is started from the dedicated focus room, never automatically.
+  el.querySelector('#open-review-focus')?.addEventListener('click', () => {
+    window.EMVS.navigate?.('focus');
   });
 
   // Log session button
@@ -170,141 +132,6 @@ export function renderModuleSessions(state) {
   el.querySelector('#quick-capture')?.addEventListener('click', () => openQuickCapture({ moduleId }));
 
   return el;
-}
-
-function renderPomodoroPanel(state) {
-  if (!state) {
-    return `
-      <div class="card pomo-idle-card">
-        <div class="pomo-session-head">
-          <div>
-            <div class="pomo-phase">Bereit</div>
-            <div class="pomo-time">${POMODORO_DEFAULTS.workMinutes}:00</div>
-          </div>
-          <div class="pomo-round">Pomodoro</div>
-        </div>
-        <p class="pomo-hint">Starte eine Fokusrunde. Pause und nächste Runde wählst du danach selbst.</p>
-        <div class="timer-actions">
-          <button class="btn primary" data-start-minutes="15">▶ 15 Min</button>
-          <button class="btn primary" data-start-minutes="25">▶ 25 Min</button>
-          <button class="btn" data-start-minutes="45">▶ 45 Min</button>
-          <button class="btn" data-start-custom>▶ Benutzerdefiniert</button>
-        </div>
-      </div>`;
-  }
-
-  const paused = state.status === STATUS.paused;
-  const pending = state.pendingLog;
-  const recommended = recommendedBreakType(state);
-  const phase = phaseLabel(state);
-  const round = roundLabel(state);
-  const pendingMinutes = pending?.duration;
-
-  let actions = '';
-  if (state.phase === PHASE.work && state.status !== STATUS.workDone) {
-    actions = `
-      <div class="timer-actions">
-        <button class="btn primary" data-pomo-toggle>${paused ? '▶ Fortsetzen' : '⏸ Pausieren'}</button>
-        <button class="btn solid-red" data-pomo-stop>⏹ Stoppen &amp; loggen</button>
-      </div>
-      <p class="pomo-hint">Beim Stoppen wird die Sitzung geloggt.</p>`;
-  } else if (state.phase === PHASE.work && state.status === STATUS.workDone) {
-    actions = `
-      ${pending ? `<p class="pomo-note">Sitzung über ${pendingMinutes} Min wartet auf dich.</p>
-        <div class="timer-actions"><button class="btn primary" data-pomo-log>Jetzt loggen</button></div>` : ''}
-      <div class="pomo-choice">
-        <span class="pomo-choice-label">Welche Pause?</span>
-        <div class="timer-actions">
-          <button class="btn" data-pomo-break="short">Kurze Pause · ${POMODORO_DEFAULTS.shortBreakMinutes} Min</button>
-          <button class="btn" data-pomo-break="long">Lange Pause · ${POMODORO_DEFAULTS.longBreakMinutes} Min${recommended === 'long' ? ' <span class="pomo-rec">Empfohlen</span>' : ''}</button>
-        </div>
-      </div>
-      <div class="timer-actions" style="margin-top:8px;">
-        <button class="btn ghost" data-pomo-next ${pending ? 'disabled title="Zuerst die Sitzung loggen"' : ''}>Nächste Runde</button>
-      </div>`;
-  } else if (state.status === STATUS.breakDone) {
-    actions = `
-      <div class="timer-actions">
-        <button class="btn primary" data-pomo-next ${pending ? 'disabled title="Zuerst die Sitzung loggen"' : ''}>▶ Nächste Runde</button>
-      </div>
-      <div class="pomo-choice">
-        <span class="pomo-choice-label">Oder noch eine Pause?</span>
-        <div class="timer-actions">
-          <button class="btn" data-pomo-break="short">Kurze Pause · ${POMODORO_DEFAULTS.shortBreakMinutes} Min</button>
-          <button class="btn" data-pomo-break="long">Lange Pause · ${POMODORO_DEFAULTS.longBreakMinutes} Min${recommended === 'long' ? ' <span class="pomo-rec">Empfohlen</span>' : ''}</button>
-        </div>
-      </div>
-      ${pending ? `<div class="timer-actions" style="margin-top:8px;"><button class="btn" data-pomo-log>Sitzung loggen (${pendingMinutes} Min)</button></div>` : ''}`;
-  } else {
-    actions = `
-      <div class="timer-actions">
-        <button class="btn primary" data-pomo-toggle>${paused ? '▶ Fortsetzen' : '⏸ Pausieren'}</button>
-        <button class="btn" data-pomo-skip>Pause überspringen</button>
-      </div>
-      ${pending ? `<div class="timer-actions" style="margin-top:8px;"><button class="btn" data-pomo-log>Sitzung loggen (${pendingMinutes} Min)</button></div>` : ''}`;
-  }
-
-  return `
-    <div class="card pomo-session-card" data-phase="${state.phase}" data-status="${state.status}">
-      <div class="pomo-session-head">
-        <div>
-          <div class="pomo-phase">${phase}${round ? ` · ${round}` : ''}</div>
-          <div class="pomo-time" role="timer" aria-live="off" data-pomo-time>${formatClock(remainingMs(state))}</div>
-        </div>
-        <div class="pomo-round">${state.completedRounds} ${state.completedRounds === 1 ? 'Runde' : 'Runden'} geschafft</div>
-      </div>
-      <div class="pomo-bar" aria-hidden="true"><i data-pomo-bar style="width:${progressPct(state).toFixed(2)}%"></i></div>
-      ${actions}
-    </div>`;
-}
-
-function updatePomodoroPanel(panel, state, moduleId, force = false) {
-  if (!panel) return;
-  const key = state
-    ? `${state.phase}|${state.status}|${state.completedRounds}|${state.pendingLog ? 'pending' : 'clear'}`
-    : 'idle';
-  if (!force && panel.dataset.pomoKey === key) {
-    const time = panel.querySelector('[data-pomo-time]');
-    if (time && state) time.textContent = formatClock(remainingMs(state));
-    const bar = panel.querySelector('[data-pomo-bar]');
-    if (bar && state) bar.style.width = `${progressPct(state).toFixed(2)}%`;
-    return;
-  }
-  panel.dataset.pomoKey = key;
-  panel.innerHTML = renderPomodoroPanel(state);
-  wirePomodoroPanel(panel, moduleId);
-}
-
-function wirePomodoroPanel(root, moduleId) {
-  root.querySelectorAll('[data-start-minutes]').forEach(btn => {
-    btn.addEventListener('click', () => startTimer(moduleId, parseInt(btn.dataset.startMinutes, 10)));
-  });
-  root.querySelector('[data-start-custom]')?.addEventListener('click', () => startCustomTimer(moduleId));
-
-  root.querySelector('[data-pomo-toggle]')?.addEventListener('click', () => {
-    const state = getPomodoro();
-    if (state?.status === STATUS.paused) resumePomodoro();
-    else pausePomodoro();
-  });
-  root.querySelector('[data-pomo-stop]')?.addEventListener('click', () => {
-    const snapshot = stopPomodoro();
-    if (snapshot) openSessionAfterTimer(snapshot);
-  });
-  root.querySelector('[data-pomo-log]')?.addEventListener('click', () => {
-    const pending = getPendingLog();
-    if (pending) openSessionAfterTimer(pending);
-  });
-  root.querySelectorAll('[data-pomo-break]').forEach(btn => {
-    btn.addEventListener('click', () => chooseBreak(btn.dataset.pomoBreak));
-  });
-  root.querySelector('[data-pomo-skip]')?.addEventListener('click', () => skipBreak());
-  root.querySelector('[data-pomo-next]')?.addEventListener('click', () => {
-    const result = startNextRound();
-    if (!result.ok && result.reason === 'pendingLog') {
-      window.EMVS.toast?.show('Bitte zuerst die Sitzung loggen');
-      if (result.pendingLog) openSessionAfterTimer(result.pendingLog);
-    }
-  });
 }
 
 /**
@@ -330,6 +157,13 @@ export function startPomodoroFor({
     reviewObjectiveId,
   });
   if (result.ok) {
+    if (reviewObjectiveId) {
+      const st = window.EMVS.getState();
+      if (st.settings.pendingReviewObjectiveId === reviewObjectiveId) {
+        delete st.settings.pendingReviewObjectiveId;
+        window.EMVS.save();
+      }
+    }
     window.EMVS.toast?.show(`Pomodoro gestartet: ${minutes} Min`);
     return true;
   }
@@ -346,25 +180,17 @@ export function startPomodoroFor({
   return false;
 }
 
-function startCustomTimer(moduleId) {
-  const minutes = prompt('Dauer in Minuten:', '30');
-  const m = parseInt(minutes, 10);
-  if (m && m > 0 && m <= 480) {
-    startTimer(moduleId, m);
-  }
-}
-
 /**
  * Open the log form for a completed or early-stopped Pomodoro round.
  * `snapshot` is either a pendingLog from the engine or the result of
- * stopPomodoro(). It never starts anything: saving/canceling only clears the
- * pending session.
+ * beginStopPomodoro(). It never starts anything: saving finalizes the round,
+ * canceling keeps it (or restores the pending session).
  */
 export function openSessionAfterTimer(snapshot) {
-  if (!snapshot) return;
+  if (!snapshot) return false;
   if (window.EMVS.modal?.isOpen?.()) {
     window.EMVS.toast?.show('Schließe zuerst den offenen Dialog');
-    return;
+    return false;
   }
 
   const state = window.EMVS.getState();
@@ -378,7 +204,7 @@ export function openSessionAfterTimer(snapshot) {
   const durationLabel = `${snapshot.duration} ${snapshot.duration === 1 ? 'Minute' : 'Minuten'}`;
   const info = snapshot.completed
     ? `Pomodoro-Runde abgeschlossen nach ${durationLabel}. Wähle Lernziele und Ressourcen, füge optional eine Notiz hinzu.`
-    : `Timer gestoppt nach ${durationLabel}. Wähle Lernziele und Ressourcen, füge optional eine Notiz hinzu.`;
+    : `Runde pausiert nach ${durationLabel}. Speichern beendet sie; Abbrechen ${snapshot.wasRunning ? 'setzt den Fokus fort' : 'lässt sie pausiert'}.`;
 
   openModal({
     title: `Sitzung loggen (${snapshot.duration} Min)`,
@@ -415,14 +241,19 @@ export function openSessionAfterTimer(snapshot) {
       </form>
     `,
     footer: `
-      <button class="btn" data-action="cancel">Verwerfen</button>
+      <button class="btn${snapshot.endedEarly ? '' : ' danger'}" data-action="cancel">${snapshot.endedEarly ? 'Zurück zum Timer' : 'Verwerfen'}</button>
       <button class="btn primary" data-action="save">Sitzung speichern</button>
     `,
     onClose: () => {}
   }).then(result => {
     if (!result) {
-      clearPendingLog();
-      window.EMVS.toast?.show('Sitzung verworfen');
+      if (snapshot.endedEarly) {
+        cancelStopPomodoro();
+        window.EMVS.toast?.show('Fokus bleibt erhalten');
+      } else {
+        clearPendingLog();
+        window.EMVS.toast?.show('Sitzung verworfen');
+      }
       return;
     }
 
@@ -445,10 +276,13 @@ export function openSessionAfterTimer(snapshot) {
     state.studySessions.push(session);
     updateObjectiveHistory(state, session);
     window.EMVS.save();
-    clearPendingLog();
+
+    if (snapshot.endedEarly) completeStopPomodoro();
+    else clearPendingLog();
 
     if (snapshot.reviewObjectiveId) {
       state.settings.todayReviewOutcome = snapshot.reviewObjectiveId;
+      delete state.settings.pendingReviewObjectiveId;
       window.EMVS.save();
     }
 
@@ -457,7 +291,7 @@ export function openSessionAfterTimer(snapshot) {
     const view = window.EMVS.getCurrentView?.();
     // Module tabs all report currentView === 'module'; refreshing the current
     // module tab updates the session list (or the session counts on Home).
-    if (view === 'today') {
+    if (view === 'today' || view === 'focus') {
       window.EMVS.refresh('pomodoro-session-logged', { sessionId: session.id, outcome: snapshot.reviewObjectiveId || null });
     } else if (view === 'module' || view === 'module-sessions') {
       window.EMVS.refresh('pomodoro-session-logged', { sessionId: session.id });
@@ -487,6 +321,8 @@ export function openSessionAfterTimer(snapshot) {
 
     document.querySelector('#modal-footer [data-action="cancel"]')?.addEventListener('click', () => closeModal());
   }, 50);
+
+  return true;
 }
 
 function renderSessionItem(session, objectives, resources) {
