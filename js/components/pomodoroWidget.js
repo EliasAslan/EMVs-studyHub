@@ -184,6 +184,11 @@ function cardMarkup(state) {
       </div>
     </div>
     ${actions}
+    <div class="pomo-card-foot">
+      <button type="button" class="pomo-card-link" data-pomo-open-focus>
+        ${icon('expand', 13)}<span>Fokusraum öffnen</span>
+      </button>
+    </div>
     <span class="sr-only" role="status" aria-live="polite">${liveText(state)}</span>
   </div>`;
 }
@@ -382,6 +387,11 @@ function handleAction(action, value) {
   if (action === 'min') { updatePomodoroPrefs({ minimized: true, hidden: false }); return; }
   if (action === 'hide') { updatePomodoroPrefs({ minimized: false, hidden: true }); return; }
   if (action === 'expand' || action === 'edge') { updatePomodoroPrefs({ minimized: false, hidden: false }); return; }
+  if (action === 'open-focus') {
+    // The focus room renders the full panel; the widget hides itself there.
+    try { window.EMVS?.navigate?.('focus'); } catch {}
+    return;
+  }
   if (action === 'toggle') {
     const state = getPomodoro();
     if (state?.status === STATUS.paused) resumePomodoro();
@@ -426,9 +436,10 @@ function onClick(event) {
   if (host.dataset.view === 'bubble') { handleAction('expand'); return; }
   // The edge host is 44px wide for touch; the visible tab is only 24px.
   if (host.dataset.view === 'edge') { handleAction('edge'); return; }
-  const button = event.target.closest('[data-pomo-min],[data-pomo-hide],[data-pomo-toggle],[data-pomo-stop],[data-pomo-log],[data-pomo-break],[data-pomo-skip],[data-pomo-next]');
+  const button = event.target.closest('[data-pomo-open-focus],[data-pomo-min],[data-pomo-hide],[data-pomo-toggle],[data-pomo-stop],[data-pomo-log],[data-pomo-break],[data-pomo-skip],[data-pomo-next]');
   if (!button) return;
-  if (button.hasAttribute('data-pomo-min')) handleAction('min');
+  if (button.hasAttribute('data-pomo-open-focus')) handleAction('open-focus');
+  else if (button.hasAttribute('data-pomo-min')) handleAction('min');
   else if (button.hasAttribute('data-pomo-hide')) handleAction('hide');
   else if (button.hasAttribute('data-pomo-toggle')) handleAction('toggle');
   else if (button.hasAttribute('data-pomo-stop')) handleAction('stop');

@@ -2146,6 +2146,19 @@ body[data-navlayout="context"] .rail-mod { display: none !important; }
 .pomo-card .pomo-hint { margin: 5px 2px 0; font-size: 10.5px; text-align: left; }
 .pomo-card .pomo-note { margin: 0 0 8px; padding: 8px 10px; font-size: 11px; }
 .pomo-card .pomo-note .pomo-btn { min-height: 44px; font-size: 11px; }
+.pomo-card-foot {
+  display: flex; justify-content: flex-end;
+  padding: 2px 2px 0;
+}
+.pomo-card-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; padding: 0 8px; border: 1px solid transparent;
+  border-radius: 8px; background: transparent; color: var(--ink-3);
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em;
+  text-transform: uppercase; cursor: pointer;
+}
+.pomo-card-link:hover { color: var(--ink); background: var(--bg); border-color: var(--rule); }
+.pomo-card-link:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
 
 /* Bubble */
 .pomo-bubble {

@@ -168,6 +168,9 @@ const router = readFileSync(new URL('../js/views/router.js', import.meta.url), '
 assert.ok(!router.includes('stopSessionsTimerDisplay'), 'router must not stop the global Pomodoro');
 const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 assert.ok(app.includes('initPomodoroWidget'), 'app mounts the floating widget');
+const widget = readFileSync(new URL('../js/components/pomodoroWidget.js', import.meta.url), 'utf8');
+assert.ok(widget.includes('data-pomo-open-focus'), 'floating widget can open the focus room');
+assert.ok(widget.includes("navigate?.('focus')"), 'widget opens #/fokus');
 
 // The safe stop flow must keep the round until the log is saved.
 const engine = readFileSync(new URL('../js/services/pomodoroEngine.js', import.meta.url), 'utf8');
