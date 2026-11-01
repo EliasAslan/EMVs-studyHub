@@ -421,6 +421,9 @@ function onClick(event) {
   if (justDragged) { justDragged = false; return; }
   if (event.target.closest('[data-pomo-bubble]')) { handleAction('expand'); return; }
   if (event.target.closest('[data-pomo-edge]')) { handleAction('edge'); return; }
+  // Pointer capture can retarget the click to the host instead of the child
+  // button. Treat any click inside the compact states as "open".
+  if (host.dataset.view === 'bubble') { handleAction('expand'); return; }
   // The edge host is 44px wide for touch; the visible tab is only 24px.
   if (host.dataset.view === 'edge') { handleAction('edge'); return; }
   const button = event.target.closest('[data-pomo-min],[data-pomo-hide],[data-pomo-toggle],[data-pomo-stop],[data-pomo-log],[data-pomo-break],[data-pomo-skip],[data-pomo-next]');
