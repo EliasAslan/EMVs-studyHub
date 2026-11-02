@@ -85,7 +85,7 @@ await test('routeTitle and breadcrumb describe the current page', async () => {
   state.modules.push({ id: 'm1', code: 'DB1', title: 'Datenbanken', accent: '#b45309', targetGrade: 5.0, createdAt: 1, updatedAt: 1 });
   const mod = state.modules[0];
   assert.deepEqual(routeTitle('today', {}, state), { title: 'Heute', sub: '' });
-  assert.deepEqual(routeTitle('module', { id: mod.id, tab: 'ziele' }, state), { title: `Modul ${mod.code}`, sub: 'Ziele' });
+  assert.deepEqual(routeTitle('module', { id: mod.id, tab: 'ziele' }, state), { title: `Modul ${mod.code}`, sub: 'Lernziele' });
   assert.equal(routeTitle('module', { id: 'missing', tab: 'plan' }, state).title, 'Modul');
   const trail = getBreadcrumb('module', { id: mod.id, tab: 'plan' }, state);
   assert.deepEqual(trail.map(c => c.label), ['Module', `Modul ${mod.code}`, 'Plan']);

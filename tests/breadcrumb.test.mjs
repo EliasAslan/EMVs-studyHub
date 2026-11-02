@@ -1,8 +1,9 @@
 /**
- * Module breadcrumb (W14).
+ * Module header + tab position.
  *
- * Module sub-tabs render the existing getBreadcrumb() trail as a quiet line
- * under the page title, so the current position is always visible.
+ * The compact header replaces the old breadcrumb line: the module code and the
+ * four tabs make the current position obvious without a second navigation
+ * trail. getBreadcrumb() stays available for layouts that still need a trail.
  *
  * Run:  node tests/breadcrumb.test.mjs   (or: npm test)
  */
@@ -17,14 +18,15 @@ const state = {
 };
 const labels = (view, params) => getBreadcrumb(view, params, state).map(c => c.label);
 
-assert.deepEqual(labels('module', { id: 'm1', tab: 'ziele' }), ['Module', 'Modul T1', 'Ziele']);
+assert.deepEqual(labels('module', { id: 'm1', tab: 'ziele' }), ['Module', 'Modul T1', 'Lernziele']);
 assert.deepEqual(labels('module', { id: 'm1', tab: 'plan' }), ['Module', 'Modul T1', 'Plan']);
 assert.deepEqual(labels('module', { id: 'm1', tab: 'home' }), ['Module', 'Modul T1'], 'Home adds no extra crumb');
 assert.deepEqual(labels('today', {}), ['Heute'], 'global views stay a single crumb');
 
 const moduleSrc = readFileSync(new URL('../js/views/module.js', import.meta.url), 'utf8');
-assert.ok(moduleSrc.includes('getBreadcrumb('), 'module view uses getBreadcrumb()');
-assert.ok(moduleSrc.includes('class="mod-breadcrumb"'), 'module view renders the breadcrumb');
-assert.ok(moduleSrc.includes('escapeHtml(c.label)'), 'breadcrumb labels are escaped');
+assert.ok(moduleSrc.includes('class="mod-head"'), 'module view renders the compact header');
+assert.ok(!moduleSrc.includes('mod-breadcrumb'), 'module view no longer duplicates navigation in a breadcrumb');
+assert.ok(moduleSrc.includes('MODULE_TABS.map'), 'module view renders all tab positions');
+assert.ok(moduleSrc.includes('aria-selected='), 'active tab is exposed to assistive tech');
 
-console.log('ok - module breadcrumb trail uses getBreadcrumb()');
+console.log('ok - module header and tabs describe the current position');

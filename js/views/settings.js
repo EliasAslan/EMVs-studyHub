@@ -117,12 +117,12 @@ export function renderSettings(state) {
         <summary class="settings-group-summary"><span>Lokale KI (Ollama, optional)</span><span class="settings-summary-hint">PDF-Import mit Qwen</span></summary>
         <div class="settings-group-content">
       <p class="settings-ai-intro">
-        Erstelle Lernziele und Ressourcen aus einem PDF mit <strong>Qwen auf deinem eigenen PC</strong>. Die KI ist optional; deine normale Lernplanung funktioniert auch ohne sie.
+        Erstelle Lernziele und Material aus einem PDF mit <strong>Qwen auf deinem eigenen PC</strong>. Die KI ist optional; deine normale Lernplanung funktioniert auch ohne sie.
       </p>
       <div class="ai-action-card">
         <div class="ai-action-copy">
           <strong>Was möchtest du mit der KI machen?</strong>
-          <span>PDF hochladen, Lernziele und Ressourcen erkennen lassen und den Entwurf prüfen.</span>
+          <span>PDF hochladen, Lernziele und Material erkennen lassen und den Entwurf prüfen.</span>
         </div>
         <button class="btn primary ai-import-cta" id="ai-import-pdf">PDF auswählen →</button>
       </div>
@@ -266,7 +266,7 @@ export function renderSettings(state) {
       <div class="settings-group-content">
       <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch;">
         EMVS Study Hub v1.0 — Local-first Lernmanagement.<br>
-        Datenmodell: Module, Lernziele, Ressourcen, Sitzungen, Prüfungen, Plan, Erfassungen, Wochenreviews.
+        Datenmodell: Module, Lernziele, Material, Sitzungen, Prüfungen, Plan, Notizen, Wochenreviews.
       </p>
     </div>
   `;
@@ -438,7 +438,7 @@ export function renderSettings(state) {
   el.querySelectorAll('[data-action="delete-module"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
-      if (await confirmDialog('Modul wirklich löschen? Alle zugehörigen Lernziele, Ressourcen, Sitzungen, Prüfungen, Plan-Einträge werden ebenfalls gelöscht.', 'Modul löschen')) {
+      if (await confirmDialog('Modul wirklich löschen? Alle zugehörigen Lernziele, Material, Sitzungen, Prüfungen, Plan-Einträge werden ebenfalls gelöscht.', 'Modul löschen')) {
         // Delete module with tombstone (cascades to all child collections)
         deleteWithTombstone(state, 'modules', id);
         

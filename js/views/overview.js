@@ -27,7 +27,7 @@ export function renderOverview(state) {
         <button class="btn" id="create-from-pdf">Modul aus PDF (lokale KI)</button>
         <button class="btn" id="import-backup">Backup importieren</button>
       </div>
-      <p class="empty-hint">PDFs und Links kannst du später pro Modul unter Material als Ressource ablegen.</p>
+      <p class="empty-hint">PDFs und Links kannst du später pro Modul unter Material als Material ablegen.</p>
     `;
     el.querySelector('#create-first-module').addEventListener('click', () => openSettingsModuleModal());
     el.querySelector('#create-from-pdf').addEventListener('click', () => openPdfImport());
@@ -86,7 +86,7 @@ function renderModuleCard(state, m) {
   const pct = objectiveProgressPercent(stats.objectivesDone, stats.objectivesTotal);
   const nextTitle = weak ? weak.title : 'Alle Lernziele gemeistert';
   const nextMeta = weak
-    ? `LZ ${weak.number ?? '–'} · Confidence ${weak.confidence ?? 0}/5`
+    ? `LZ ${weak.number ?? '–'} · Sicherheit ${weak.confidence ?? 0}/5`
     : 'Zeit für eine Mock-Prüfung';
 
   return `
@@ -113,7 +113,7 @@ function renderModuleCard(state, m) {
           <span class="stat-value">${stats.objectivesDone} <span class="muted">/ ${stats.objectivesTotal}</span></span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">Ressourcen</span>
+          <span class="stat-label">Material</span>
           <span class="stat-value">${stats.resourcesDone} <span class="muted">/ ${stats.resourcesTotal}</span></span>
         </div>
         <div class="stat-row">

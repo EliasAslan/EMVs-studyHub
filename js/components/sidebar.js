@@ -18,11 +18,10 @@ import { openLaunchpad } from './nav/bento.js';
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 
 const MTAB_META = {
-  home: { ico: '⌂', tip: 'Modul-Home — Übersicht' },
+  home: { ico: '⌂', tip: 'Übersicht' },
   ziele: { ico: '◎', tip: 'Lernziele' },
+  material: { ico: '▤', tip: 'Material' },
   plan: { ico: '≡', tip: 'Plan' },
-  sessions: { ico: '▶', tip: 'Sitzungen' },
-  material: { ico: '▤', tip: 'Material und Prüfungen' },
 };
 
 function hexToRgb(hex) {
@@ -117,7 +116,7 @@ function moduleSectionHtml(state, nav, cur, currentView) {
     html += `
       <div class="mod-current" data-module="${cur.id}">
         <button type="button" class="mod-current-head${nav.moduleTab === 'home' && currentView === 'module' ? ' active' : ''}" data-mtab-go="home" data-module="${cur.id}"
-          title="Modul-Home — ${escapeHtml(cur.title)}" aria-label="Modul-Home — Modul ${escapeHtml(cur.code)}">
+          title="Übersicht — ${escapeHtml(cur.title)}" aria-label="Übersicht — Modul ${escapeHtml(cur.code)}">
           <span class="toc-ico mod-home-ico" aria-hidden="true">⌂</span>
           <span class="rail-mod-dot" aria-hidden="true" style="background: var(--accent);"></span>
           <span class="mod-current-code">Modul ${escapeHtml(cur.code)}</span>
@@ -151,7 +150,7 @@ function moduleSectionHtml(state, nav, cur, currentView) {
 
 /** Bind one rendered module section (sidebar copy or panel copy). */
 function bindModuleSection(container) {
-  // Module tab buttons: Home + 4 tabs keep module context.
+  // Module tab buttons: Übersicht + 3 working tabs keep module context.
   // These controls are native buttons. Let the browser synthesize their
   // click for Enter/Space; handling keydown as well would navigate twice.
   container.querySelectorAll('[data-mtab]').forEach(btn => {

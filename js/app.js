@@ -215,7 +215,9 @@ function init() {
       const st = window.EMVS.getState();
       if (st.modules.length) openQuickCapture({ moduleId: st.settings.currentModuleId || null });
     }
-    // Today view queue shortcuts: Enter = start review, n = skip.
+    // Today view queue shortcuts: Enter = open the focus room for the hero
+    // objective, n = defer it to later today. Inline Sitzt/Wackelig/Verloren
+    // stay one click away on the card itself.
     // Enter is also the native activation key for buttons/links, so only
     // treat it as a queue shortcut when focus is not on an interactive row.
     else if (key === 'enter' && window.EMVS.getCurrentView?.() === 'today'
@@ -226,8 +228,8 @@ function init() {
     }
     else if (key === 'n' && window.EMVS.getCurrentView?.() === 'today') {
       e.preventDefault();
-      const qSkip = document.querySelector('.q-card .q-skip');
-      qSkip?.click();
+      const qDefer = document.querySelector('.q-card .q-outcome-defer');
+      qDefer?.click();
     }
   });
   

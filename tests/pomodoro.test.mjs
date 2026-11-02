@@ -136,7 +136,9 @@ assert.equal(formatClock(0), '00:00');
 assert.equal(formatClock(1000), '00:01');
 assert.equal(formatClock(59_500), '01:00');
 
-// Entry points that start a session must use the shared Pomodoro.
+// Entry points that start a session must use the shared Pomodoro. Manual
+// logging is allowed on the module overview, objective detail and Today; those
+// views must not open a log modal in place of starting a focus round.
 const views = [
   'js/views/focus.js',
   'js/views/module-home.js',
@@ -148,7 +150,14 @@ const views = [
 for (const file of views) {
   const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
   assert.ok(src.includes('startPomodoroFor'), `${file}: starts a Pomodoro`);
-  assert.ok(!src.includes('openSessionModal'), `${file}: no immediate log modal start`);
+}
+for (const file of ['js/views/focus.js', 'js/views/module-resources.js', 'js/views/overview.js', 'js/views/weak-spots.js']) {
+  const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+  assert.ok(!src.includes('openSessionModal'), `${file}: no log modal instead of the focus round`);
+}
+for (const file of ['js/views/module-home.js', 'js/views/module-objectives.js']) {
+  const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+  assert.ok(src.includes('openSessionModal'), `${file}: offers an optional manual session log`);
 }
 const today = readFileSync(new URL('../js/views/today.js', import.meta.url), 'utf8');
 assert.ok(today.includes('pendingReviewObjectiveId'), 'today carries the review objective');

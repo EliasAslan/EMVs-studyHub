@@ -13,7 +13,7 @@
 import { escapeHtml } from '../utils/helpers.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { generateId, ensureResourceFields, markResourceUsed, setResourceUnderstood, unlinkResourceEverywhere, deleteWithTombstone } from '../services/store.js';
-import { RESOURCE_TYPES } from '../utils/helpers.js';
+import { RESOURCE_TYPES, RESOURCE_TYPE_LABELS } from '../utils/helpers.js';
 import { getResourceUsage, formatLastUsed, rhythmOf } from '../utils/helpers.js';
 import { refresh, registerPatcher } from './router.js';
 import { startPomodoroFor } from './module-sessions.js';
@@ -29,7 +29,7 @@ const STATE_FILTERS = [
   { key: 'unused', label: 'Nie benutzt' },
 ];
 
-export function renderModuleResources(state) {
+export function renderModuleResources(state, { embedded = false } = {}) {
   const moduleId = state.settings.currentModuleId;
   const m = state.modules.find(x => x.id === moduleId);
   if (!m) return document.createElement('div');
@@ -38,24 +38,25 @@ export function renderModuleResources(state) {
 
   const el = document.createElement('div');
   el.innerHTML = `
+    ${embedded ? '' : `
     <div class="eyebrow">Bibliothek · Modul ${escapeHtml(m.code)}</div>
     <h1 class="page-title">Lernmaterial</h1>
-    <p class="page-lede js-res-lede"></p>
+    <p class="page-lede js-res-lede"></p>`}
     <div class="res-search">
       <input class="res-search-input" id="res-search" type="search"
         placeholder="Suchen — Name, Notiz, URL…" value="${escapeHtml(filters.q)}"
-        aria-label="Ressourcen suchen">
+        aria-label="Material suchen">
     </div>
     <div class="res-filters" role="group" aria-label="Typ filtern">
       <button class="badge filter-btn ${filters.type === 'all' ? 'active' : ''}" data-tfilter="all">Alle Typen</button>
-      ${RESOURCE_TYPES.map(t => `<button class="badge filter-btn ${filters.type === t ? 'active' : ''}" data-tfilter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}
+      ${RESOURCE_TYPES.map(t => `<button class="badge filter-btn ${filters.type === t ? 'active' : ''}" data-tfilter="${escapeHtml(t)}">${escapeHtml(RESOURCE_TYPE_LABELS[t] || t)}</button>`).join('')}
     </div>
     <div class="res-filters" role="group" aria-label="Stand filtern" style="margin-top:8px;">
       ${STATE_FILTERS.map(f => `<button class="badge filter-btn ${filters.state === f.key ? 'active' : ''}" data-sfilter="${f.key}">${f.label}</button>`).join('')}
     </div>
     <div class="res-list" id="resources-list"></div>
     <div class="mt-3">
-      <button class="btn primary" id="add-resource">＋ Ressource hinzufügen</button>
+      <button class="btn primary" id="add-resource">＋ Material hinzufügen</button>
     </div>
   `;
 
@@ -103,7 +104,7 @@ function applyFilters(state, list) {
     if (filters.state === 'used' && usage.totalUses === 0) return false;
     if (filters.state === 'unused' && usage.totalUses > 0) return false;
     if (q) {
-      const hay = `${r.name} ${r.notes || ''} ${r.url || ''} ${r.type || ''}`.toLowerCase();
+      const hay = `${r.name} ${r.notes || ''} ${r.url || ''} ${r.type || ''} ${RESOURCE_TYPE_LABELS[r.type] || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -118,13 +119,13 @@ function paintResourceList(el, state, moduleId, keepFocus = false) {
   const lede = el.querySelector('.js-res-lede');
   if (lede) {
     lede.textContent = all.length
-      ? `${all.length} Ressourcen · ${understood} verstanden · ${unused} noch nie benutzt. Benutzt ≠ verstanden: Öffnen heisst nicht Können.`
-      : 'Noch keine Ressourcen — lege oben die erste an.';
+      ? `${all.length} ${all.length === 1 ? 'Material' : 'Materialien'} · ${understood} verstanden · ${unused} noch nie benutzt. Benutzt ≠ verstanden: Öffnen heisst nicht Können.`
+      : 'Noch kein Material — lege oben das erste an.';
   }
   const host = el.querySelector('#resources-list');
   host.innerHTML = list.length
     ? list.map(r => renderResourceCard(r, state)).join('')
-    : `<div class="card empty-state"><div class="icon">📚</div><h3>Nichts gefunden</h3><p>Filter oder Suche anpassen — oder eine neue Ressource anlegen.</p></div>`;
+    : `<div class="card empty-state"><div class="icon">📚</div><h3>Nichts gefunden</h3><p>Filter oder Suche anpassen — oder neues Material anlegen.</p></div>`;
   host.querySelectorAll('.res-card').forEach(card => bindResourceCard(card, el, state, moduleId));
   if (keepFocus) {
     const input = el.querySelector('#res-search');
@@ -156,7 +157,7 @@ function renderResourceCard(res, state) {
             ${res.url ? `<a href="${escapeHtml(res.url)}" target="_blank" rel="noopener" style="text-decoration: underline; text-underline-offset: 3px;">${escapeHtml(res.name)} ↗</a>` : escapeHtml(res.name)}
           </div>
           <div class="res-sub">
-            <span class="badge">${escapeHtml(res.type)}</span>
+            <span class="badge">${escapeHtml(RESOURCE_TYPE_LABELS[res.type] || res.type)}</span>
             ${usageBadge(state, res)}
             ${res.understood
               ? `<span class="badge done">verstanden ✓</span>`
@@ -169,8 +170,8 @@ function renderResourceCard(res, state) {
           </div>
         </div>
         <div class="res-actions">
-          <button class="edit-btn" data-act="edit" title="Bearbeiten" aria-label="Ressource bearbeiten: ${escapeHtml(res.name)}">✎</button>
-          <button class="delete-btn" data-act="delete" title="Löschen" aria-label="Ressource löschen: ${escapeHtml(res.name)}">✕</button>
+          <button class="edit-btn" data-act="edit" title="Bearbeiten" aria-label="Material bearbeiten: ${escapeHtml(res.name)}">✎</button>
+          <button class="delete-btn" data-act="delete" title="Löschen" aria-label="Material löschen: ${escapeHtml(res.name)}">✕</button>
         </div>
       </div>
       <div class="res-quick">
@@ -230,7 +231,7 @@ function bindResourceCard(card, el, state, moduleId) {
   });
   card.querySelector('[data-act="delete"]')?.addEventListener('click', e => {
     e.stopPropagation();
-    if (confirm('Ressource wirklich löschen? Verlauf und Verknüpfungen gehen verloren.')) {
+    if (confirm('Material wirklich löschen? Verlauf und Verknüpfungen gehen verloren.')) {
       deleteWithTombstone(state, 'resources', id);
       // Unlink from sessions and plan items (keep them, drop the reference)
       unlinkResourceEverywhere(state, id);
@@ -252,7 +253,7 @@ export function openResourceHistory(resourceId, onChange = null) {
   ensureResourceFields(res);
 
   openModal({
-    title: 'Ressource · Verlauf',
+    title: 'Material · Verlauf',
     body: `<div id="res-history-body">${resourceHistoryHtml(state, res)}</div>`,
     footer: `<button class="btn" data-action="close">Schliessen</button>`,
     onClose: () => {},
@@ -301,7 +302,7 @@ function resourceHistoryHtml(state, res) {
       ${res.url ? `<div style="margin-top:4px;"><a href="${escapeHtml(res.url)}" target="_blank" rel="noopener" style="text-decoration: underline; text-underline-offset: 3px; font-size:13.5px;">${escapeHtml(res.url.length > 60 ? res.url.slice(0, 60) + '…' : res.url)} ↗</a></div>` : ''}
       ${res.notes ? `<div class="obj-hist-desc">${escapeHtml(res.notes)}</div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
-        <span class="badge">${escapeHtml(res.type || 'Material')}</span>
+        <span class="badge">${escapeHtml(RESOURCE_TYPE_LABELS[res.type] || res.type || 'Material')}</span>
         <span class="badge" title="Priorität">${escapeHtml(res.focus === '70' ? 'High-Yield' : 'Advanced')}</span>
         ${usage.totalUses
           ? `<span class="badge res-used">${usage.totalUses}× benutzt · ${escapeHtml(formatLastUsed(usage.lastUsedTs))}</span>`
@@ -313,7 +314,7 @@ function resourceHistoryHtml(state, res) {
         ${res.understood
           ? `<button class="btn" data-ract="reopen">Wieder offen</button>`
           : `<button class="btn primary" data-ract="understood">Verstanden ✓</button>`}
-        <button class="btn" data-ract="session">⏱ Sitzung mit dieser Ressource</button>
+        <button class="btn" data-ract="session">⏱ Sitzung mit diesem Material</button>
       </div>
       <p class="today-empty-line" style="margin-top:10px;">Benutzt ≠ verstanden: Öffnen zählt als Benutzung — Verstehen markierst du explizit.</p>
       <div class="timer-actions" style="margin-top:6px;">
@@ -327,7 +328,7 @@ function resourceHistoryHtml(state, res) {
       return `<div class="obj-hist-res-row">
         <button class="badge res-obj-chip" data-robj="${o.id}" title="Verlauf öffnen">LZ ${o.number}</button>
         <span class="obj-hist-res-name">${escapeHtml(o.title.length > 70 ? o.title.slice(0, 70) + '…' : o.title)}</span>
-        <span class="muted" style="font-size:12px;">Confidence ${o.confidence ?? 0}/5 · ${escapeHtml(r.label)}</span>
+        <span class="muted" style="font-size:12px;">Sicherheit ${o.confidence ?? 0}/5 · ${escapeHtml(r.label)}</span>
       </div>`;
     }).join('')}</div>` : `<p class="today-empty-line">Noch kein Lernziel verknüpft — über Bearbeiten zuordnen.</p>`}
 
@@ -441,7 +442,7 @@ export function openResourceModal(resource = null, moduleId = null, onChange = n
   ensureResourceFields(res);
 
   openModal({
-    title: isNew ? 'Neue Ressource' : 'Ressource bearbeiten',
+    title: isNew ? 'Neues Material' : 'Material bearbeiten',
     body: `
       <form id="resource-form">
         <div class="field-row">
@@ -451,7 +452,7 @@ export function openResourceModal(resource = null, moduleId = null, onChange = n
         <div class="field-row">
           <label>Typ</label>
           <select name="type">
-            ${RESOURCE_TYPES.map(t => `<option value="${t}" ${res.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+            ${RESOURCE_TYPES.map(t => `<option value="${t}" ${res.type === t ? 'selected' : ''}>${RESOURCE_TYPE_LABELS[t] || t}</option>`).join('')}
           </select>
         </div>
         <div class="field-row">

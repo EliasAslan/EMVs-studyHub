@@ -45,8 +45,8 @@ function ymd(ts) {
 // Fixed "today" at local noon to avoid midnight edge flakes.
 const NOW = new Date(2026, 9, 15, 12, 0, 0).getTime();
 
-await test('module tabs: exactly Home + four working tabs', async () => {
-  assert.deepEqual(MODULE_TABS.map(t => t.key), ['home', 'ziele', 'plan', 'sessions', 'material']);
+await test('module tabs: exactly four working tabs', async () => {
+  assert.deepEqual(MODULE_TABS.map(t => t.key), ['home', 'ziele', 'material', 'plan']);
   assert.equal(DEFAULT_MODULE_TAB, 'home');
   assert.deepEqual(GLOBAL_VIEWS, ['today', 'overview', 'weak-spots', 'exams-global']);
 });

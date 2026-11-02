@@ -1,9 +1,9 @@
 /**
  * Module Objectives View — history first, not status first.
  *
- * Each objective is a learning thread with a past (sessions, confidence
+ * Each objective is a learning thread with a past (sessions, Sicherheit
  * changes, reviews, resources used, exams, captures) and a rhythm (spaced
- * resurfacing). Rows show history signals — confidence, last touched, total
+ * resurfacing). Rows show history signals — Sicherheit, last touched, total
  * study time, linked resource count, next review — and clicking a row opens
  * the full timeline. There are no checkboxes and no status dropdown on the
  * row; "done" means "resting until the next review", never gone.
@@ -13,31 +13,33 @@ import { escapeHtml } from '../utils/helpers.js';
 import {
   buildObjectiveTimeline, rhythmOf, formatLastTouched, formatNextReview,
   linkedResourceCount, resourcesForObjective,
-  examsForObjective, getExamGrade, isDue,
+  examsForObjective, getExamGrade, isDue, capturesForObjective,
+  CAPTURE_TYPE_LABELS, RESOURCE_TYPE_LABELS,
 } from '../utils/helpers.js';
 import { openModal, closeModal, confirmDialog } from '../components/modal.js';
 import {
   generateId, ensureObjectiveFields, recordReview, markUnderstood,
   reopenObjective, unlinkObjectiveEverywhere, pushCapped, deleteWithTombstone,
 } from '../services/store.js';
+import { openQuickCapture, openCaptureModal } from './captures.js';
 import { refresh, registerPatcher } from './router.js';
-import { startPomodoroFor } from './module-sessions.js';
+import { startPomodoroFor, openSessionModal } from './module-sessions.js';
 
 const GROUP_ORDER = ['due', 'active', 'resting', 'fresh'];
 const GROUP_TITLES = {
-  due: 'Wieder fällig — zuerst vergessen',
+  due: 'Fällig — zuerst wiederholen',
   active: 'In Bewegung',
-  resting: 'Verstanden — ruht bis zum Review',
-  fresh: 'Neu — noch unberührt',
+  resting: 'Verstanden — ruht bis zur Wiederholung',
+  fresh: 'Neu — noch nicht begonnen',
 };
 const GROUP_NOTES = {
-  due: 'Diese Fäden hast du als verstanden abgelegt — ihr Review ist fällig.',
-  active: 'Hier arbeitest du gerade. Berührung hält den Faden warm.',
-  resting: 'Verstanden heisst nicht fertig: jedes ruht bis zu seinem nächsten Review.',
-  fresh: 'Noch kein Verlauf. Eine erste Sitzung beginnt die Geschichte.',
+  due: 'Die Wiederholung ist fällig.',
+  active: 'Daran arbeitest du gerade.',
+  resting: 'Verstanden heisst nicht fertig: Es ruht bis zur nächsten Wiederholung.',
+  fresh: 'Noch keine Sitzung. Die erste beginnt den Verlauf.',
 };
 
-export function renderModuleObjectives(state) {
+export function renderModuleObjectives(state, { embedded = false } = {}) {
   const moduleId = state.settings.currentModuleId;
   const m = state.modules.find(x => x.id === moduleId);
   if (!m) return document.createElement('div');
@@ -46,9 +48,10 @@ export function renderModuleObjectives(state) {
 
   const el = document.createElement('div');
   el.innerHTML = `
+    ${embedded ? '' : `
     <div class="eyebrow">Verläufe · Modul ${escapeHtml(m.code)}</div>
-    <h1 class="page-title">Lernverläufe</h1>
-    <p class="page-lede js-obj-lede"></p>
+    <h1 class="page-title">Lernziele</h1>
+    <p class="page-lede js-obj-lede"></p>`}
     <div id="objectives-groups"></div>
     <div class="mt-3">
       <button class="btn primary" id="add-objective">＋ Lernziel hinzufügen</button>
@@ -96,8 +99,8 @@ function paintObjectiveGroups(el, state, moduleId) {
   const due = objectives.filter(o => groupOf(o) === 'due').length;
   if (lede) {
     lede.textContent = due
-      ? `${objectives.length} Lernverläufe · ${due} fällig zur Wiederholung. Klick auf einen Verlauf öffnet seine Geschichte.`
-      : `${objectives.length} Lernverläufe. Klick auf einen Verlauf öffnet seine Geschichte — Confidence per Klick anpassen.`;
+      ? `${objectives.length} Lernziele · ${due} fällig zur Wiederholung. Klick auf ein Ziel öffnet Notizen, Material und Verlauf.`
+      : `${objectives.length} Lernziele. Klick auf ein Ziel öffnet Notizen, Material und Verlauf — Sicherheit per Klick anpassen.`;
   }
   const host = el.querySelector('#objectives-groups');
   const groups = { due: [], active: [], resting: [], fresh: [] };
@@ -129,17 +132,17 @@ function renderObjectiveCard(obj, state) {
       </div>
       <div class="hz-title obj-title">${escapeHtml(obj.title)}</div>
       <div class="obj-meta">
-        <div class="confidence-dots" data-id="${obj.id}" role="group" aria-label="Confidence">
-          ${[1, 2, 3, 4, 5].map(n => `<div class="confidence-dot ${n <= (obj.confidence || 0) ? 'on' : ''}" data-n="${n}" title="Confidence ${n}/5" role="button" tabindex="0" aria-label="Confidence ${n}"></div>`).join('')}
+        <div class="confidence-dots" data-id="${obj.id}" role="group" aria-label="Sicherheit">
+          ${[1, 2, 3, 4, 5].map(n => `<div class="confidence-dot ${n <= (obj.confidence || 0) ? 'on' : ''}" data-n="${n}" title="Sicherheit ${n}/5" role="button" tabindex="0" aria-label="Sicherheit ${n}"></div>`).join('')}
         </div>
         <span class="obj-meta-item" title="Zuletzt berührt">berührt ${escapeHtml(formatLastTouched(obj))}</span>
         <span class="obj-meta-item" title="Gesamte Lernzeit">${totalTime} Min</span>
-        <span class="obj-meta-item" title="Verknüpfte Ressourcen">${resCount} Ressource${resCount === 1 ? '' : 'n'}</span>
-        <span class="obj-meta-item obj-next ${due ? 'due' : ''}" title="Nächstes Review">Review: ${escapeHtml(formatNextReview(obj))}</span>
-        ${reviewCount ? `<span class="obj-meta-item" title="Abgeschlossene Reviews">${reviewCount}× reviewt</span>` : ''}
+        <span class="obj-meta-item" title="Verknüpftes Material">${resCount} Material</span>
+        <span class="obj-meta-item obj-next ${due ? 'due' : ''}" title="Nächste Wiederholung">Wiederholung: ${escapeHtml(formatNextReview(obj))}</span>
+        ${reviewCount ? `<span class="obj-meta-item" title="Abgeschlossene Wiederholungen">${reviewCount}× wiederholt</span>` : ''}
       </div>
       <div class="obj-actions">
-        <button type="button" class="obj-open-hint" data-open-history aria-label="Verlauf öffnen: ${escapeHtml(obj.title)}">Verlauf öffnen →</button>
+        <button type="button" class="obj-open-hint" data-open-history aria-label="Lernziel öffnen: ${escapeHtml(obj.title)}">Öffnen →</button>
         <span class="obj-tools">
           <button class="edit-btn" title="Details bearbeiten" aria-label="Details bearbeiten">✎</button>
           <button class="delete-btn" title="Löschen" aria-label="Lernziel löschen">✕</button>
@@ -181,7 +184,7 @@ function bindObjectiveCard(item, state) {
 
   item.querySelector('.delete-btn')?.addEventListener('click', e => {
     e.stopPropagation();
-    if (confirm('Lernziel wirklich löschen? Verlauf, Reviews und Verknüpfungen gehen verloren.')) {
+    if (confirm('Lernziel wirklich löschen? Verlauf, Wiederholungen und Verknüpfungen gehen verloren.')) {
       deleteWithTombstone(state, 'learningObjectives', id);
       // Strip the deleted id from all linked entities so exam/plan/resource
       // views stay consistent instead of counting orphaned links.
@@ -208,9 +211,9 @@ export function openObjectiveHistory(objectiveId) {
   ensureObjectiveFields(obj);
 
   openModal({
-    title: `LZ ${obj.number ?? '–'} · Verlauf`,
+    title: `LZ ${obj.number ?? '–'} · Lernziel`,
     body: `<div id="obj-history-body">${historyBodyHtml(state, obj)}</div>`,
-    footer: `<button class="btn" data-action="close">Schliessen</button>`,
+    footer: `<button class="btn" data-action="close">Schließen</button>`,
     onClose: () => {},
   });
 
@@ -228,6 +231,7 @@ function historyBodyHtml(state, obj) {
   const exams = examsForObjective(state, obj);
   const reviewCount = (obj.reviewHistory || []).length;
   const due = isDue(obj);
+  const notes = capturesForObjective(state, obj);
 
   const resourceUsage = linked.map(res => {
     const uses = state.studySessions
@@ -244,23 +248,25 @@ function historyBodyHtml(state, obj) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
         <span class="badge rhythm rhythm-${r.key}">${escapeHtml(r.label)}</span>
         ${obj.status === 'done' ? `<span class="badge done">verstanden</span>` : ''}
-        <span class="badge">Confidence ${obj.confidence ?? 0}/5</span>
+        <span class="badge">Sicherheit ${obj.confidence ?? 0}/5</span>
       </div>
       <div class="obj-hist-facts">
         <span>Berührt <strong>${escapeHtml(formatLastTouched(obj))}</strong></span>
         <span><strong>${obj.totalStudyTime || 0} Min</strong> gesamt</span>
-        <span><strong>${resCount}</strong> Ressourcen</span>
-        <span>Review: <strong class="${due ? 'obj-next due' : ''}">${escapeHtml(formatNextReview(obj))}</strong></span>
-        <span><strong>${reviewCount}×</strong> reviewt</span>
+        <span><strong>${resCount}</strong> Material</span>
+        <span>Wiederholung: <strong class="${due ? 'obj-next due' : ''}">${escapeHtml(formatNextReview(obj))}</strong></span>
+        <span><strong>${reviewCount}×</strong> wiederholt</span>
       </div>
       <div class="timer-actions" style="margin-top:14px;">
-        <button class="btn primary" data-hact="session">⏱ Sitzung loggen</button>
+        <button class="btn primary" data-hact="log">＋ Sitzung loggen</button>
+        <button class="btn" data-hact="session">▶ Fokus starten</button>
+        <button class="btn" data-hact="note-new">＋ Notiz</button>
         ${obj.status === 'done'
           ? `<button class="btn" data-hact="reopen">Wieder öffnen</button>`
           : `<button class="btn" data-hact="understood">✓ Als verstanden markieren</button>`}
       </div>
       <div class="obj-review-row">
-        <span class="obj-review-label">Review festhalten:</span>
+        <span class="obj-review-label">Wiederholung festhalten:</span>
         <div class="timer-actions">
           <button class="btn" data-hact="review-solid" title="Sitzt — Abstand wächst">Sitzt ✓</button>
           <button class="btn" data-hact="review-shaky" title="Wackelig — gleicher Abstand">Wackelig ~</button>
@@ -272,12 +278,27 @@ function historyBodyHtml(state, obj) {
       </div>
     </div>
 
+    <h3 class="section-label" style="margin-top:24px;">Notizen · ${notes.length}</h3>
+    ${notes.length ? `
+      <div class="obj-hist-res">
+        ${notes.map(c => `
+          <button type="button" class="obj-hist-res-row obj-note-row" data-note="${c.id}">
+            <span class="badge">${escapeHtml(CAPTURE_TYPE_LABELS[c.type] || c.type || 'Notiz')}</span>
+            <span class="obj-hist-res-name">${escapeHtml(String(c.content || '').slice(0, 140))}${String(c.content || '').length > 140 ? '…' : ''}</span>
+            <span class="muted" style="font-size:12px;">${new Date(c.timestamp || c.createdAt || Date.now()).toLocaleDateString('de-CH')}</span>
+          </button>`).join('')}
+      </div>` : `
+      <p class="today-empty-line">Noch keine Notiz zu diesem Ziel.</p>
+      <div class="timer-actions" style="margin-top:8px;">
+        <button class="btn ghost" data-hact="note-new">＋ Notiz hinzufügen</button>
+      </div>`}
+
     ${resourceUsage.length ? `
-      <h3 class="section-label" style="margin-top:24px;">Verknüpfte Ressourcen · ${resourceUsage.length}</h3>
+      <h3 class="section-label" style="margin-top:24px;">Material · ${resourceUsage.length}</h3>
       <div class="obj-hist-res">
         ${resourceUsage.map(({ res, uses, last }) => `
           <div class="obj-hist-res-row">
-            <span class="badge">${escapeHtml(res.type || 'Material')}</span>
+            <span class="badge">${escapeHtml(RESOURCE_TYPE_LABELS[res.type] || res.type || 'Material')}</span>
             <span class="obj-hist-res-name">${res.url ? `<a href="${escapeHtml(res.url)}" target="_blank" rel="noopener">${escapeHtml(res.name)} ↗</a>` : escapeHtml(res.name)}</span>
             <span class="muted" style="font-size:12px;">${uses ? `${uses}× benutzt${last ? ` · zuletzt ${new Date(last.startTime).toLocaleDateString('de-CH')}` : ''}` : 'noch nie in Sitzung benutzt'}</span>
           </div>`).join('')}
@@ -335,17 +356,43 @@ function bindHistoryBody(state, objId) {
       minutes: 25,
     });
   });
+  act('log', () => {
+    const obj = window.EMVS.getState().learningObjectives.find(o => o.id === objId);
+    if (!obj) return;
+    closeModal();
+    setTimeout(() => openSessionModal(null, obj.moduleId, {
+      linkedObjectiveIds: [obj.id],
+    }), 80);
+  });
+  act('note-new', () => {
+    const obj = window.EMVS.getState().learningObjectives.find(o => o.id === objId);
+    if (!obj) return;
+    closeModal();
+    setTimeout(() => openQuickCapture({
+      moduleId: obj.moduleId,
+      objectiveId: obj.id,
+      type: 'thought',
+    }), 80);
+  });
+  body.querySelectorAll('[data-note]').forEach(row => {
+    row.addEventListener('click', () => {
+      const c = window.EMVS.getState().captures.find(x => x.id === row.dataset.note);
+      if (!c) return;
+      closeModal();
+      setTimeout(() => openCaptureModal(c), 80);
+    });
+  });
   act('understood', async () => {
     const st = window.EMVS.getState();
     const obj = st.learningObjectives.find(o => o.id === objId);
     if (obj.confidence < 4) {
-      const msg = `Verstanden markieren bei Confidence ${obj.confidence}/5?`;
-      const ok = await confirmDialog(msg, 'Confidence niedrig');
+      const msg = `Verstanden markieren bei Sicherheit ${obj.confidence}/5?`;
+      const ok = await confirmDialog(msg, 'Sicherheit niedrig');
       if (!ok) return;
     }
     markUnderstood(obj);
     window.EMVS.save();
-    window.EMVS.toast.show(`Verstanden — nächstes Review in ${obj.reviewSchedule.interval} Tagen`);
+    window.EMVS.toast.show(`Verstanden — nächste Wiederholung in ${obj.reviewSchedule.interval} Tagen`);
     rerenderHistory(st, objId);
   });
   act('reopen', () => {
@@ -361,12 +408,12 @@ function bindHistoryBody(state, objId) {
     const obj = st.learningObjectives.find(o => o.id === objId);
     const entry = recordReview(obj, outcome);
     window.EMVS.save();
-    window.EMVS.toast.show(`${msg} — nächstes Review in ${entry.interval} Tagen`);
+    window.EMVS.toast.show(`${msg} — nächste Wiederholung in ${entry.interval} Tagen`);
     rerenderHistory(st, objId);
   };
-  act('review-solid', review('solid', 'Review: sitzt'));
-  act('review-shaky', review('shaky', 'Review: wackelig'));
-  act('review-lost', review('lost', 'Review: verloren'));
+  act('review-solid', review('solid', 'Sitzt'));
+  act('review-shaky', review('shaky', 'Wackelig'));
+  act('review-lost', review('lost', 'Verloren'));
   act('edit', () => {
     const st = window.EMVS.getState();
     const obj = st.learningObjectives.find(o => o.id === objId);
@@ -423,14 +470,14 @@ export function openObjectiveModal(objective = null, moduleId = null) {
           <textarea name="description" rows="3">${escapeHtml(obj.description || '')}</textarea>
         </div>
         <div class="field-row">
-          <label>Confidence (0-5)</label>
+          <label>Sicherheit (0-5)</label>
           <input type="number" name="confidence" value="${obj.confidence}" min="0" max="5" step="1">
         </div>
         <div class="field-row">
           <label>Notizen</label>
           <textarea name="notes" rows="3" placeholder="Pitfalls, Definitionen, Merksätze…">${escapeHtml(obj.notes || '')}</textarea>
         </div>
-        ${!isNew ? `<p class="today-empty-line">Rhythmus: ${escapeHtml(rhythmOf(obj).label)} · ${escapeHtml(rhythmOf(obj).detail)} · Review: ${escapeHtml(formatNextReview(obj))}. Status und Review steuerst du im Verlauf, nicht hier.</p>` : `<p class="today-empty-line">Neue Ziele starten ohne Review-Termin — der Rhythmus beginnt mit der ersten Sitzung oder mit „Als verstanden markieren“.</p>`}
+        ${!isNew ? `<p class="today-empty-line">Rhythmus: ${escapeHtml(rhythmOf(obj).label)} · ${escapeHtml(rhythmOf(obj).detail)} · Wiederholung: ${escapeHtml(formatNextReview(obj))}. Status und Wiederholung steuerst du im Lernziel, nicht hier.</p>` : `<p class="today-empty-line">Neue Ziele starten ohne Wiederholungstermin — der Rhythmus beginnt mit der ersten Sitzung oder mit „Als verstanden markieren“.</p>`}
       </form>
     `,
     footer: `

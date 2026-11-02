@@ -16,7 +16,7 @@ import { PLAN_ITEM_TYPES } from '../utils/helpers.js';
 import { refresh, registerPatcher } from './router.js';
 import { openObjectiveHistory } from './module-objectives.js';
 
-export function renderModulePlan(state) {
+export function renderModulePlan(state, { embedded = false } = {}) {
   const moduleId = state.settings.currentModuleId;
   const m = state.modules.find(x => x.id === moduleId);
   if (!m) return document.createElement('div');
@@ -25,9 +25,10 @@ export function renderModulePlan(state) {
 
   const el = document.createElement('div');
   el.innerHTML = `
+    ${embedded ? '' : `
     <div class="eyebrow">Plan · Modul ${escapeHtml(m.code)}</div>
     <h1 class="page-title">Aktionsplan</h1>
-    <p class="page-lede">Wochen sind Vorschläge, kein Käfig. Der Plan bemerkt, wenn die Realität abweicht — und fragt, was davon noch zählt.</p>
+    <p class="page-lede">Wochen sind Vorschläge, kein Käfig. Der Plan bemerkt, wenn die Realität abweicht — und fragt, was davon noch zählt.</p>`}
     <div id="plan-reality"></div>
     <div class="plan-weeks" id="plan-weeks"></div>
     <div class="mt-3">
@@ -197,7 +198,7 @@ function renderWeek(weekNum, items, state, moduleId, currentWeek, now) {
 }
 
 function renderPlanItem(item, state) {
-  const typeLabels = { task: 'Aufgabe', milestone: 'Meilenstein', review: 'Review' };
+  const typeLabels = { task: 'Aufgabe', milestone: 'Meilenstein', review: 'Wiederholung' };
   const typeColors = { task: 'var(--ink)', milestone: 'var(--accent)', review: 'var(--green)' };
   const statusClass = item.dropped ? 'dropped' : item.done ? 'done' : '';
 
@@ -375,7 +376,7 @@ export function openPlanItemModal(item = null, moduleId = null, onChange = null)
           <select name="type">
             <option value="task" ${i.type === 'task' ? 'selected' : ''}>Aufgabe</option>
             <option value="milestone" ${i.type === 'milestone' ? 'selected' : ''}>Meilenstein</option>
-            <option value="review" ${i.type === 'review' ? 'selected' : ''}>Review</option>
+            <option value="review" ${i.type === 'review' ? 'selected' : ''}>Wiederholung</option>
           </select>
         </div>
         <div class="field-row">
@@ -393,7 +394,7 @@ export function openPlanItemModal(item = null, moduleId = null, onChange = null)
           </select>
         </div>
         <div class="field-row">
-          <label>Verknüpfte Ressourcen</label>
+          <label>Verknüpfte Material</label>
           <select name="linkedResources" multiple style="min-height: 80px;">
             ${resources.map(r => `<option value="${r.id}" ${i.linkedResourceIds?.includes(r.id) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
           </select>

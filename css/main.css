@@ -391,7 +391,7 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 .badge {
   font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: 99px;
   background: var(--bg); border: 1px solid var(--rule); color: var(--ink-3);
-  text-transform: lowercase; letter-spacing: 0.02em;
+  text-transform: none; letter-spacing: 0.02em;
 }
 .badge.done { color: var(--green); border-color: var(--green); background: var(--green-soft); }
 .badge.in-progress { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
@@ -647,6 +647,94 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
 .exam-chip-name { font-family: var(--serif); font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .exam-chip-meta { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
 
+/* ============ COMPACT SHELL + SHARED ROWS ============ */
+/* Calmer and denser: less air around chrome, more content per screen. */
+.sidebar { width: 236px; padding: 22px 16px calc(18px + env(safe-area-inset-bottom)); }
+.brand { margin-bottom: 22px; }
+.toc-label { margin: 18px 0 8px; }
+.toc-item { min-height: 36px; padding: 4px 8px; }
+.page { max-width: 920px; padding: 36px 36px 104px; }
+.page-title { font-size: 42px; }
+.page-lede { margin-bottom: 28px; }
+.section-label { margin-bottom: 12px; }
+
+.section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.section-head .section-label { margin: 0; }
+.btn-sm { min-height: 34px; padding: 5px 10px; font-size: 12.5px; }
+
+/* Module header + tabs */
+.mod-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+}
+.mod-head-text { min-width: 0; }
+.mod-head .eyebrow { margin-bottom: 6px; }
+.mod-head .mod-title { font-size: clamp(26px, 4.4vw, 34px); margin: 0; }
+.mod-head .mod-switcher { margin: 0 0 2px; }
+.mod-head .mod-switch { width: auto; min-width: 152px; padding: 8px 28px 8px 10px; font-size: 13px; }
+.subtabs { margin: 14px 0 18px; padding: 3px; border-radius: 10px; }
+.subtab { min-height: 38px; padding: 6px 12px; font-size: 13px; }
+
+/* Prüfungen: one list, diagnostics stay quiet */
+.exam-list { display: flex; flex-direction: column; gap: 10px; }
+.exam-item {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px; padding: 15px 17px; border: 1px solid var(--rule);
+  border-radius: 10px; background: var(--paper); cursor: default;
+}
+.exam-main { min-width: 0; flex: 1 1 auto; }
+.exam-name { font-family: var(--serif); font-size: 19px; line-height: 1.25; color: var(--ink); overflow-wrap: anywhere; }
+.exam-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
+}
+.exam-breakdown { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.exam-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.exam-grade {
+  font-family: var(--serif); font-size: 30px; line-height: 1; color: var(--ink-2);
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+
+/* Sessions on the module overview + Today */
+.mod-session { flex-wrap: wrap; font-size: 13.5px; }
+.mod-session-when { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); min-width: 74px; }
+.mod-session-dur { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+.mod-session-objs { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+.mod-session-note { font-style: italic; color: var(--ink-2); flex-basis: 100%; font-size: 13px; }
+.session-more { margin-top: 8px; }
+.session-more summary {
+  cursor: pointer; font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+  padding: 6px 0;
+}
+.session-more summary:hover { color: var(--ink); }
+
+/* Inline review outcomes */
+.q-outcomes { margin-top: 12px; }
+.q-card-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
+.q-link {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+  color: var(--ink-3); padding: 2px 0; text-align: left;
+}
+.q-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.q-row-actions { display: flex; gap: 3px; margin-left: 4px; }
+.q-row-btn {
+  width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--rule);
+  background: var(--bg); color: var(--ink-2); font-family: var(--mono);
+  font-size: 12px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+}
+.q-row-btn:hover { border-color: var(--rule-2); color: var(--ink); background: var(--paper); }
+.q-outcome-solid.q-row-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.ws-outcomes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.ws-outcomes .btn { min-height: 38px; padding: 6px 12px; font-size: 13px; }
+
+/* Objective detail notes are clickable rows */
+.obj-note-row { width: 100%; text-align: left; cursor: pointer; }
+.obj-note-row:hover { border-color: var(--rule-2); background: var(--paper); }
+
 /* ============ TOAST ============ */
 .toast {
   position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -844,7 +932,7 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
   .bento-where { flex: 1; min-width: 0; font-family: var(--serif); font-size: 20px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* Tree / context use the labeled sidebar */
-  body[data-navlayout="context"] .sidebar { width: 264px; }
+  body[data-navlayout="context"] .sidebar { width: 244px; }
 
   /* Mobile layout on wide screens: phone-first column with bottom bar */
   body[data-navlayout="mobile"] { background: var(--rule); }
@@ -1707,14 +1795,14 @@ body[data-navlayout="context"] .sidebar-overflow { display: none !important; }
 body[data-navlayout="context"] #nav-global { margin-top: 14px; }
 body[data-navlayout="context"] .rail-mod { display: none !important; }
 .ctx-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; }
-.ctx-mode { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; padding: 6px 4px; border-radius: 8px; font-size: 13px; color: var(--ink-2); text-align: center; min-width: 0; }
+.ctx-mode { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 44px; padding: 4px; border-radius: 8px; font-size: 12.5px; color: var(--ink-2); text-align: center; min-width: 0; }
 .ctx-mode-lb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ctx-mode:hover { background: var(--bg); color: var(--ink); }
 .ctx-mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ctx-mode.active { background: var(--ink); color: var(--bg); font-weight: 500; }
 .ctx-mode-ico { font-size: 15px; color: var(--accent); }
 .ctx-mode.active .ctx-mode-ico { color: inherit; }
-.ctx-lede { font-size: 12.5px; color: var(--ink-3); margin: 14px 2px 8px; }
+.ctx-lede { font-size: 12.5px; color: var(--ink-3); margin: 8px 2px 6px; }
 .ctx-list { display: flex; flex-direction: column; gap: 2px; }
 .ctx-action { width: 100%; margin-top: 12px; }
 

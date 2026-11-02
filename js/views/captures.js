@@ -24,24 +24,24 @@ export function renderCaptures(state) {
 
   const el = document.createElement('div');
   el.innerHTML = `
-    <div class="eyebrow">Erfassungen</div>
-    <h1 class="page-title">Schnellerfassung</h1>
-    <p class="page-lede">Fang Fragen, Begriffe, Ressourcen, Fehler und Gedanken sofort ein — mitten in der Sitzung, ohne sie zu unterbrechen. Optional einem Modul/Lernziel zuordnen.</p>
+    <div class="eyebrow">Notizen</div>
+    <h1 class="page-title">Notizen</h1>
+    <p class="page-lede">Deine Notizen zu Modulen und Lernzielen — durchsuchbar, typisiert, an einer Stelle. Optional einem Modul oder Lernziel zuordnen.</p>
 
     <div class="timer-actions mb-3">
-      <button class="btn primary" id="quick-capture">⚡ Schnell erfassen</button>
-      <button class="btn" id="add-capture">＋ Ausführlich erfassen</button>
+      <button class="btn primary" id="add-capture">＋ Notiz</button>
+      <button class="btn" id="quick-capture">⚡ Schnell erfassen</button>
     </div>
 
     <div class="res-search">
       <input class="res-search-input" id="capture-search" type="search"
-        placeholder="Suchen…" value="${escapeHtml(listFilters.q)}" aria-label="Erfassungen suchen">
+        placeholder="Notizen durchsuchen…" value="${escapeHtml(listFilters.q)}" aria-label="Notizen durchsuchen">
     </div>
 
     <div class="capture-filters mb-3" style="display: flex; gap: 8px; flex-wrap: wrap;">
       <button class="badge filter-btn ${listFilters.type === 'all' && !listFilters.unlinked ? 'active' : ''}" data-filter="all">Alle</button>
       ${CAPTURE_TYPES.map(t => `<button class="badge filter-btn ${listFilters.type === t ? 'active' : ''}" data-filter="${t}">${CAPTURE_TYPE_LABELS[t]}</button>`).join('')}
-      <button class="badge filter-btn ${listFilters.unlinked ? 'active' : ''}" data-filter="__unlinked" title="Erfassungen ohne Modul und Lernziel">Ohne Zuordnung</button>
+      <button class="badge filter-btn ${listFilters.unlinked ? 'active' : ''}" data-filter="__unlinked" title="Notizen ohne Modul und Lernziel">Ohne Zuordnung</button>
     </div>
     <div class="captures-list" id="captures-list"></div>
   `;
@@ -95,7 +95,7 @@ function paintCaptureList(el, state, modules, allObjectives) {
   const host = el.querySelector('#captures-list');
   host.innerHTML = captures.length
     ? captures.map(c => renderCaptureItem(c, modules, allObjectives)).join('')
-    : `<div class="card empty-state"><div class="icon">📝</div><h3>Nichts festgehalten</h3><p>${state.captures.length ? 'Filter oder Suche anpassen.' : 'Halte deine erste Frage, deinen ersten Fehler, deinen ersten Gedanken fest — ⚡ Schnell erfassen.'}</p></div>`;
+    : `<div class="card empty-state"><div class="icon">📝</div><h3>Noch keine Notizen</h3><p>${state.captures.length ? 'Filter oder Suche anpassen.' : 'Halte deine erste Frage, deinen ersten Fehler, deinen ersten Gedanken fest — über „＋ Notiz“.'}</p></div>`;
 
   host.querySelectorAll('.capture-item').forEach(item => {
     const id = item.dataset.id;
@@ -112,7 +112,7 @@ function paintCaptureList(el, state, modules, allObjectives) {
       const snapshot = JSON.parse(JSON.stringify(state.captures));
       const { deleteWithUndo } = await import('../components/undoDelete.js');
       deleteWithUndo({
-        message: 'Erfassung gelöscht',
+        message: 'Notiz gelöscht',
         snapshot,
         remove: () => {
           deleteWithTombstone(state, 'captures', id);
@@ -312,7 +312,7 @@ export function openCaptureModal(capture = null, preset = {}) {
   };
 
   openModal({
-    title: isNew ? 'Neue Erfassung' : 'Erfassung bearbeiten',
+    title: isNew ? 'Neue Notiz' : 'Notiz bearbeiten',
     body: `
       <form id="capture-form">
         <div class="field-row">

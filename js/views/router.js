@@ -19,7 +19,7 @@ const LEGACY_TO_HASH = {
   'overview': '#/module',
   'weak-spots': '#/schwach',
   'exams-global': '#/pruefungen',
-  'captures': '#/erfassen',
+  'captures': '#/notizen',
   'weekly-review': '#/review',
   'tools': '#/werkzeuge',
   'settings': '#/einstellungen',
@@ -28,7 +28,7 @@ const LEGACY_TO_HASH = {
   'module-home': '#/modul',
   'module-objectives': '#/modul/__cur__/ziele',
   'module-resources': '#/modul/__cur__/material',
-  'module-sessions': '#/modul/__cur__/sessions',
+  'module-sessions': '#/modul/__cur__/home',
   'module-exams': '#/modul/__cur__/material',
   'module-plan': '#/modul/__cur__/plan',
 };
@@ -40,12 +40,20 @@ const HASH_TO_VIEW = {
   '/schwach': 'weak-spots',
   '/pruefungen': 'exams-global',
   '/erfassen': 'captures',
-  '/review': 'weekly-review',
-  '/werkzeuge': 'tools',
+  '/notizen': 'captures',
+  // Removed pages stay reachable as redirects, never as dead ends.
+  '/review': 'weak-spots',
+  '/werkzeuge': 'overview',
   '/einstellungen': 'settings',
-  '/vorbereitung': 'exam-prep',
-  '/mock': 'mock-exam',
+  '/vorbereitung': 'exams-global',
+  '/mock': 'exams-global',
   '/modul': 'module',
+};
+
+/** Old routes that are now tabs of the merged Prüfungen page. */
+const LEGACY_TAB_ROUTE = {
+  '/vorbereitung': 'vorbereitung',
+  '/mock': 'mock',
 };
 
 export function getCurrentView() {
@@ -120,7 +128,7 @@ export function navigate(view, params = {}) {
     if (view.startsWith('module-') && params.id) {
       const tab = view === 'module-objectives' ? 'ziele'
         : view === 'module-plan' ? 'plan'
-        : view === 'module-sessions' ? 'sessions' : 'material';
+        : view === 'module-sessions' ? 'home' : 'material';
       setHash(`#/modul/${params.id}/${tab}`);
       return;
     }
@@ -182,6 +190,8 @@ export function routeFromHash() {
 
   const key = '/' + segs.join('/');
   const view = HASH_TO_VIEW[key] || HASH_TO_VIEW['/' + (segs[0] || 'heute')] || 'today';
+  // Old standalone pages are tabs of the merged Prüfungen page now.
+  if (LEGACY_TAB_ROUTE[key]) qs.tab = LEGACY_TAB_ROUTE[key];
   // Unknown module-subtab legacy handled above; unknown paths fall back
   if (!VIEWS[view]) {
     previousView = currentView;
@@ -221,7 +231,9 @@ function render() {
 
   // Cleanup previous view-specific intervals. The Pomodoro is global and
   // intentionally survives navigation, so it has no cleanup here.
-  if (previousView === 'mock-exam') {
+  // The mock run lives inside the Prüfungen page; only discard it when the
+  // student actually leaves that page (not on a tab switch or repaint).
+  if (previousView === 'exams-global' && currentView !== 'exams-global') {
     stopMockExamDisplay();
   }
 

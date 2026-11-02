@@ -52,7 +52,7 @@ export function renderModuleSessions(state) {
     ${pendingReviewObj ? `
       <div class="focus-intent focus-intent--compact">
         <div>
-          <div class="pomo-phase">Review fällig</div>
+          <div class="pomo-phase">Wiederholung fällig</div>
           <div class="focus-intent-title">${escapeHtml(pendingReviewObj.title || 'Lernziel ' + pendingReviewObj.number)}</div>
         </div>
         <button type="button" class="pomo-btn primary" id="open-review-focus">Im Fokusraum starten</button>
@@ -203,41 +203,38 @@ export function openSessionAfterTimer(snapshot) {
 
   const durationLabel = `${snapshot.duration} ${snapshot.duration === 1 ? 'Minute' : 'Minuten'}`;
   const info = snapshot.completed
-    ? `Pomodoro-Runde abgeschlossen nach ${durationLabel}. Wähle Lernziele und Ressourcen, füge optional eine Notiz hinzu.`
+    ? `Pomodoro-Runde abgeschlossen nach ${durationLabel}. Wähle Lernziele und Material, füge optional eine Notiz hinzu.`
     : `Runde pausiert nach ${durationLabel}. Speichern beendet sie; Abbrechen ${snapshot.wasRunning ? 'setzt den Fokus fort' : 'lässt sie pausiert'}.`;
 
   openModal({
-    title: `Sitzung loggen (${snapshot.duration} Min)`,
+    title: `Sitzung speichern (${snapshot.duration} Min)`,
     body: `
       <div style="margin-bottom: 16px; padding: 12px; background: var(--bg); border-radius: 4px; font-size: 13px; color: var(--ink-2);">
         <strong>${info}</strong>
       </div>
       <form id="session-form">
+        <input type="hidden" name="startTime" value="${startValue}">
+        <input type="hidden" name="duration" value="${snapshot.duration}">
         <div class="field-row">
-          <label>Startzeit</label>
-          <input type="datetime-local" name="startTime" value="${startValue}" required>
+          <label>Notiz (optional)</label>
+          <input type="text" name="note" value="" placeholder="Was hast du gelernt?">
         </div>
-        <div class="field-row">
-          <label>Dauer (Minuten)</label>
-          <input type="number" name="duration" value="${snapshot.duration}" min="1" max="480" required>
-        </div>
-        <div class="field-row">
-          <label>Notiz</label>
-          <input type="text" name="note" value="" placeholder="Was hast du gelernt? (optional)">
-        </div>
-        <div class="field-row">
-          <label>Verknüpfte Lernziele</label>
-          <select name="linkedObjectives" multiple style="min-height: 100px;">
-            ${objectives.map(o => `<option value="${o.id}" ${linkedObjectiveIds.has(o.id) ? 'selected' : ''}>${o.number}: ${escapeHtml(o.title)}</option>`).join('')}
-          </select>
-          <small style="color: var(--ink-3);">Strg/Cmd + Klick für Mehrfachauswahl</small>
-        </div>
-        <div class="field-row">
-          <label>Verknüpfte Ressourcen</label>
-          <select name="linkedResources" multiple style="min-height: 100px;">
-            ${resources.map(r => `<option value="${r.id}" ${linkedResourceIds.has(r.id) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
-          </select>
-        </div>
+        <details class="session-more">
+          <summary>Lernziele & Material verknüpfen</summary>
+          <div class="field-row">
+            <label>Lernziele</label>
+            <select name="linkedObjectives" multiple style="min-height: 100px;">
+              ${objectives.map(o => `<option value="${o.id}" ${linkedObjectiveIds.has(o.id) ? 'selected' : ''}>${o.number}: ${escapeHtml(o.title)}</option>`).join('')}
+            </select>
+            <small style="color: var(--ink-3);">Strg/Cmd + Klick für Mehrfachauswahl</small>
+          </div>
+          <div class="field-row">
+            <label>Material</label>
+            <select name="linkedResources" multiple style="min-height: 100px;">
+              ${resources.map(r => `<option value="${r.id}" ${linkedResourceIds.has(r.id) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+            </select>
+          </div>
+        </details>
       </form>
     `,
     footer: `
@@ -288,13 +285,11 @@ export function openSessionAfterTimer(snapshot) {
 
     window.EMVS.toast?.show(`Sitzung geloggt: ${session.duration} min`);
 
+    // Stay where the user is: Today, the module page, the focus room, or the
+    // Prüfungen page all have a session context to update.
     const view = window.EMVS.getCurrentView?.();
-    // Module tabs all report currentView === 'module'; refreshing the current
-    // module tab updates the session list (or the session counts on Home).
-    if (view === 'today' || view === 'focus') {
+    if (view && window.EMVS.refresh) {
       window.EMVS.refresh('pomodoro-session-logged', { sessionId: session.id, outcome: snapshot.reviewObjectiveId || null });
-    } else if (view === 'module' || view === 'module-sessions') {
-      window.EMVS.refresh('pomodoro-session-logged', { sessionId: session.id });
     }
   });
 
@@ -351,7 +346,7 @@ function renderSessionItem(session, objectives, resources) {
         <div style="font-size: 13px; color: var(--ink-2); display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px;">
           <span><strong>Dauer:</strong> ${session.duration} min</span>
           <span><strong>Lernziele:</strong> ${escapeHtml(objNames)}</span>
-          <span><strong>Ressourcen:</strong> ${escapeHtml(resNames)}</span>
+          <span><strong>Material:</strong> ${escapeHtml(resNames)}</span>
         </div>
       </div>
       <div style="display: flex; gap: 4px;">
@@ -419,7 +414,7 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
           </select>
         </div>
         <div class="field-row">
-          <label>Verknüpfte Ressourcen</label>
+          <label>Verknüpfte Material</label>
           <select name="linkedResources" multiple style="min-height: 100px;">
             ${resources.map(r => `<option value="${r.id}" ${s.linkedResourceIds?.includes(r.id) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
           </select>
@@ -454,6 +449,8 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
 
     if (onSave) {
       onSave(s, isNew);
+    } else if (window.EMVS.refresh) {
+      window.EMVS.refresh('session-logged', { sessionId: s.id });
     } else {
       navigate('module-sessions');
     }

@@ -2,7 +2,7 @@
  * Weak Spots View — one ranked list of "things you are probably wrong about".
  *
  * The ranking is a transparent estimate, not exact science: every card shows
- * its weakness score AND the reasons behind it (low confidence, poor exam
+ * its weakness score AND the reasons behind it (low Sicherheit, poor exam
  * diagnosis, staleness, missing reviews, low study time vs. exam weight,
  * repeated mistakes/captures). Each card leads directly to an action:
  * review the objective, start a session, inspect related resources, or
@@ -12,8 +12,9 @@
 import {
   escapeHtml, getWeakSpots, formatLastTouched, formatNextReview,
   linkedResourceCount, resourcesForObjective, capturesForObjective,
-  getResourceUsage,
+  getResourceUsage, RESOURCE_TYPE_LABELS,
 } from '../utils/helpers.js';
+import { recordReview } from '../services/store.js';
 import { navigate, getCurrentParams } from './router.js';
 import { openObjectiveHistory } from './module-objectives.js';
 import { startPomodoroFor } from './module-sessions.js';
@@ -29,7 +30,7 @@ export function renderWeakSpots(state) {
   el.innerHTML = `
     <div class="eyebrow">Diagnose · alle Module</div>
     <h1 class="page-title">Schwachstellen</h1>
-    <p class="page-lede">Wonach du wahrscheinlich falsch liegst — als Rangliste mit Begründung. Nützliche Schätzung, keine exakte Wissenschaft: Die Schwäche summiert Confidence, Prüfungsdiagnose, Berührung, Reviews, Lernzeit und festgehaltene Fehler.</p>
+    <p class="page-lede">Wonach du wahrscheinlich falsch liegst — als Rangliste mit Begründung. Die Reihenfolge ist eine nützliche Schätzung, keine exakte Wissenschaft.</p>
     <div class="res-filters" role="group" aria-label="Modul filtern" id="ws-modules"></div>
     <div class="ws-list" id="ws-list"></div>
   `;
@@ -77,12 +78,12 @@ export function renderWeakSpots(state) {
 
 function spotContext(obj, state) {
   const bits = [
-    `Confidence ${obj.confidence ?? 0}/5`,
+    `Sicherheit ${obj.confidence ?? 0}/5`,
     `berührt ${formatLastTouched(obj)}`,
     `${obj.totalStudyTime || 0} Min`,
-    `${linkedResourceCount(state, obj)} Ressourcen`,
+    `${linkedResourceCount(state, obj)} Material`,
   ];
-  const next = obj.reviewSchedule?.nextReview ? `Review: ${formatNextReview(obj)}` : null;
+  const next = obj.reviewSchedule?.nextReview ? `Wiederholung: ${formatNextReview(obj)}` : null;
   if (next) bits.push(next);
   return bits;
 }
@@ -96,19 +97,23 @@ function renderSpot(obj, breakdown, rank, state) {
       <div class="ws-head">
         <span class="ws-rank">#${rank}</span>
         <span class="badge ws-level ws-level-${breakdown.level}">${LEVEL_LABELS[breakdown.level]}</span>
-        <span class="ws-score" title="Summe aller Warnsignale — Schätzung, kein Messwert">Schwäche ${breakdown.score}</span>
       </div>
       <div class="ws-title">${escapeHtml(obj.title)}</div>
       <div class="ws-meta">LZ ${escapeHtml(String(obj.number ?? '–'))}${m ? ` · Modul ${escapeHtml(m.code)}` : ''}${obj.status === 'done' ? ' · verstanden' : ''} · ${spotContext(obj, state).map(escapeHtml).join(' · ')}</div>
       <div class="ws-why">
-        ${breakdown.signals.map(s => `<div class="ws-signal"><span>${escapeHtml(s.label)}</span><span class="ws-points">+${s.points}</span></div>`).join('')}
+        ${breakdown.signals.map(s => `<div class="ws-signal"><span>${escapeHtml(s.label)}</span></div>`).join('')}
         ${breakdown.stabilizers.map(s => `<div class="ws-stabil">${escapeHtml(s)}</div>`).join('')}
       </div>
+      <div class="ws-outcomes" role="group" aria-label="Wiederholung bewerten">
+        <button class="btn primary" data-outcome="solid">Sitzt</button>
+        <button class="btn" data-outcome="shaky">Wackelig</button>
+        <button class="btn ghost" data-outcome="lost">Verloren</button>
+      </div>
       <div class="timer-actions ws-actions">
-        <button class="btn primary" data-act="review">Verlauf / Review</button>
-        <button class="btn" data-act="session">▶ Session</button>
-        <button class="btn" data-act="resources" ${resources.length ? '' : 'disabled'}>Ressourcen (${resources.length})</button>
-        <button class="btn" data-act="captures" ${caps.length ? '' : 'disabled'}>Fehler & Fragen (${caps.length})</button>
+        <button class="btn ghost" data-act="review">Lernziel</button>
+        <button class="btn ghost" data-act="session">▶ Fokus</button>
+        <button class="btn ghost" data-act="resources" ${resources.length ? '' : 'disabled'}>Material (${resources.length})</button>
+        <button class="btn ghost" data-act="captures" ${caps.length ? '' : 'disabled'}>Fehler & Fragen (${caps.length})</button>
       </div>
       <div class="ws-detail" hidden></div>
     </div>
@@ -120,6 +125,18 @@ function bindSpot(card, state) {
   const obj = state.learningObjectives.find(o => o.id === id);
   if (!obj) return;
   const detail = card.querySelector('.ws-detail');
+
+  card.querySelectorAll('[data-outcome]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const outcome = btn.dataset.outcome;
+      const entry = recordReview(obj, outcome);
+      window.EMVS.save();
+      const nextIn = entry.interval === 1 ? 'morgen' : `in ${entry.interval} Tagen`;
+      const label = outcome === 'solid' ? 'Sitzt' : outcome === 'shaky' ? 'Wackelig' : 'Verloren';
+      window.EMVS.toast?.show(`${label} — nächste Wiederholung ${nextIn}`);
+      window.EMVS.refresh?.('weak-spot-outcome', { id, outcome });
+    });
+  });
 
   const closeDetail = () => {
     detail.hidden = true;
@@ -148,11 +165,11 @@ function bindSpot(card, state) {
     detail.dataset.kind = 'resources';
     detail.hidden = false;
     detail.innerHTML = `
-      <h2 class="section-label" style="margin: 4px 0 8px;">Verknüpfte Ressourcen · ${list.length}</h2>
+      <h2 class="section-label" style="margin: 4px 0 8px;">Verknüpfte Material · ${list.length}</h2>
       ${list.map(r => {
         const u = getResourceUsage(window.EMVS.getState(), r);
         return `<div class="obj-hist-res-row">
-          <span class="badge">${escapeHtml(r.type || 'Material')}</span>
+          <span class="badge">${escapeHtml(RESOURCE_TYPE_LABELS[r.type] || r.type || 'Material')}</span>
           <span class="obj-hist-res-name">${escapeHtml(r.name.length > 60 ? r.name.slice(0, 60) + '…' : r.name)}</span>
           <span class="muted" style="font-size:12px;">${u.totalUses}× benutzt · ${r.understood ? 'verstanden ✓' : 'offen'}</span>
           <button class="btn ghost" data-res="${r.id}" style="min-height:28px;font-size:12px;">Öffnen →</button>
@@ -179,7 +196,7 @@ function bindSpot(card, state) {
       </div>`).join('')}
       <div class="timer-actions" style="margin-top:8px;">
         <button class="btn ghost" data-act="capture-new" style="min-height:28px;font-size:12px;">⚡ Dazu festhalten</button>
-        <button class="btn ghost" data-act="capture-all" style="min-height:28px;font-size:12px;">Erfassungen →</button>
+        <button class="btn ghost" data-act="capture-all" style="min-height:28px;font-size:12px;">Notizen →</button>
       </div>`;
     card.querySelectorAll('[data-act="resources"], [data-act="captures"]').forEach(b => b.classList.toggle('active', b === btn));
     detail.querySelector('[data-act="capture-new"]')?.addEventListener('click', () =>

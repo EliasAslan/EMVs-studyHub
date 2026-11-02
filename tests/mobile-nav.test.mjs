@@ -77,8 +77,11 @@ await test('capture is a secondary action, not a primary navigation destination'
 });
 
 await test('More sheet holds all secondary destinations', async () => {
-  for (const route of ['weekly-review', 'tools', 'exam-prep', 'mock-exam', 'captures', 'settings']) {
+  for (const route of ['focus', 'captures', 'settings']) {
     assert.ok(html.includes(`data-route="${route}"`), `more-sheet links ${route}`);
+  }
+  for (const retired of ['weekly-review', 'tools', 'exam-prep', 'mock-exam']) {
+    assert.ok(!html.includes(`data-route="${retired}"`), `retired route ${retired} is gone from the More sheet`);
   }
   assert.ok(html.includes('id="more-close"'), 'sheet has a close control');
   assert.ok(html.includes('id="more-overlay"'), 'sheet overlay exists');

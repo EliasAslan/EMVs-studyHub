@@ -3,7 +3,8 @@
  *
  * One name per destination across nav surfaces. The bottom tabbar may use a
  * documented short form (`DESTINATIONS[...].short`); every other surface uses
- * the full label.
+ * the full label. Retired pages (weekly review, tools, standalone exam prep /
+ * mock exam) must not reappear as destinations.
  *
  * Run:  node tests/terminology.test.mjs   (or: npm test)
  */
@@ -21,16 +22,16 @@ const expected = {
   'overview': 'Module',
   'weak-spots': 'Schwachstellen',
   'exams-global': 'Prüfungen',
-  'weekly-review': 'Review',
-  'tools': 'Werkzeuge',
+  'focus': 'Fokus',
   'settings': 'Einstellungen',
-  'exam-prep': 'Prüfungsvorbereitung',
-  'mock-exam': 'Mock-Prüfung',
-  'captures': 'Erfassungen',
+  'captures': 'Notizen',
 };
 
 for (const [id, label] of Object.entries(expected)) {
   assert.equal(DESTINATIONS[id]?.label, label, `${id} label`);
+}
+for (const id of ['weekly-review', 'tools', 'exam-prep', 'mock-exam']) {
+  assert.equal(DESTINATIONS[id], undefined, `${id} is not a destination anymore`);
 }
 
 // Only the tabbar's tight column may abbreviate, and only via `short`.
@@ -40,8 +41,11 @@ for (const [id, d] of Object.entries(DESTINATIONS)) {
 }
 
 // Nav surfaces use the canonical labels (the label text appears in the shell).
-for (const label of ['Heute', 'Module', 'Prüfungen', 'Review', 'Werkzeuge', 'Prüfungsvorbereitung', 'Mock-Prüfung', 'Erfassungen', 'Einstellungen']) {
+for (const label of ['Heute', 'Module', 'Prüfungen', 'Fokus', 'Notizen', 'Einstellungen']) {
   assert.ok(index.includes(label), `index.html uses "${label}"`);
+}
+for (const retired of ['Review', 'Werkzeuge', 'Prüfungsvorbereitung', 'Mock-Prüfung', 'Erfassungen']) {
+  assert.ok(!index.includes(`>${retired}<`), `index.html no longer shows "${retired}" as a nav label`);
 }
 
 // The tabbar labels are rendered from the registry, not hand-maintained HTML.
@@ -52,7 +56,6 @@ assert.ok(tabbar.includes('dest?.short || dest?.label'), 'tabbar uses short/labe
 // Capture action has one name; the page has another.
 assert.ok(index.includes('>Schnell erfassen</span>'), 'sidebar capture action says "Schnell erfassen"');
 assert.ok(!index.includes('>Erfassen</span>'), 'no bare "Erfassen" action label');
-assert.ok(!index.includes('>Alle Erfassungen</button>'), 'More sheet uses "Erfassungen", not "Alle Erfassungen"');
 assert.ok(palette.includes("label: 'Schnell erfassen'"), 'palette capture action says "Schnell erfassen"');
 
 console.log('ok - one destination name per nav surface');

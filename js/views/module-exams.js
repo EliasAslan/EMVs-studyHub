@@ -46,10 +46,10 @@ export function renderModuleExams(state) {
   updateProjection(el, state, moduleId);
 
   el.querySelector('#add-exam')?.addEventListener('click', () => openExamModal(null, moduleId));
-  el.querySelector('#start-mock')?.addEventListener('click', () => navigate('mock-exam'));
+  el.querySelector('#start-mock')?.addEventListener('click', () => navigate('exams-global', { qs: '?tab=mock' }));
   el.querySelector('#open-prep')?.addEventListener('click', () => {
     setExamPrepPreset({ moduleId, examId: null });
-    navigate('exam-prep');
+    navigate('exams-global', { qs: '?tab=vorbereitung' });
   });
 
   registerPatcher('module-exams', (reason, payload = {}) => {
@@ -124,7 +124,7 @@ function bindExamItems(list, el, state, moduleId, exams) {
     item.querySelector('.exam-prep')?.addEventListener('click', e => {
       e.stopPropagation();
       setExamPrepPreset({ moduleId: exam.moduleId, examId: id });
-      navigate('exam-prep');
+      navigate('exams-global', { qs: '?tab=vorbereitung' });
     });
 
     item.querySelector('.edit-btn')?.addEventListener('click', e => {

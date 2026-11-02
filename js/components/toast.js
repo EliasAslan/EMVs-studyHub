@@ -1,6 +1,6 @@
 /**
  * Toast Component
- * Non-blocking notifications with optional undo
+ * Non-blocking notifications with an optional action or undo.
  */
 
 let toastTimeout = null;
@@ -16,9 +16,22 @@ export function showToast(message, options = {}) {
   const toast = document.getElementById('toast');
   const messageEl = document.getElementById('toast-message');
   const undoBtn = document.getElementById('toast-undo');
-  
+  const actionBtn = document.getElementById('toast-action');
+
   messageEl.textContent = message;
-  
+
+  if (options.action && actionBtn) {
+    actionBtn.textContent = options.action.label || 'Öffnen';
+    actionBtn.style.display = 'inline-block';
+    actionBtn.onclick = () => {
+      options.action.onClick?.();
+      hideToast();
+    };
+  } else if (actionBtn) {
+    actionBtn.style.display = 'none';
+    actionBtn.onclick = null;
+  }
+
   if (options.undo) {
     undoBtn.style.display = 'inline-block';
     undoBtn.onclick = () => {
@@ -28,9 +41,9 @@ export function showToast(message, options = {}) {
   } else {
     undoBtn.style.display = 'none';
   }
-  
+
   toast.classList.add('open');
-  
+
   if (toastTimeout) clearTimeout(toastTimeout);
   toastTimeout = setTimeout(hideToast, options.duration || 5000);
 }

@@ -6,13 +6,12 @@
  * consume these helpers so they can never disagree about destinations.
  */
 
-/** Module detail tabs. 'home' is the module dashboard; the other four are the working tabs. */
+/** Module detail tabs. 'home' is the dashboard; sessions live on it, exams globally. */
 export const MODULE_TABS = [
-  { key: 'home', label: 'Home' },
-  { key: 'ziele', label: 'Ziele' },
-  { key: 'plan', label: 'Plan' },
-  { key: 'sessions', label: 'Sessions' },
+  { key: 'home', label: 'Übersicht' },
+  { key: 'ziele', label: 'Lernziele' },
   { key: 'material', label: 'Material' },
+  { key: 'plan', label: 'Plan' },
 ];
 
 /** Landing tab when a module is opened without an explicit tab. */
@@ -32,18 +31,13 @@ export const DESTINATIONS = {
   'focus': { label: 'Fokus', ico: '◐', view: 'focus', key: '9', hint: 'Pomodoro-Fokusraum' },
   'overview': { label: 'Module', ico: '▦', view: 'overview', key: '2', hint: 'Alle Module im Überblick' },
   'weak-spots': { label: 'Schwachstellen', short: 'Schwach', ico: '△', view: 'weak-spots', key: '3', hint: 'Fällige Wiederholungen' },
-  'exams-global': { label: 'Prüfungen', ico: '◷', view: 'exams-global', key: '4', hint: 'Alle Termine' },
-  'weekly-review': { label: 'Review', ico: '✎', view: 'weekly-review', key: '5', hint: 'Wochenrückblick' },
-  'tools': { label: 'Werkzeuge', ico: '⚒', view: 'tools', key: '6', hint: 'Links und Ressourcen' },
+  'exams-global': { label: 'Prüfungen', ico: '◷', view: 'exams-global', key: '4', hint: 'Termine, Vorbereitung, Mock' },
   'settings': { label: 'Einstellungen', ico: '⚙', view: 'settings', key: '7', hint: 'Konto, Daten, Navigation' },
-  'exam-prep': { label: 'Prüfungsvorbereitung', ico: '⧉', view: 'exam-prep', key: '8', hint: 'Stoff und Lücken erkennen' },
-  'mock-exam': { label: 'Mock-Prüfung', ico: '⏱', view: 'mock-exam', hint: 'Prüfung unter Zeitdruck simulieren' },
-  'captures': { label: 'Erfassungen', ico: '⚡', view: 'captures', hint: 'Fragen, Fehler und Gedanken' },
-  'module:home': { label: 'Modul-Home', ico: '⌂', moduleTab: 'home', hint: 'Übersicht des aktuellen Moduls' },
+  'captures': { label: 'Notizen', ico: '⚡', view: 'captures', hint: 'Fragen, Fehler und Gedanken' },
+  'module:home': { label: 'Übersicht', ico: '⌂', moduleTab: 'home', hint: 'Übersicht des aktuellen Moduls' },
   'module:ziele': { label: 'Lernziele', ico: '◎', moduleTab: 'ziele', hint: 'Ziele und Sicherheit' },
   'module:plan': { label: 'Plan', ico: '≡', moduleTab: 'plan', hint: 'Wochenplan' },
-  'module:sessions': { label: 'Sitzungen', ico: '▶', moduleTab: 'sessions', hint: 'Lernzeit erfassen' },
-  'module:material': { label: 'Material', ico: '▤', moduleTab: 'material', hint: 'Ressourcen und Prüfungen' },
+  'module:material': { label: 'Material', ico: '▤', moduleTab: 'material', hint: 'Ressourcen und Notizen' },
 };
 
 /** Destination id for a route, or null when the route has none. */
@@ -68,13 +62,13 @@ export function shortcutMap() {
  */
 export const CONTEXT_MODES = [
   { id: 'learn', label: 'Lernen', ico: '◈', lede: 'Stoff verstehen und einordnen',
-    items: ['overview', 'module:home', 'module:ziele', 'module:material', 'tools'] },
-  { id: 'practice', label: 'Üben', ico: '✦', lede: 'Abfragen und Prüfungen trainieren',
-    items: ['focus', 'exam-prep', 'mock-exam', 'module:sessions'] },
+    items: ['overview', 'module:home', 'module:ziele', 'module:material'] },
+  { id: 'practice', label: 'Üben', ico: '✦', lede: 'Fokus und Prüfungen trainieren',
+    items: ['focus', 'exams-global'] },
   { id: 'plan', label: 'Planen', ico: '❏', lede: 'Heute, Woche und Termine',
-    items: ['today', 'module:plan', 'exams-global'] },
-  { id: 'review', label: 'Wiederholen', ico: '↻', lede: 'Schwachstellen und Rückblick',
-    items: ['weak-spots', 'weekly-review', 'captures'] },
+    items: ['today', 'module:plan'] },
+  { id: 'review', label: 'Wiederholen', ico: '↻', lede: 'Schwachstellen und Notizen',
+    items: ['weak-spots', 'captures'] },
 ];
 
 export const DEFAULT_CONTEXT_MODE = 'plan';
@@ -109,16 +103,15 @@ export const MEGA_MENUS = [
   { id: 'lernen', label: 'Lernen', groups: [
     { title: 'Fächer', kind: 'modules' },
     { title: 'Aktuelles Modul', items: ['module:home', 'module:ziele', 'module:material'] },
-    { title: 'Mehr', items: ['overview', 'tools'] },
+    { title: 'Mehr', items: ['overview'] },
   ] },
   { id: 'pruefen', label: 'Prüfen', groups: [
-    { title: 'Vorbereiten', items: ['exam-prep', 'mock-exam'] },
-    { title: 'Termine', items: ['exams-global'] },
+    { title: 'Prüfungen', items: ['exams-global'] },
     { title: 'Wiederholen', items: ['weak-spots'] },
   ] },
   { id: 'planen', label: 'Planen', groups: [
-    { title: 'Planen', items: ['module:plan', 'module:sessions'] },
-    { title: 'Rückblick', items: ['weekly-review', 'captures'] },
+    { title: 'Planen', items: ['module:plan'] },
+    { title: 'Notizen', items: ['captures'] },
   ] },
 ];
 
@@ -144,7 +137,7 @@ export function getBreadcrumb(currentView, params = {}, state = null) {
     return [
       { label: 'Module', dest: 'overview' },
       { label: t.title, dest: 'module:home' },
-      ...(t.sub && t.sub !== 'Home' ? [{ label: t.sub, dest: null }] : []),
+      ...(t.sub && t.sub !== 'Übersicht' ? [{ label: t.sub, dest: null }] : []),
     ];
   }
   const d = DESTINATIONS[currentView];
@@ -159,7 +152,7 @@ export const LEGACY_VIEW_TO_TAB = {
   'module-objectives': 'ziele',
   'module-resources': 'material',
   'module-exams': 'material',
-  'module-sessions': 'sessions',
+  'module-sessions': 'home',
   'module-plan': 'plan',
 };
 

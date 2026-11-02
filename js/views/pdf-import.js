@@ -144,7 +144,7 @@ function draftItemHtml(kind, item, i) {
   }
   return `
     <li class="pdf-draft-item" data-kind="res" data-idx="${i}">
-      <label class="pdf-check"><input type="checkbox" data-check ${checked}><span class="sr-only">Ressource übernehmen: ${escapeHtml(item.name)}</span></label>
+      <label class="pdf-check"><input type="checkbox" data-check ${checked}><span class="sr-only">Material übernehmen: ${escapeHtml(item.name)}</span></label>
       <div class="pdf-draft-main">
         <div class="pdf-res-name">${escapeHtml(item.name)}</div>
         ${item.note ? `<div class="pdf-res-note">${escapeHtml(item.note)}</div>` : ''}
@@ -162,13 +162,13 @@ export function openPdfReview(task) {
   openModal({
     title: `Entwurf prüfen — ${t.title}`,
     body: `
-    <p class="pdf-note">${objs.length} Lernziel${objs.length !== 1 ? 'e' : ''}${ress.length ? `, ${ress.length} Ressource${ress.length !== 1 ? 'n' : ''}` : ''} aus dem PDF vorgeschlagen. Abgewähltes wird nicht übernommen — nichts wird automatisch gespeichert. Änderungen bleiben erhalten, auch wenn du zwischendurch woanders weiterarbeitest.</p>
+    <p class="pdf-note">${objs.length} Lernziel${objs.length !== 1 ? 'e' : ''}${ress.length ? `, ${ress.length} Material${ress.length !== 1 ? 'n' : ''}` : ''} aus dem PDF vorgeschlagen. Abgewähltes wird nicht übernommen — nichts wird automatisch gespeichert. Änderungen bleiben erhalten, auch wenn du zwischendurch woanders weiterarbeitest.</p>
     <h3 class="section-label">Lernziele</h3>
     <ul class="pdf-draft-list" id="pdf-obj-list">
       ${objs.map((o, i) => draftItemHtml('obj', o, i)).join('')}
     </ul>
     ${ress.length ? `
-      <h3 class="section-label" style="margin-top: 16px;">Ressourcen</h3>
+      <h3 class="section-label" style="margin-top: 16px;">Material</h3>
       <ul class="pdf-draft-list" id="pdf-res-list">
         ${ress.map((r, i) => draftItemHtml('res', r, i)).join('')}
       </ul>` : ''}

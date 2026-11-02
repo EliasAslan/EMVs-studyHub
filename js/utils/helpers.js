@@ -286,7 +286,7 @@ export function getPlanItemActivity(state, item) {
   if (!item.done && !item.dropped && suggestedDone) {
     hint = allDone
       ? 'Verknüpfte Ziele sind gemeistert — festhalten?'
-      : 'Verknüpfte Ziele sitzen (Confidence ≥ 4), Sitzungen vorhanden — festhalten?';
+      : 'Verknüpfte Ziele sitzen (Sicherheit ≥ 4), Sitzungen vorhanden — festhalten?';
   } else if (!item.done && !item.dropped && minutesSincePlan > 0 && linked.length) {
     hint = `${minutesSincePlan} Min seit Planung an verknüpften Zielen`;
   }
@@ -309,7 +309,7 @@ export function getPlanReality(state, moduleId, now = new Date()) {
 }
 
 /**
- * Most overdue spaced-repetition review: the objective whose
+ * Most overdue spaced-repetition Wiederholung: the objective whose
  * reviewSchedule.nextReview lies furthest in the past. Null when
  * nothing is scheduled or nothing is overdue.
  *
@@ -413,7 +413,7 @@ export function rhythmOf(obj, now = Date.now()) {
     return {
       key: 'due',
       label: 'Wieder fällig',
-      detail: days === 0 ? 'Review ist heute fällig' : days === 1 ? 'seit gestern fällig' : `seit ${days} Tagen fällig`,
+      detail: days === 0 ? 'Wiederholung ist heute fällig' : days === 1 ? 'seit gestern fällig' : `seit ${days} Tagen fällig`,
     };
   }
   if (obj?.status === 'done' && next) {
@@ -421,12 +421,12 @@ export function rhythmOf(obj, now = Date.now()) {
     return {
       key: 'resting',
       label: 'Verstanden · ruht',
-      detail: days <= 1 ? 'Review morgen' : `Review in ${days} Tagen`,
+      detail: days <= 1 ? 'Wiederholung morgen' : `Wiederholung in ${days} Tagen`,
     };
   }
   if (next && next - now <= 3 * day) {
     const days = Math.ceil((next - now) / day);
-    return { key: 'soon', label: 'Bald fällig', detail: days <= 1 ? 'Review morgen' : `Review in ${days} Tagen` };
+    return { key: 'soon', label: 'Bald fällig', detail: days <= 1 ? 'Wiederholung morgen' : `Wiederholung in ${days} Tagen` };
   }
   const touched = obj?.lastTouched || obj?.updatedAt || obj?.createdAt;
   if (!touched) return { key: 'fresh', label: 'Neu', detail: 'noch unberührt' };
@@ -459,7 +459,7 @@ export function formatNextReview(obj) {
 
 /**
  * Unified history timeline for one objective, newest first.
- * Merges: creation, sessions, confidence changes, reviews (incl. the
+ * Merges: creation, sessions, Sicherheit changes, reviews (incl. the
  * scheduled next review), linked-resource links, linked exams with grades,
  * and linked captures. Views render this — no view re-implements merging.
  *
@@ -493,7 +493,7 @@ export function buildObjectiveTimeline(state, obj) {
     if (!h.timestamp) continue;
     events.push({
       ts: h.timestamp, kind: 'confidence',
-      title: `Confidence → ${h.value}/5`,
+      title: `Sicherheit → ${h.value}/5`,
       detail: '',
       tone: 'quiet',
     });
@@ -501,7 +501,7 @@ export function buildObjectiveTimeline(state, obj) {
 
   for (const r of (obj.reviewHistory || [])) {
     if (!r.timestamp) continue;
-    const label = r.outcome === 'solid' ? 'Review · sitzt' : r.outcome === 'shaky' ? 'Review · wackelig' : 'Review · verloren';
+    const label = r.outcome === 'solid' ? 'Wiederholung · sitzt' : r.outcome === 'shaky' ? 'Wiederholung · wackelig' : 'Wiederholung · verloren';
     events.push({
       ts: r.timestamp, kind: 'review', title: label,
       detail: [`nächster Abstand: ${r.interval}d`, r.note || ''].filter(Boolean).join(' — '),
@@ -512,7 +512,7 @@ export function buildObjectiveTimeline(state, obj) {
   if (obj.reviewSchedule?.nextReview) {
     events.push({
       ts: obj.reviewSchedule.nextReview, kind: 'scheduled',
-      title: `Nächstes Review in ${obj.reviewSchedule.interval}d`,
+      title: `Nächste Wiederholung in ${obj.reviewSchedule.interval}d`,
       detail: `Rhythmus #${(obj.reviewHistory?.length || 0) + 1} · ${new Date(obj.reviewSchedule.nextReview).toLocaleDateString('de-CH')}`,
       tone: obj.reviewSchedule.nextReview <= Date.now() ? 'amber' : 'quiet',
       future: obj.reviewSchedule.nextReview > Date.now(),
@@ -522,7 +522,7 @@ export function buildObjectiveTimeline(state, obj) {
   for (const r of resourcesForObjective(state, obj)) {
     events.push({
       ts: r.updatedAt || r.createdAt || 0, kind: 'resource',
-      title: `Ressource: ${r.name}`,
+      title: `Material: ${r.name}`,
       detail: [r.type || '', r.url ? 'verlinkt' : ''].filter(Boolean).join(' · '),
       tone: 'quiet', refId: r.id,
     });
@@ -566,7 +566,7 @@ export function buildObjectiveTimeline(state, obj) {
 
 /**
  * Composite risk score for "what am I probably getting wrong":
- * low confidence + staleness + weak exam diagnosis.
+ * low Sicherheit + staleness + weak exam diagnosis.
  *
  * Exam signal comes from per-objective ratings (weak/okay/strong), not from
  * the overall grade: a bad exam tells WHERE the user is weak. Exams without
@@ -599,11 +599,11 @@ export function getObjectiveExamSignal(state, obj) {
  * mitigating facts (e.g. strong exam results) that do not add points.
  *
  * Signals:
- *  - confidence: low self-assessed confidence (gap to 5, when >= 3)
+ *  - confidence: low self-assessed Sicherheit (gap to 5, when >= 3)
  *  - stale:      not touched for 7+ days (0–4 pts, capped at 30 days)
  *  - exam:       weak/okay per-objective exam ratings (legacy unrated fails)
  *                weak×3, okay×1, legacyFail×2, strong×2 offset (capped −3)
- *  - review:     never reviewed, or no review for 14+/21+ days (1–2 pts)
+ *  - Wiederholung:     never reviewed, or no review for 14+/21+ days (1–2 pts)
  *  - studytime:  high linked exam weight but below-median study time (2 pts)
  *  - mistakes / questions: repeated mistake/question captures (1–3 pts)
  *
@@ -614,24 +614,24 @@ export function getObjectiveExamSignal(state, obj) {
  *  - legacy fail ×2 (grade < 4.0 without per-objective ratings)
  *  - exam strong ×2 offset, floored at −3 total from exam signal
  *  - staleness   0–4 pts linear over 7–30 days
- *  - confidence  gap to 5 (when gap ≥ 3)
+ *  - Sicherheit  gap to 5 (when gap ≥ 3)
  *  - review gap  never >7d: 2; >21d: 2; >14d: 1
  *  - studytime   2 if linkedWeight>0 and time<median
  *  - mistakes    min(count, 3)
  *  - questions   1 if count ≥ 3
  *  - thresholds  level hoch ≥ 7 / mittel ≥ 3.5 / niedrig < 3.5
- *  - confidence signal only when gap ≥ 3
+ *  - Sicherheit signal only when gap ≥ 3
  */
 export function getWeaknessBreakdown(state, obj, now = Date.now()) {
   const day = 86400000;
   const signals = [];
   const stabilizers = [];
 
-  // 1. Low confidence
+  // 1. Low Sicherheit
   const conf = obj.confidence ?? 0;
   const gap = 5 - conf;
   if (gap >= 3) {
-    signals.push({ key: 'confidence', label: `Confidence ${conf}/5`, points: gap });
+    signals.push({ key: 'confidence', label: `Sicherheit ${conf}/5`, points: gap });
   }
 
   // 2. Staleness
@@ -663,11 +663,11 @@ export function getWeaknessBreakdown(state, obj, now = Date.now()) {
   // 4. Insufficient recent review
   if (!obj.lastReviewed) {
     const age = obj.createdAt ? Math.floor((now - obj.createdAt) / day) : 0;
-    if (age > 7) signals.push({ key: 'review', label: 'Noch nie reviewt', points: 2 });
+    if (age > 7) signals.push({ key: 'review', label: 'Noch nie wiederholt', points: 2 });
   } else {
     const daysSince = Math.floor((now - obj.lastReviewed) / day);
-    if (daysSince > 21) signals.push({ key: 'review', label: `Seit ${daysSince} Tagen kein Review`, points: 2 });
-    else if (daysSince > 14) signals.push({ key: 'review', label: `Seit ${daysSince} Tagen kein Review`, points: 1 });
+    if (daysSince > 21) signals.push({ key: 'review', label: `Seit ${daysSince} Tagen keine Wiederholung`, points: 2 });
+    else if (daysSince > 14) signals.push({ key: 'review', label: `Seit ${daysSince} Tagen keine Wiederholung`, points: 1 });
   }
 
   // 5. Low study time relative to importance (linked exam weight vs. module median)
@@ -734,7 +734,7 @@ export function scoreObjectiveRisk(state, obj, now = Date.now()) {
 
 export function riskReasons(state, obj, now = Date.now()) {
   const reasons = [];
-  reasons.push(`Confidence ${obj.confidence ?? 0}/5`);
+  reasons.push(`Sicherheit ${obj.confidence ?? 0}/5`);
   const touched = obj.lastTouched || obj.updatedAt || obj.createdAt;
   if (touched) {
     const days = Math.floor((now - touched) / 86400000);
@@ -803,13 +803,25 @@ export function getDailyPrompt(date = new Date()) {
 }
 
 export const RESOURCE_TYPES = ['Video', 'Exercise', 'Dataset', 'Project', 'Cheat Sheet', 'Article', 'Book', 'Other'];
+export const RESOURCE_TYPE_LABELS = {
+  Video: 'Video',
+  Exercise: 'Übung',
+  Dataset: 'Datensatz',
+  Project: 'Projekt',
+  'Cheat Sheet': 'Spickzettel',
+  Article: 'Artikel',
+  Book: 'Buch',
+  Other: 'Sonstiges',
+  pdf: 'PDF',
+  link: 'Link',
+};
 export const EXAM_RATINGS = ['weak', 'okay', 'strong'];
 export const EXAM_RATING_LABELS = { weak: 'Schwach', okay: 'Okay', strong: 'Stark' };
 export const CAPTURE_TYPES = ['question', 'term', 'resource', 'mistake', 'thought'];
 export const CAPTURE_TYPE_LABELS = {
   question: 'Frage',
   term: 'Begriff',
-  resource: 'Ressource',
+  resource: 'Material',
   mistake: 'Fehler',
   thought: 'Gedanke'
 };
@@ -861,10 +873,10 @@ export function pickFocus(state, now = Date.now()) {
     return {
       kind: 'overdue',
       objective: overdue,
-      label: 'Überfälliges Review',
+      label: 'Überfällige Wiederholung',
       context: (days === 0
-        ? 'Review ist heute fällig'
-        : days === 1 ? 'Review ist seit gestern fällig' : `Review ist seit ${days} Tagen fällig`) + understood
+        ? 'Wiederholung ist heute fällig'
+        : days === 1 ? 'Wiederholung ist seit gestern fällig' : `Wiederholung ist seit ${days} Tagen fällig`) + understood
     };
   }
   const weak = getWeakestObjective(state);
@@ -873,7 +885,7 @@ export function pickFocus(state, now = Date.now()) {
       kind: 'weakest',
       objective: weak,
       label: 'Schwächstes Lernziel',
-      context: `Confidence ${weak.confidence ?? 0}/5`
+      context: `Sicherheit ${weak.confidence ?? 0}/5`
     };
   }
   return null;

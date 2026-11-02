@@ -50,7 +50,7 @@
       <button type="button" class="toc-item" data-view="exams-global" title="Prüfungen — alle Termine"><span class="toc-ico" aria-hidden="true">◷</span><span class="toc-num">04</span> <span class="toc-lb">Prüfungen</span><span class="nav-badge" id="railBadgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></button>
       <button type="button" class="toc-item" data-view="focus" title="Fokus — Pomodoro-Fokusraum"><span class="toc-ico" aria-hidden="true">◐</span><span class="toc-num">05</span> <span class="toc-lb">Fokus</span><span class="focus-rail-time" data-focus-rail-time hidden></span></button>
       <div class="nav-quick" role="group" aria-label="Weitere Bereiche">
-        <button class="nav-quick-more" id="railMore" data-open-more aria-label="Weitere Bereiche öffnen: Fokusraum, Review, Werkzeuge, Prüfungsvorbereitung, Mock-Prüfung, Erfassungen, Einstellungen" title="Weitere Bereiche: Fokusraum, Review, Werkzeuge, Prüfungsvorbereitung, Mock-Prüfung, Erfassungen, Einstellungen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
+        <button class="nav-quick-more" id="railMore" data-open-more aria-label="Weitere Bereiche öffnen: Fokusraum, Notizen, Einstellungen" title="Weitere Bereiche: Fokusraum, Notizen, Einstellungen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
       </div>
     </nav>
     <div class="sidebar-overflow" id="sidebar-overflow" hidden>
@@ -80,11 +80,7 @@
       <h2 class="sheet-title" id="more-title">Weitere Bereiche</h2>
       <div class="sheet-list">
         <button class="sheet-item" data-route="focus"><span aria-hidden="true">◐</span> Fokusraum</button>
-        <button class="sheet-item" data-route="weekly-review"><span aria-hidden="true">✎</span> Review</button>
-        <button class="sheet-item" data-route="tools"><span aria-hidden="true">⚒</span> Werkzeuge</button>
-        <button class="sheet-item" data-route="exam-prep"><span aria-hidden="true">⧉</span> Prüfungsvorbereitung</button>
-        <button class="sheet-item" data-route="mock-exam"><span aria-hidden="true">⏱</span> Mock-Prüfung</button>
-        <button class="sheet-item" data-route="captures"><span aria-hidden="true">⚡</span> Erfassungen</button>
+        <button class="sheet-item" data-route="captures"><span aria-hidden="true">⚡</span> Notizen</button>
         <button class="sheet-item" data-route="settings"><span aria-hidden="true">⚙</span> Einstellungen</button>
       </div>
       <button class="btn ghost sheet-close" id="more-close">Schließen</button>
@@ -129,6 +125,7 @@
 <!-- Toast -->
 <div class="toast" id="toast" role="status" aria-live="polite">
   <span id="toast-message"></span>
+  <button class="btn ghost" id="toast-action" style="display:none"></button>
   <button class="btn ghost" id="toast-undo" style="display:none">Rückgängig</button>
 </div>
 

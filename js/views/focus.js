@@ -19,20 +19,20 @@ function reviewIntentMarkup(objective, module, timer) {
   const busy = timer?.status === STATUS.running || timer?.status === STATUS.paused;
   const pending = !!timer?.pendingLog;
   const hint = busy
-    ? 'Ein Timer läuft bereits. Du kannst den Review danach starten.'
+    ? 'Ein Timer läuft bereits. Du kannst die Wiederholung danach starten.'
     : pending
-      ? 'Logge zuerst die offene Sitzung. Danach ist der Review bereit.'
+      ? 'Logge zuerst die offene Sitzung. Danach ist die Wiederholung bereit.'
       : 'Starte eine Fokusrunde für dieses Lernziel. Danach entscheidest du über Pause und nächste Runde.';
   return `<div class="focus-intent">
     <div class="focus-intent-mark" aria-hidden="true">${icon('spark', 20)}</div>
     <div class="focus-intent-copy">
-      <div class="pomo-phase">Review fällig</div>
+      <div class="pomo-phase">Wiederholung fällig</div>
       <div class="focus-intent-title">${escapeHtml(title)}</div>
       <p>${module ? `Modul ${escapeHtml(module.code)} · ` : ''}${hint}</p>
     </div>
     <div class="focus-intent-actions">
       <button type="button" class="pomo-btn primary" id="focus-review-start"${busy ? ' aria-disabled="true"' : ''}>
-        ${icon('play', 17)}<span>Review-Fokus starten</span>
+        ${icon('play', 17)}<span>Wiederholung starten</span>
       </button>
       <button type="button" class="pomo-btn ghost" id="focus-review-dismiss">Nicht jetzt</button>
     </div>

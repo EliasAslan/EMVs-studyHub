@@ -8,7 +8,6 @@ import { openObjectiveModal as openObjectiveSheet } from '../views/module-object
 import { openResourceModal as openResourceSheet } from '../views/module-resources.js';
 import { openSessionModal as openSessionSheet, startTimer } from '../views/module-sessions.js';
 import { openCaptureModal as openCaptureSheet, openQuickCapture as openQuickCaptureSheet } from '../views/captures.js';
-import { openReviewModal as openWeeklyReviewSheet } from '../views/weekly-review.js';
 import { openObjectiveHistory } from '../views/module-objectives.js';
 import { getDueObjectives, getMostOverdueObjective, getWeakestObjective } from '../utils/helpers.js';
 import { DESTINATIONS } from '../utils/navigation.js';
@@ -52,12 +51,9 @@ export function initPalette() {
       'focus': ['pomodoro', 'timer', 'fokusraum', 'fokus', 'lernen'],
       'overview': ['module', 'fächer', 'alle module'],
       'weak-spots': ['schwach', 'probleme', 'fällig', 'wiederholen'],
-      'exams-global': ['prüfung', 'examen', 'termine'],
-      'weekly-review': ['wochenreview', 'reflexion', 'rückblick'],
-      'tools': ['links', 'ressourcen', 'tools'],
-      'exam-prep': ['vorbereitung', 'mock'],
+      'exams-global': ['prüfung', 'examen', 'termine', 'vorbereitung', 'mock'],
       'settings': ['setup', 'konfiguration', 'navigation'],
-      'captures': ['notizen', 'alle erfassungen', 'fragen', 'fehler', 'gedanken'],
+      'captures': ['notizen', 'erfassungen', 'fragen', 'fehler', 'gedanken'],
     };
     Object.keys(NAV_ALIASES).forEach(id => {
       const d = DESTINATIONS[id];
@@ -67,17 +63,21 @@ export function initPalette() {
 
     // Module-specific
     state.modules.forEach(m => {
-      ['Home', 'Lernziele', 'Ressourcen', 'Sitzungen', 'Prüfungen', 'Plan'].forEach(sub => {
+      [
+        { label: 'Übersicht', tab: 'home' },
+        { label: 'Lernziele', tab: 'ziele' },
+        { label: 'Material', tab: 'material' },
+        { label: 'Plan', tab: 'plan' },
+      ].forEach(sub => {
         add({
-          label: `Modul ${m.code} · ${sub}`,
-          aliases: [m.title, sub],
+          label: `Modul ${m.code} · ${sub.label}`,
+          aliases: [m.title, sub.label],
           group: 'modul',
           action: () => {
             state.settings.currentModuleId = m.id;
             window.EMVS.save();
             renderSidebar();
-            const map = { 'Home': 'module-home', 'Lernziele': 'module-objectives', 'Ressourcen': 'module-resources', 'Sitzungen': 'module-sessions', 'Prüfungen': 'module-exams', 'Plan': 'module-plan' };
-            navigate(map[sub]);
+            navigate('module', { id: m.id, tab: sub.tab });
           }
         });
       });
@@ -97,6 +97,7 @@ export function initPalette() {
     add({ label: 'Pomodoro ausblenden', aliases: ['timer', 'floating', 'popup', 'ausblenden', 'randlasche'], group: 'aktion', action: () => window.EMVS.pomodoro?.hide?.() });
     add({ label: 'Sitzung protokollieren', aliases: ['lernzeit', 'loggen'], group: 'aktion', action: () => openSessionModal() });
     add({ label: 'Mock-Prüfung starten', aliases: ['mock', 'simulieren'], group: 'aktion', action: () => openMockExam() });
+    add({ label: 'Prüfungsvorbereitung öffnen', aliases: ['vorbereitung', 'prüfung', 'lernplan'], group: 'aktion', action: () => navigate('exams-global', { qs: '?tab=vorbereitung' }) });
     add({ label: 'Neues Modul erstellen', aliases: ['modul anlegen'], group: 'verwalten', action: () => openModuleModal() });
     add({ label: 'Neues Lernziel erstellen', aliases: ['ziel anlegen'], group: 'verwalten', action: () => openObjectiveModal() });
     add({ label: 'Neue Ressource hinzufügen', aliases: ['ressource anlegen'], group: 'verwalten', action: () => openResourceModal() });
@@ -104,7 +105,6 @@ export function initPalette() {
     add({ label: '⚡ Fehler festhalten', aliases: ['fehler', 'falsch'], group: 'erfassen', action: () => openQuickCapture({ type: 'mistake' }) });
     add({ label: '⚡ Begriff festhalten', aliases: ['begriff', 'definition'], group: 'erfassen', action: () => openQuickCapture({ type: 'term' }) });
     add({ label: '⚡ Gedanke festhalten', aliases: ['gedanke', 'notiz'], group: 'erfassen', action: () => openQuickCapture({ type: 'thought' }) });
-    add({ label: 'Wochenreview schreiben', aliases: ['review schreiben'], group: 'verwalten', action: () => openWeeklyReviewModal() });
     add({ label: 'Backup exportieren', aliases: ['sichern', 'json'], group: 'verwalten', action: () => window.EMVS.exportData() });
     add({ label: 'Backup importieren', aliases: ['wiederherstellen'], group: 'verwalten', action: () => importBackup() });
     add({ label: 'Theme: Hell', aliases: ['hell', 'licht'], group: 'ansicht', action: () => setTheme('light') });
@@ -128,7 +128,7 @@ export function initPalette() {
         action: () => { goModule(o.moduleId, 'ziele'); openObjectiveHistory(o.id); },
       }));
       (state.captures || []).filter(c => has(c?.content)).slice(0, 5).forEach(c => hits.push({
-        label: `Notiz · ${clip(c.content)}`, group: 'notiz', action: () => goTo('captures'),
+        label: `Notiz · ${clip(c.content)}`, group: 'notiz', action: () => openCaptureSheet(c),
       }));
       state.resources.filter(r => has(r.name)).slice(0, 5).forEach(r => hits.push({
         label: `Material · ${clip(r.name)}`, group: 'material', action: () => goModule(r.moduleId, 'material'),
@@ -220,9 +220,9 @@ export function initPalette() {
 }
 
 // Helper functions (imported from views/actions)
-function navigate(view) {
+function navigate(view, params) {
   // This will be set by router
-  window.EMVS.navigate?.(view);
+  window.EMVS.navigate?.(view, params);
 }
 
 function renderSidebar() {
@@ -261,7 +261,7 @@ function openMockExam() {
   st.settings.currentModuleId = modId;
   window.EMVS.save();
   renderSidebar();
-  navigate('mock-exam');
+  navigate('exams-global', { qs: '?tab=mock' });
 }
 
 function openCaptureModal() {
@@ -271,10 +271,6 @@ function openCaptureModal() {
 function openQuickCapture(preset = {}) {
   const st = window.EMVS.getState();
   openQuickCaptureSheet({ moduleId: st.settings.currentModuleId || null, ...preset });
-}
-
-function openWeeklyReviewModal() {
-  openWeeklyReviewSheet();
 }
 
 function importBackup() {

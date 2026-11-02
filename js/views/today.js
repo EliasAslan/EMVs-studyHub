@@ -4,13 +4,14 @@
  * No hero countdown, no percentage stats, no streaks, no red, no shaming.
  */
 
-import { escapeHtml, daysUntil, getRecentSessions, relativeDay, getDailyPrompt, getCurrentWeekNumber, hasWeeklyReview, buildReviewQueue, normalizeTodaySkips, riskReasons } from '../utils/helpers.js';
+import { escapeHtml, daysUntil, getRecentSessions, relativeDay, buildReviewQueue, normalizeTodaySkips, riskReasons } from '../utils/helpers.js';
 import { recordReview, pushCapped, ensureObjectiveFields } from '../services/store.js';
 import { getOpenPlanItems, getRecentCaptures } from '../utils/navigation.js';
 import { navigate } from './router.js';
 import { openModuleModal } from './settings.js';
 import { openObjectiveHistory } from './module-objectives.js';
 import { openCaptureModal } from './captures.js';
+import { openSessionModal } from './module-sessions.js';
 
 export function renderToday(state) {
   const now = new Date();
@@ -30,12 +31,8 @@ export function renderToday(state) {
   });
   const closestExams = closestTests(state, 3);
   const recent = getRecentSessions(state, 3);
-  const prompt = getDailyPrompt(now);
   const todos = getOpenPlanItems(state, { limit: 5 });
   const notes = getRecentCaptures(state, { limit: 3 });
-  const reviewWeek = getCurrentWeekNumber(now);
-  const reviewDue = state.modules.length > 0 &&
-    !hasWeeklyReview(state, reviewWeek, now.getFullYear(), state.settings.currentModuleId);
 
   // Visible items: hero (idx 0) + up to 3 collapsed rows (idx 1-3)
   const visibleCount = Math.min(queue.length, 4);
@@ -47,7 +44,7 @@ export function renderToday(state) {
     <h1 class="page-title today-title">Was jetzt <em>zählt.</em></h1>
 
     ${queue.length ? `
-      <h2 class="section-label">Im Faden · ${visibleCount} von ${queue.length}</h2>
+      <h2 class="section-label">Wiederholungen · ${visibleCount} von ${queue.length}</h2>
       <div class="queue">${queue.slice(0, visibleCount).map((item, idx) => renderQueueItem(item, state, idx)).join('')}</div>
       ${tailCount > 0 ? `<p class="queue-tail">… ${tailCount} weitere folgen heute</p>` : ''}
     ` : !state.modules.length ? `
@@ -63,7 +60,10 @@ export function renderToday(state) {
       <div class="today-focus">
         <div class="today-focus-label">Bereit</div>
         <div class="today-focus-title">Alles im Rhythmus.</div>
-        <div class="today-focus-context">Kein Review fällig — vertiefe einen Verlauf oder protokolliere eine freie Sitzung.</div>
+        <div class="today-focus-context">Keine Wiederholung fällig — vertiefe einen Verlauf oder protokolliere eine freie Sitzung.</div>
+        <div class="timer-actions mt-2">
+          <button class="btn" data-log-session>＋ Sitzung protokollieren</button>
+        </div>
       </div>
     `}
 
@@ -72,7 +72,10 @@ export function renderToday(state) {
 
     <hr class="rule today-rule">
 
-    <h2 class="section-label">Am Rand</h2>
+    <div class="section-head">
+      <h2 class="section-label" style="margin: 0;">Am Rand</h2>
+      <button type="button" class="btn ghost btn-sm" data-log-session>＋ Sitzung</button>
+    </div>
     <div class="am-rand">
       ${recent.length ? `
         <div class="am-rand-row" data-am-rand="recent">
@@ -96,23 +99,6 @@ export function renderToday(state) {
         <div class="am-rand-panel" id="am-rand-notes" hidden><div class="today-notes">${notes.map(c => renderNoteRow(c, state)).join('')}</div></div>
       ` : ''}
     </div>
-
-    <hr class="rule today-rule">
-
-    ${reviewDue ? `
-      <div class="today-review-nudge">
-        <div>
-          <div class="today-review-nudge-title">Wochenreflexion offen — KW ${reviewWeek}</div>
-          <div class="today-review-nudge-sub">Drei Fragen, fünf Minuten, mit den Fakten der Woche daneben.</div>
-        </div>
-        <button class="btn primary" id="today-review-now">Jetzt reviewen</button>
-      </div>
-      <hr class="rule today-rule">
-    ` : ''}
-
-    <div class="today-prompt">
-      <span class="today-prompt-q">„${escapeHtml(prompt)}“</span>
-    </div>
   `;
 
   // Empty state handlers
@@ -120,14 +106,14 @@ export function renderToday(state) {
     b.addEventListener('click', () => openModuleModal())
   );
 
-  // Activity rows → jump to that module's sessions.
+  // Activity rows → jump to that module's Übersicht (sessions live there).
   el.querySelectorAll('.today-session[data-module]').forEach(row => {
     row.addEventListener('click', () => {
       const st = window.EMVS.getState();
       st.settings.currentModuleId = row.dataset.module;
       window.EMVS.save();
       window.EMVS.renderSidebar();
-      navigate('module', { id: row.dataset.module, tab: 'sessions' });
+      navigate('module', { id: row.dataset.module, tab: 'home' });
     });
   });
 
@@ -164,7 +150,14 @@ export function renderToday(state) {
     });
   });
 
-  el.querySelector('#today-review-now')?.addEventListener('click', () => navigate('weekly-review'));
+  // Manual session log: one tap from Today, no timer required.
+  el.querySelectorAll('[data-log-session]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const st = window.EMVS.getState();
+      const moduleId = st.settings.currentModuleId || st.modules[0]?.id;
+      if (!moduleId) { openModuleModal(); return; }
+      openSessionModal(null, moduleId);
+    }));
 
   // Exam strip + "Alle Prüfungen" go through the router (focus/scroll reset).
   el.querySelectorAll('[data-goto-exams]').forEach(b =>
@@ -173,16 +166,12 @@ export function renderToday(state) {
   const objectiveById = (id) =>
     window.EMVS.getState().learningObjectives.find(o => o.id === id);
 
-  // One review-start path: start the Pomodoro first. The outcome card appears
-  // after the round is logged, so the review loop cannot be bypassed by
-  // clicking the card instead of the button.
-  // Review is not auto-started: the user lands on the Pomodoro page and
-  // presses start themselves. The pending review objective is carried along
-  // so the start button links the round to that review.
+  // Optional secondary path: carry the objective into the focus room and let
+  // the user start the Pomodoro themselves. The primary path is the inline
+  // outcome buttons above, which need no timer.
   const beginReview = (obj) => {
     if (!obj) return;
     const st = window.EMVS.getState();
-    st.settings.currentModuleId = obj.moduleId;
     st.settings.currentModuleId = obj.moduleId;
     st.settings.pendingReviewObjectiveId = obj.id;
     window.EMVS.save();
@@ -195,19 +184,6 @@ export function renderToday(state) {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       beginReview(objectiveById(btn.dataset.obj));
-    })
-  );
-  el.querySelectorAll('.q-skip').forEach(btn =>
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      // Skip adds to today's skipIds and re-renders
-      const st = window.EMVS.getState();
-      normalizeTodaySkips(st);
-      const skipIds = new Set(st.settings.todaySkipIds || []);
-      skipIds.add(btn.dataset.obj);
-      st.settings.todaySkipIds = Array.from(skipIds);
-      window.EMVS.save();
-      window.EMVS.refresh('today-queue-skip', { skipIds: st.settings.todaySkipIds });
     })
   );
   el.querySelectorAll('.q-history').forEach(btn =>
@@ -236,7 +212,7 @@ export function renderToday(state) {
         st.settings.todaySkipIds = Array.from(skipIds);
         delete st.settings.todayReviewOutcome;
         window.EMVS.save();
-        window.EMVS.toast?.show('Review verschoben — heute nicht mehr angesagt');
+        window.EMVS.toast?.show('Wiederholung verschoben — heute nicht mehr angesagt');
         window.EMVS.refresh('today-outcome-defer', { skipIds: st.settings.todaySkipIds });
         return;
       }
@@ -249,11 +225,20 @@ export function renderToday(state) {
       const interval = entry.interval;
       const nextIn = interval === 1 ? 'morgen' : `in ${interval} Tagen`;
       const phrases = {
-        solid: 'Review: sitzt',
-        shaky: 'Review: wackelig',
-        lost: 'Review: verloren'
+        solid: 'Sitzt',
+        shaky: 'Wackelig',
+        lost: 'Verloren'
       };
-      window.EMVS.toast?.show(`${phrases[outcome]} — nächstes Review ${nextIn}`);
+      window.EMVS.toast?.show(`${phrases[outcome]} — nächste Wiederholung ${nextIn}`, {
+        action: {
+          label: 'Sitzung loggen',
+          onClick: () => openSessionModal(null, obj.moduleId, {
+            linkedObjectiveIds: [obj.id],
+            duration: 25,
+            note: 'Wiederholung',
+          }),
+        },
+      });
       
       // Clear outcome flag and advance (re-render will show next card)
       delete st.settings.todayReviewOutcome;
@@ -265,7 +250,7 @@ export function renderToday(state) {
       window.EMVS.refresh('today-outcome-recorded', { objectiveId: objId, outcome });
     })
   );
-  // Confidence dots: edit in place, no session, no re-render.
+  // Sicherheit dots: edit in place, no session, no re-render.
   el.querySelectorAll('.q-card .confidence-dot').forEach(dot => {
     const set = () => {
       const obj = objectiveById(dot.dataset.obj);
@@ -284,8 +269,8 @@ export function renderToday(state) {
         d.classList.toggle('on', on);
         d.setAttribute('aria-pressed', String(on));
       });
-      card?.querySelector('.q-card-confidence')?.setAttribute('aria-label', `Confidence ${obj.confidence}/5`);
-      // Weak cards print the risk reasons (including confidence) in the body.
+      card?.querySelector('.q-card-confidence')?.setAttribute('aria-label', `Sicherheit ${obj.confidence}/5`);
+      // Weak cards print the risk reasons (including Sicherheit) in the body.
       const reasonLine = card?.querySelector('.q-card-reason');
       if (reasonLine && (card.dataset.kind === 'weak' || card.dataset.kind === 'weakest')) {
         reasonLine.textContent = riskReasons(window.EMVS.getState(), obj, Date.now()).join(' · ');
@@ -297,13 +282,17 @@ export function renderToday(state) {
     });
   });
 
-  // Background click is a shortcut for the primary action. The outcome card
-  // must not start a second session, and nested buttons/dots keep their own
-  // action. No keydown trap here: the card itself is not focusable, and
-  // cancelling Enter/Space on bubbled events would break the buttons inside it.
+  // Background click opens the learning thread (notes, history, material).
+  // The outcome buttons keep their own action; nested buttons/dots are ignored.
   el.querySelector('.q-card:not(.q-outcome)')?.addEventListener('click', e => {
     if (e.target.closest('button, .confidence-dot')) return;
-    beginReview(objectiveById(e.currentTarget.dataset.obj));
+    openObjectiveHistory(e.currentTarget.dataset.obj);
+  });
+  el.querySelectorAll('.q-row').forEach(row => {
+    row.addEventListener('click', e => {
+      if (e.target.closest('button')) return;
+      openObjectiveHistory(row.dataset.obj);
+    });
   });
 
   // Am Rand expandable panels
@@ -370,12 +359,12 @@ function renderQueueItem(item, state, idx) {
   // Check if we should show the outcome choice for this objective
   const showOutcome = state.settings.todayReviewOutcome === obj.id;
 
-  // Interactive confidence rating (same contract as module-objectives.js:
+  // Interactive Sicherheit rating (same contract as module-objectives.js:
   // tapping the current value lowers it by one).
   const confidence = obj.confidence ?? 0;
   const dots = [1, 2, 3, 4, 5].map(n => `
     <span class="confidence-dot ${n <= confidence ? 'on' : ''}" data-n="${n}" data-obj="${obj.id}"
-          title="Confidence ${n}/5" role="button" tabindex="0" aria-label="Confidence ${n}/5"
+          title="Sicherheit ${n}/5" role="button" tabindex="0" aria-label="Sicherheit ${n}/5"
           aria-pressed="${n <= confidence ? 'true' : 'false'}"></span>
   `).join('');
 
@@ -396,29 +385,41 @@ function renderQueueItem(item, state, idx) {
   }
 
   if (isHero) {
-    // q-card - expanded view
+    // q-card - expanded view. Inline outcomes are the primary action; the
+    // focus room stays available as a secondary path.
     return `
       <div class="q-card" data-obj="${obj.id}" data-kind="${item.kind}">
         <div class="q-card-eyebrow">${escapeHtml(kindLabel)}</div>
         <div class="q-card-title">${escapeHtml(obj.title)}</div>
         <div class="q-card-meta">
           <span>LZ ${escapeHtml(String(obj.number ?? '–'))}${m ? ` · Modul ${escapeHtml(m.code)}` : ''}</span>
-          <span class="q-card-confidence" role="group" aria-label="Confidence ${confidence}/5">${dots}</span>
+          <span class="q-card-confidence" role="group" aria-label="Sicherheit ${confidence}/5">${dots}</span>
         </div>
         <div class="q-card-reason">${escapeHtml(item.reason)}</div>
-        <div class="q-card-actions">
-          <button class="btn primary q-start" data-obj="${obj.id}">▶ Review starten</button>
-          <button class="btn ghost q-skip" data-obj="${obj.id}">Überspringen</button>
-          <button class="btn ghost q-history" data-obj="${obj.id}">Verlauf</button>
+        <div class="q-card-actions q-outcomes">
+          <button class="btn primary q-outcome-solid" data-obj="${obj.id}" data-outcome="solid">Sitzt</button>
+          <button class="btn q-outcome-shaky" data-obj="${obj.id}" data-outcome="shaky">Wackelig</button>
+          <button class="btn ghost q-outcome-lost" data-obj="${obj.id}" data-outcome="lost">Verloren</button>
+          <button class="btn ghost q-outcome-defer" data-obj="${obj.id}" data-outcome="defer">Später</button>
+        </div>
+        <div class="q-card-links">
+          <button class="q-link q-start" data-obj="${obj.id}">▶ Fokus starten</button>
+          <button class="q-link q-history" data-obj="${obj.id}">Lernziel öffnen</button>
         </div>
       </div>`;
   } else if (isCollapsedRow) {
-    // Collapsed q-row
+    // Collapsed row with the same inline outcomes, one click away.
     return `
       <div class="q-row" data-obj="${obj.id}" data-kind="${item.kind}">
         <span class="q-row-kind">${escapeHtml(kindLabel)}</span>
         <span class="q-row-title">${escapeHtml(obj.title)}</span>
         <span class="q-row-meta">LZ ${escapeHtml(String(obj.number ?? '–'))}${m ? ` · ${escapeHtml(m.code)}` : ''}</span>
+        <span class="q-row-actions">
+          <button class="q-row-btn q-outcome-solid" data-obj="${obj.id}" data-outcome="solid" aria-label="Sitzt" title="Sitzt">✓</button>
+          <button class="q-row-btn q-outcome-shaky" data-obj="${obj.id}" data-outcome="shaky" aria-label="Wackelig" title="Wackelig">~</button>
+          <button class="q-row-btn q-outcome-lost" data-obj="${obj.id}" data-outcome="lost" aria-label="Verloren" title="Verloren">✕</button>
+          <button class="q-row-btn q-outcome-defer" data-obj="${obj.id}" data-outcome="defer" aria-label="Später" title="Später">→</button>
+        </span>
       </div>`;
   } else {
     // Hidden beyond the first 4 - will be counted in the tail
@@ -445,7 +446,7 @@ function objectiveNumbers(state, session) {
 
 function renderRecent(recent, state) {
   if (!recent.length) {
-    return `<p class="today-empty-line">Noch keine Sitzungen — starte oben eine Session oder nutze den Timer unter Sitzungen.</p>`;
+    return `<p class="today-empty-line">Noch keine Sitzungen — protokolliere eine über „＋ Sitzung“.</p>`;
   }
   return `
     <div class="today-sessions">

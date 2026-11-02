@@ -83,9 +83,7 @@ export function renderMockExam(state) {
   const el = document.createElement('div');
   el.className = 'mock-wrap';
   if (!m) {
-    el.innerHTML = `<div class="eyebrow">Mock-Prüfung</div>
-      <h1 class="page-title">Mock-Prüfung</h1>
-      <p class="page-lede">Kein Modul ausgewählt.</p>`;
+    el.innerHTML = `<p class="today-empty-line">Kein Modul ausgewählt — lege zuerst ein Modul an.</p>`;
     return el;
   }
   if (!run || run.moduleId !== moduleId) {
@@ -97,18 +95,22 @@ export function renderMockExam(state) {
   else if (run.phase === 'scoring') el.appendChild(renderScoring(state, m));
   else if (run.phase === 'result') el.appendChild(renderResult(state, m));
   else el.appendChild(renderSetup(state, m));
+  if (run?.phase === 'running') startTimer();
   return el;
 }
 
 function rerenderMock() {
+  if (window.EMVS?.refresh) {
+    window.EMVS.refresh('mock-rerender');
+    return;
+  }
   const root = document.getElementById('view-root');
   if (!root) return;
   stopTimerOnly();
   const state = window.EMVS.getState();
   root.innerHTML = '';
-  root.dataset.view = 'mock-exam';
+  root.dataset.view = 'exams-global';
   root.appendChild(renderMockExam(state));
-  if (run?.phase === 'running') startTimer();
 }
 
 // ---------------------------------------------------------------------------
@@ -127,8 +129,7 @@ function renderSetup(state, m) {
 
   const el = document.createElement('div');
   el.innerHTML = `
-    <div class="eyebrow">Mock-Prüfung · Modul ${escapeHtml(m.code)}</div>
-    <h1 class="page-title">Mock-Prüfung</h1>
+    <h2 class="section-label">Mock-Prüfung · Modul ${escapeHtml(m.code)}</h2>
     <p class="page-lede">Ein fokussierter Durchgang: eine Frage pro Lernziel, auf Zeit, aus dem Kopf. Das Ergebnis wird als Mock (0&nbsp;%) festgehalten — Diagnose ja, Notendruck nein.</p>
     ${objectives.length ? `
       <h2 class="section-label">Lernziele · schwächste zuerst</h2>
@@ -138,7 +139,7 @@ function renderSetup(state, m) {
             <input type="checkbox" data-oid="${o.id}" ${preset.has(o.id) ? 'checked' : ''}>
             <span class="mock-objnum">LZ ${o.number ?? '–'}</span>
             <span class="mock-objtitle">${escapeHtml(o.title)}</span>
-            <span class="badge">Confidence ${o.confidence ?? 0}/5</span>
+            <span class="badge">Sicherheit ${o.confidence ?? 0}/5</span>
           </label>`).join('')}
       </div>
       <h2 class="section-label" style="margin-top:24px;">Dauer</h2>
@@ -203,8 +204,8 @@ function renderSetup(state, m) {
     rerenderMock();
   });
 
-  el.querySelector('#mock-back')?.addEventListener('click', () => navigate('module-exams'));
-  el.querySelector('#mock-goto-obj')?.addEventListener('click', () => navigate('module-objectives'));
+  el.querySelector('#mock-back')?.addEventListener('click', () => navigate('exams-global', { qs: '?tab=termine' }));
+  el.querySelector('#mock-goto-obj')?.addEventListener('click', () => navigate('module', { tab: 'ziele' }));
 
   return el;
 }
@@ -280,7 +281,7 @@ function renderRunning(state, m) {
   el.querySelector('#mock-abort')?.addEventListener('click', () => {
     if (confirm('Mock verwerfen? Es wird nichts festgehalten.')) {
       stopMockExamDisplay();
-      navigate('module-exams');
+      navigate('exams-global', { qs: '?tab=termine' });
     }
   });
   return el;
@@ -469,7 +470,7 @@ function renderResult(state, m) {
 
   el.querySelector('#mock-to-exams')?.addEventListener('click', () => {
     stopMockExamDisplay();
-    navigate('module-exams');
+    navigate('exams-global', { qs: '?tab=ergebnisse' });
   });
   el.querySelector('#mock-to-weak')?.addEventListener('click', () => {
     stopMockExamDisplay();

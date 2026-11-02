@@ -246,7 +246,7 @@ await test('reason string derived from riskReasons for weak/weakest', async () =
   });
   const state = makeState([], [weak]);
   const queue = buildReviewQueue(state, { now });
-  assert.ok(queue[0].reason.includes('Confidence 1/5'));
+  assert.ok(queue[0].reason.includes('Sicherheit 1/5'));
 });
 
 await test('focus is overdue when exists, else weakest', async () => {

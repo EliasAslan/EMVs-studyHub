@@ -18,7 +18,7 @@
 import {
   escapeHtml, formatDate, getExamGrade, getWeaknessBreakdown,
   rhythmOf, formatNextReview, resourcesForObjective, sessionsForObjective,
-  capturesForObjective, isImportantCapture,
+  capturesForObjective, isImportantCapture, RESOURCE_TYPE_LABELS,
 } from '../utils/helpers.js';
 import { navigate } from './router.js';
 
@@ -156,16 +156,17 @@ export function buildExamPrep(state, { moduleId, examId = null } = {}) {
 // View: setup → preview → print / download
 // ---------------------------------------------------------------------------
 
-export function renderExamPrep(state) {
+export function renderExamPrep(state, { embedded = false } = {}) {
   const p = preset;
   preset = null;
   const initialModule = p?.moduleId || state.settings.currentModuleId || state.modules[0]?.id || null;
 
   const el = document.createElement('div');
   el.innerHTML = `
+    ${embedded ? '' : `
     <div class="eyebrow no-print">Prüfungsvorbereitung</div>
     <h1 class="page-title no-print">Prüfungsvorbereitung</h1>
-    <p class="page-lede no-print">Für den Abend vorher: Schwächen zuerst, Fakten daneben, eine Seite zum Wiederholen. Als Ausdruck oder Datei mitnehmbar.</p>
+    <p class="page-lede no-print">Für den Abend vorher: Schwächen zuerst, Fakten daneben, eine Seite zum Wiederholen. Als Ausdruck oder Datei mitnehmbar.</p>`}
     <div class="card no-print" style="margin-bottom:24px;">
       <div class="field-row">
         <label>Modul</label>
@@ -253,7 +254,7 @@ function renderPreview(prep) {
         <h2>2 · Was zu wiederholen ist</h2>
         ${reviewList.length ? `<ul>${reviewList.map(({ objective: o, rhythm, examRating }) => `
           <li><strong>LZ ${o.number ?? '–'} — ${escapeHtml(o.title)}</strong>${ratingChip(examRating)}
-            <br><span class="muted">${escapeHtml(rhythm.label)} — ${escapeHtml(rhythm.detail)} · Confidence ${o.confidence ?? 0}/5</span>
+            <br><span class="muted">${escapeHtml(rhythm.label)} — ${escapeHtml(rhythm.detail)} · Sicherheit ${o.confidence ?? 0}/5</span>
           </li>`).join('')}</ul>`
           : `<p>Nichts überfällig — dem Rhythmus vertrauen.</p>`}
       </section>
@@ -267,11 +268,11 @@ function renderPreview(prep) {
       </section>
 
       <section>
-        <h2>4 · Relevante Ressourcen</h2>
+        <h2>4 · Relevantes Material</h2>
         ${prep.resources.length ? `<ul>${prep.resources.map(({ resource: r, objective: o }) => `
-          <li>${escapeHtml(r.name)} <span class="muted">(${escapeHtml(r.type || 'Material')}${r.url ? ` · ${escapeHtml(r.url)}` : ''} · LZ ${o.number ?? '–'} · ${r.understood ? 'verstanden ✓' : 'offen'})</span>
+          <li>${escapeHtml(r.name)} <span class="muted">(${escapeHtml(RESOURCE_TYPE_LABELS[r.type] || r.type || 'Material')}${r.url ? ` · ${escapeHtml(r.url)}` : ''} · LZ ${o.number ?? '–'} · ${r.understood ? 'verstanden ✓' : 'offen'})</span>
           </li>`).join('')}</ul>`
-          : `<p>Keine Ressourcen verknüpft.</p>`}
+          : `<p>Keine Material verknüpft.</p>`}
       </section>
 
       <section>
@@ -285,7 +286,7 @@ function renderPreview(prep) {
         <h2>6 · Spickzettel — eine Seite</h2>
         <ol class="print-compact">
           ${prep.revisionSheet.map(({ objective: o, examRating, pitfall }) => `
-            <li><strong>LZ ${o.number ?? '–'} — ${escapeHtml(o.title)}</strong>${ratingChip(examRating)} <span class="muted">(C${o.confidence ?? 0}/5 · Review: ${escapeHtml(formatNextReview(o))})</span>
+            <li><strong>LZ ${o.number ?? '–'} — ${escapeHtml(o.title)}</strong>${ratingChip(examRating)} <span class="muted">(C${o.confidence ?? 0}/5 · Wiederholung: ${escapeHtml(formatNextReview(o))})</span>
             ${pitfall ? `<br>⚠ ${escapeHtml(pitfall)}` : ''}</li>`).join('') || '<li>Keine Lernziele.</li>'}
         </ol>
       </section>
@@ -342,7 +343,7 @@ export function examPrepToMarkdown(prep) {
   L.push('## 2 · Was zu wiederholen ist');
   if (!prep.toReview.length) L.push('Nichts überfällig — dem Rhythmus vertrauen.');
   for (const { objective: o, rhythm, examRating } of prep.toReview) {
-    L.push(`- **LZ ${o.number ?? '–'} — ${o.title}**${examRating ? ` [${RATING_LABELS[examRating]}]` : ''} — ${rhythm.label}: ${rhythm.detail} · Confidence ${o.confidence ?? 0}/5`);
+    L.push(`- **LZ ${o.number ?? '–'} — ${o.title}**${examRating ? ` [${RATING_LABELS[examRating]}]` : ''} — ${rhythm.label}: ${rhythm.detail} · Sicherheit ${o.confidence ?? 0}/5`);
   }
   L.push('');
   L.push('## 3 · Fehler, Fragen & wichtige Notizen');
@@ -352,10 +353,10 @@ export function examPrepToMarkdown(prep) {
     L.push(`- **${kind}** (LZ ${o.number ?? '–'}): ${String(c.content || '').slice(0, 220)}`);
   }
   L.push('');
-  L.push('## 4 · Relevante Ressourcen');
-  if (!prep.resources.length) L.push('Keine Ressourcen verknüpft.');
+  L.push('## 4 · Relevantes Material');
+  if (!prep.resources.length) L.push('Keine Material verknüpft.');
   for (const { resource: r, objective: o } of prep.resources) {
-    L.push(`- ${r.name} (${r.type || 'Material'}${r.url ? ` · ${r.url}` : ''} · LZ ${o.number ?? '–'} · ${r.understood ? 'verstanden ✓' : 'offen'})`);
+    L.push(`- ${r.name} (${RESOURCE_TYPE_LABELS[r.type] || r.type || 'Material'}${r.url ? ` · ${r.url}` : ''} · LZ ${o.number ?? '–'} · ${r.understood ? 'verstanden ✓' : 'offen'})`);
   }
   L.push('');
   L.push('## 5 · Wohin die Lernzeit ging');
@@ -388,11 +389,11 @@ export function examPrepToHtmlDoc(prep) {
 <h2>1 · Schwache Lernziele</h2>
 ${prep.weakObjectives.length ? `<ol>${prep.weakObjectives.map(({ objective: o, breakdown, examRating }) => `<li><strong>LZ ${o.number ?? '–'} — ${esc(o.title)}</strong> (Schwäche ${breakdown.score})${examRating ? ` [${RATING_LABELS[examRating]}]` : ''}<br><span class="muted">${breakdown.signals.map(s => esc(s.label)).join(' · ')}</span></li>`).join('')}</ol>` : '<p>Keine Schwachstellen.</p>'}
 <h2>2 · Was zu wiederholen ist</h2>
-${prep.toReview.length ? li(prep.toReview.map(({ objective: o, rhythm, examRating }) => `<li><strong>LZ ${o.number ?? '–'} — ${esc(o.title)}</strong>${examRating ? ` [${RATING_LABELS[examRating]}]` : ''}<br><span class="muted">${esc(rhythm.label)} — ${esc(rhythm.detail)} · Confidence ${o.confidence ?? 0}/5</span></li>`)) : '<p>Nichts überfällig.</p>'}
+${prep.toReview.length ? li(prep.toReview.map(({ objective: o, rhythm, examRating }) => `<li><strong>LZ ${o.number ?? '–'} — ${esc(o.title)}</strong>${examRating ? ` [${RATING_LABELS[examRating]}]` : ''}<br><span class="muted">${esc(rhythm.label)} — ${esc(rhythm.detail)} · Sicherheit ${o.confidence ?? 0}/5</span></li>`)) : '<p>Nichts überfällig.</p>'}
 <h2>3 · Fehler, Fragen &amp; wichtige Notizen</h2>
 ${prep.captures.length ? li(prep.captures.map(({ capture: c, objective: o }) => `<li><strong>${c.type === 'mistake' ? 'Fehler' : c.type === 'question' ? 'Frage' : 'Notiz'}</strong> (LZ ${o.number ?? '–'}): ${esc(String(c.content || '').slice(0, 220))}</li>`)) : '<p>Keine.</p>'}
-<h2>4 · Relevante Ressourcen</h2>
-${prep.resources.length ? li(prep.resources.map(({ resource: r, objective: o }) => `<li>${esc(r.name)} <span class="muted">(${esc(r.type || 'Material')} · LZ ${o.number ?? '–'} · ${r.understood ? 'verstanden ✓' : 'offen'})</span></li>`)) : '<p>Keine verknüpft.</p>'}
+<h2>4 · Relevantes Material</h2>
+${prep.resources.length ? li(prep.resources.map(({ resource: r, objective: o }) => `<li>${esc(r.name)} <span class="muted">(${esc(RESOURCE_TYPE_LABELS[r.type] || r.type || 'Material')} · LZ ${o.number ?? '–'} · ${r.understood ? 'verstanden ✓' : 'offen'})</span></li>`)) : '<p>Keine verknüpft.</p>'}
 <h2>5 · Wohin die Lernzeit ging</h2>
 <p>${prep.timeSummary.totalMinutes} Min in ${prep.timeSummary.sessionCount} Sitzungen · davon ${prep.timeSummary.last7Minutes} Min in den letzten 7 Tagen.</p>
 ${li(prep.timeSummary.byObjective.map(({ objective: o, minutes }) => `<li>LZ ${o.number ?? '–'} — ${esc(o.title)}: <strong>${minutes} Min</strong></li>`))}

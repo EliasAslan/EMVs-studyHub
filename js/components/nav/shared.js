@@ -39,9 +39,9 @@ export function goModule(id, tab = 'home') {
 }
 
 /**
- * Open a destination by registry id. Module tabs and the mock exam need a
- * module; without one the user lands on the module overview, where the
- * "create module" action lives, instead of on an empty page.
+ * Open a destination by registry id. Module tabs need a module; without one
+ * the user lands on the module overview, where the "create module" action
+ * lives, instead of on an empty page.
  */
 export function goTo(destId) {
   const d = DESTINATIONS[destId];
@@ -52,15 +52,6 @@ export function goTo(destId) {
     if (!mod) { navigate('overview'); return; }
     goModule(mod.id, d.moduleTab);
     return;
-  }
-  if (d.view === 'mock-exam') {
-    const mod = currentModule(state);
-    if (!mod) { navigate('overview'); return; }
-    if (state.settings.currentModuleId !== mod.id) {
-      state.settings.currentModuleId = mod.id;
-      window.EMVS.save();
-      window.EMVS.renderSidebar?.();
-    }
   }
   navigate(d.view);
 }
@@ -132,7 +123,7 @@ export function showShortcuts() {
     .map(([key, id]) => `<tr><td><kbd>${esc(key)}</kbd></td><td>${esc(DESTINATIONS[id].label)}</td></tr>`)
     .join('');
   const extra = [
-    [kbdLabel(), 'Befehlspalette: Seiten, Fächer, Notizen, Werkzeuge'],
+    [kbdLabel(), 'Befehlspalette: Seiten, Fächer, Notizen, Prüfungen'],
     ['/', 'Suche öffnen'],
     ['G', 'Launchpad (Bento-Layout)'],
     ['M', 'Menü ein-/ausblenden (Fokus-Layout)'],

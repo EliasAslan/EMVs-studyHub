@@ -55,10 +55,11 @@ assert.ok(today.includes("el.querySelectorAll('.q-card .confidence-dot')"), 'con
 assert.match(today, /confidence-dot[^>]*role="button"/, 'confidence dots are buttons');
 assert.match(today, /aria-pressed=/, 'confidence dots expose their state');
 
-// Clicking the hero background and pressing "Review starten" must take the
-// same path (session → outcome card), and the outcome card must not restart.
-assert.ok(today.includes('beginReview(objectiveById(btn.dataset.obj))'), 'review button uses the shared start path');
-assert.ok(today.includes('beginReview(objectiveById(e.currentTarget.dataset.obj))'), 'card click uses the shared start path');
+// Inline outcomes record the review directly; the focus room stays a
+// secondary path. Clicking the card background opens the learning thread.
+assert.ok(today.includes('data-outcome="solid"') && today.includes('data-outcome="shaky"') && today.includes('data-outcome="lost"'), 'inline outcomes are present');
+assert.ok(today.includes('beginReview(objectiveById(btn.dataset.obj))'), 'focus button uses the shared start path');
+assert.ok(today.includes('openObjectiveHistory(e.currentTarget.dataset.obj)'), 'card click opens the learning thread');
 assert.ok(today.includes(".q-card:not(.q-outcome)"), 'outcome card does not start a second session');
 
 console.log('ok - row interaction contract (no nested interactive rows, icon buttons labelled)');

@@ -78,7 +78,7 @@ function launchpadHtml(state) {
           <span class="lp-today-s">${data.openTasks} offene ${data.openTasks === 1 ? 'Aufgabe' : 'Aufgaben'} · Tagesfokus öffnen →</span>
         </button></section>
       <section class="lp-card lp-card-tools" aria-labelledby="lp-h-tools"><h3 id="lp-h-tools">Lernwerkzeuge</h3>
-        <div class="lp-tools">${['weak-spots', 'exam-prep', 'mock-exam', 'weekly-review', 'tools'].map(id => destButton(id, { cls: 'lp-tool', showHint: true })).join('')}</div></section>
+        <div class="lp-tools">${['weak-spots', 'exams-global', 'captures'].map(id => destButton(id, { cls: 'lp-tool', showHint: true })).join('')}</div></section>
       <section class="lp-card lp-card-exams" aria-labelledby="lp-h-exams"><h3 id="lp-h-exams">Anstehende Prüfungen</h3>
         ${data.exams.length ? `<ul class="lp-list">${data.exams.map(e => `
           <li><button type="button" class="lp-row${e.urgent ? ' urgent' : ''}" data-exam-module="${esc(e.moduleId || '')}">
@@ -120,13 +120,13 @@ export function openLaunchpad() {
   }));
   sheet.querySelectorAll('[data-exam-module]').forEach(b => b.addEventListener('click', () => {
     closeLaunchpad(false);
-    if (b.dataset.examModule) goModule(b.dataset.examModule, 'material'); else goTo('exams-global');
+    goTo('exams-global');
   }));
   sheet.querySelectorAll('[data-activity]').forEach(b => b.addEventListener('click', () => {
     closeLaunchpad(false);
     const mod = b.dataset.activityModule;
     if (b.dataset.activity === 'capture') goTo('captures');
-    else if (mod) goModule(mod, b.dataset.activity === 'session' ? 'sessions' : 'ziele');
+    else if (mod) goModule(mod, b.dataset.activity === 'session' ? 'home' : 'ziele');
     else goTo('today');
   }));
   sheet.querySelector('#lp-capture')?.addEventListener('click', () => {

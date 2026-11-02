@@ -10,10 +10,11 @@
 import {
   escapeHtml, formatDate, getNextExam, getWeakestObjective, getModuleStats,
   calculateProjection, getWeakSpots, getRecentSessions, relativeDay,
+  CAPTURE_TYPE_LABELS,
 } from '../utils/helpers.js';
 import { formatCountdown, getOpenPlanItems, getRecentCaptures } from '../utils/navigation.js';
 import { navigate } from './router.js';
-import { startPomodoroFor } from './module-sessions.js';
+import { startPomodoroFor, openSessionModal } from './module-sessions.js';
 import { openObjectiveHistory } from './module-objectives.js';
 import { openCaptureModal } from './captures.js';
 import { renderToday } from './today.js';
@@ -25,7 +26,9 @@ export function renderModuleHomeSection(state, m) {
   const weak = getWeakestObjective(state, m.id);
   const stats = getModuleStats(state, m.id);
   const projection = calculateProjection(state, m.id, m.targetGrade ?? 5.0);
-  const lastSession = getRecentSessions(state, 50).find(s => s.moduleId === m.id) || null;
+  const recentSessions = getRecentSessions(state, 50)
+    .filter(s => s.moduleId === m.id)
+    .slice(0, 3);
   // The primary continue-learning card owns the weakest objective; the
   // attention list should surface other objectives instead of repeating it.
   const spots = getWeakSpots(state, { moduleId: m.id, limit: state.learningObjectives.length })
@@ -47,7 +50,7 @@ export function renderModuleHomeSection(state, m) {
         <span class="stat-value">${stats.objectivesDone} <span class="muted">/ ${stats.objectivesTotal}</span></span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">Ressourcen verstanden</span>
+        <span class="stat-label">Material verstanden</span>
         <span class="stat-value">${stats.resourcesDone} <span class="muted">/ ${stats.resourcesTotal}</span></span>
       </div>
       <div class="stat-row">
@@ -60,7 +63,7 @@ export function renderModuleHomeSection(state, m) {
       <div class="projection">${renderProjectionText(projection, m.targetGrade ?? 5.0)}</div>
     ` : ''}
     ${spots.length ? renderSpots(state, m, spots) : ''}
-    ${renderLastSession(state, m, lastSession)}
+    ${renderSessions(state, m, recentSessions)}
     ${todos.length ? renderTodos(state, todos) : ''}
     ${notes.length ? renderNotes(state, notes) : ''}
   `;
@@ -79,7 +82,7 @@ function renderExamSection(state, m, exam) {
       <h2 class="section-label">Nächste Prüfung</h2>
       <p class="today-empty-line">Keine Prüfung eingetragen.</p>
       <div class="btn-row" style="margin-top: 12px;">
-        <button class="btn" data-goto="material">Prüfung eintragen</button>
+        <button class="btn" data-goto-exams>Prüfung eintragen</button>
       </div>`;
   }
   const cd = formatCountdown(exam.date);
@@ -91,7 +94,7 @@ function renderExamSection(state, m, exam) {
         ${cd ? `<span class="badge ${cd.urgent ? 'in-progress' : 'todo'} mod-exam-cd">${escapeHtml(cd.text)}</span>` : ''}
       </div>
       <div class="btn-row" style="margin-top: 12px;">
-        <button class="btn" data-goto="material">Zu den Prüfungen</button>
+        <button class="btn" data-goto-exams>Zu den Prüfungen</button>
       </div>
     </div>`;
 }
@@ -104,7 +107,7 @@ function renderContinue(m, weak) {
         <div class="today-focus-title">Alles im Rhythmus.</div>
         <div class="today-focus-context">Kein offenes Lernziel — vertiefe einen Verlauf oder protokolliere eine freie Sitzung.</div>
         <div class="timer-actions" style="margin-top: 16px;">
-          <button class="btn primary" data-goto="sessions">Sitzung protokollieren</button>
+          <button class="btn primary" data-log-session>＋ Sitzung protokollieren</button>
         </div>
       </div>`;
   }
@@ -112,27 +115,36 @@ function renderContinue(m, weak) {
     <div class="today-focus">
       <div class="today-focus-label">Schwächstes Lernziel · Modul ${escapeHtml(m.code)}</div>
       <div class="today-focus-title">${escapeHtml(weak.title)}</div>
-      <div class="today-focus-context">Lernziel ${weak.number ?? '–'} · Confidence ${weak.confidence ?? 0}/5</div>
+      <div class="today-focus-context">Lernziel ${weak.number ?? '–'} · Sicherheit ${weak.confidence ?? 0}/5</div>
       <div class="timer-actions" style="margin-top: 16px;">
-        <button class="btn primary" data-start-session="${weak.id}">▶ Session starten</button>
-        <button class="btn" data-open-history="${weak.id}">Verlauf</button>
+        <button class="btn primary" data-start-session="${weak.id}">▶ Fokus starten</button>
+        <button class="btn" data-open-history="${weak.id}">Lernziel</button>
       </div>
     </div>`;
 }
 
-function renderLastSession(state, m, s) {
-  if (!s) return '';
-  const linked = (s.linkedObjectiveIds || [])
-    .map(id => state.learningObjectives.find(o => o.id === id)?.number)
-    .filter(n => n !== undefined && n !== null);
+function renderSessions(state, m, sessions) {
   return `
-    <h2 class="section-label" style="margin-top: 24px;">Letzte Sitzung</h2>
-    <div class="today-session" role="link" tabindex="0" data-goto-session>
-      <span class="today-session-when">${escapeHtml(relativeDay(s.startTime))}</span>
-      <span class="today-session-dur">${escapeHtml(String(s.duration ?? 0))} Min</span>
-      <span class="today-session-objs">${linked.length ? `LZ ${linked.join(', ')}` : 'freie Sitzung'}</span>
-      ${s.note ? `<span class="today-session-note">${escapeHtml(s.note.slice(0, 80))}${s.note.length > 80 ? '…' : ''}</span>` : ''}
-    </div>`;
+    <div class="section-head">
+      <h2 class="section-label" style="margin: 0;">Sitzungen</h2>
+      <button type="button" class="btn ghost btn-sm" data-log-session>＋ Sitzung</button>
+    </div>
+    ${sessions.length ? `
+      <div class="list">
+        ${sessions.map(s => {
+          const linked = (s.linkedObjectiveIds || [])
+            .map(id => state.learningObjectives.find(o => o.id === id)?.number)
+            .filter(n => n !== undefined && n !== null);
+          return `
+            <div class="list-item mod-session">
+              <span class="mod-session-when">${escapeHtml(relativeDay(s.startTime))}</span>
+              <span class="mod-session-dur">${escapeHtml(String(s.duration ?? 0))} Min</span>
+              <span class="mod-session-objs">${linked.length ? `LZ ${linked.join(', ')}` : 'frei'}</span>
+              ${s.note ? `<span class="mod-session-note">${escapeHtml(s.note.slice(0, 60))}${s.note.length > 60 ? '…' : ''}</span>` : ''}
+            </div>`;
+        }).join('')}
+      </div>` : '<p class="today-empty-line">Noch keine Sitzung protokolliert.</p>'}
+  `;
 }
 
 function renderSpots(state, m, spots) {
@@ -159,7 +171,7 @@ function renderNotes(state, notes) {
         <div class="list-item mod-note" role="link" tabindex="0" data-open-capture="${c.id}">
           <div style="flex: 1; min-width: 0;">
             <div class="mod-note-text">${escapeHtml(String(c.content || '').slice(0, 120))}${String(c.content || '').length > 120 ? '…' : ''}</div>
-            <div class="mod-note-meta">${escapeHtml(relativeDay(c.timestamp || c.createdAt))}${c.type ? ` · ${escapeHtml(c.type)}` : ''}</div>
+            <div class="mod-note-meta">${escapeHtml(relativeDay(c.timestamp || c.createdAt))}${c.type ? ` · ${escapeHtml(CAPTURE_TYPE_LABELS[c.type] || c.type)}` : ''}</div>
           </div>
         </div>`).join('')}
     </div>`;
@@ -219,10 +231,10 @@ function startSessionFor(moduleId, objectiveId) {
 function wireModuleHome(el, state, m) {
   el.querySelectorAll('[data-goto]').forEach(b =>
     b.addEventListener('click', () => goTab(m, b.dataset.goto)));
-  el.querySelector('[data-goto-session]')?.addEventListener('click', () => goTab(m, 'sessions'));
-  el.querySelector('[data-goto-session]')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTab(m, 'sessions'); }
-  });
+  el.querySelectorAll('[data-goto-exams]').forEach(b =>
+    b.addEventListener('click', () => navigate('exams-global')));
+  el.querySelectorAll('[data-log-session]').forEach(b =>
+    b.addEventListener('click', () => openSessionModal(null, m.id)));
   el.querySelector('[data-weak-all]')?.addEventListener('click', () => {
     navigate('weak-spots', { module: m.id });
   });
