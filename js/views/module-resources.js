@@ -18,6 +18,10 @@ import { getResourceUsage, formatLastUsed, rhythmOf } from '../utils/helpers.js'
 import { refresh, registerPatcher } from './router.js';
 import { startPomodoroFor } from './module-sessions.js';
 import { openObjectiveHistory } from './module-objectives.js';
+import {
+  saveAttachment, getAttachment, deleteAttachment, deleteAttachmentsForResource,
+  attachmentUrl, formatBytes, validateAttachmentFile,
+} from '../services/attachments.js';
 
 // Filter state lives at module level so repaints (list-only) keep it.
 const filters = { q: '', type: 'all', state: 'all' };
@@ -174,11 +178,21 @@ function renderResourceCard(res, state) {
           <button class="delete-btn" data-act="delete" title="Löschen" aria-label="Material löschen: ${escapeHtml(res.name)}">✕</button>
         </div>
       </div>
+      ${res.attachments?.length ? `
+      <div class="res-attachments">
+        ${res.attachments.map(a => `
+          <button type="button" class="res-file" data-file="${a.id}" title="Öffnen: ${escapeHtml(a.name)}">
+            <span class="res-file-ico">${a.type?.startsWith('image/') ? '🖼' : '📄'}</span>
+            <span class="res-file-name">${escapeHtml(a.name)}</span>
+            <span class="res-file-size">${formatBytes(a.size)}</span>
+          </button>`).join('')}
+      </div>` : ''}
       <div class="res-quick">
         <button class="btn ghost" data-act="used" title="Als benutzt markieren — kein Verstehen vorausgesetzt">Benutzt ✓</button>
         ${res.understood
           ? `<button class="btn ghost" data-act="reopen" title="Verstanden-Markierung zurücknehmen">Wieder offen</button>`
           : `<button class="btn ghost" data-act="understood" title="Explizit: ich habe das verstanden">Verstanden ✓</button>`}
+        <button class="btn ghost" data-act="attach" title="PDF oder Foto lokal anhängen">📎 Datei</button>
         <button type="button" class="res-open-hint" data-act="history" aria-label="Verlauf öffnen: ${escapeHtml(res.name)}">Verlauf öffnen →</button>
       </div>
     </div>
@@ -229,17 +243,114 @@ function bindResourceCard(card, el, state, moduleId) {
     e.stopPropagation();
     openResourceModal(res, moduleId, () => paintResourceList(el, state, moduleId));
   });
-  card.querySelector('[data-act="delete"]')?.addEventListener('click', e => {
+  card.querySelector('[data-act="attach"]')?.addEventListener('click', e => {
+    e.stopPropagation();
+    pickResourceAttachment(res, () => paintResourceList(el, state, moduleId));
+  });
+  card.querySelectorAll('[data-file]').forEach(btn => btn.addEventListener('click', e => {
+    e.stopPropagation();
+    openResourceAttachment(res.id, btn.dataset.file, () => paintResourceList(el, state, moduleId));
+  }));
+  card.querySelector('[data-act="delete"]')?.addEventListener('click', async e => {
     e.stopPropagation();
     if (confirm('Material wirklich löschen? Verlauf und Verknüpfungen gehen verloren.')) {
       deleteWithTombstone(state, 'resources', id);
       // Unlink from sessions and plan items (keep them, drop the reference)
       unlinkResourceEverywhere(state, id);
+      try { await deleteAttachmentsForResource(id); } catch {}
       window.EMVS.save();
       paintResourceList(el, state, moduleId);
       refresh('resource-delete', { id });
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Local attachments: PDFs and photos stay in IndexedDB, metadata in state.
+// ---------------------------------------------------------------------------
+
+function pickResourceAttachment(res, onChange) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf,image/*';
+  input.hidden = true;
+  document.body.appendChild(input);
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    input.remove();
+    if (!file) return;
+    const error = validateAttachmentFile(file);
+    if (error) {
+      window.EMVS.toast?.show(error);
+      return;
+    }
+    try {
+      const meta = await saveAttachment(file, { resourceId: res.id });
+      res.attachments = [...(res.attachments || []), meta];
+      res.updatedAt = Date.now();
+      window.EMVS.save();
+      onChange?.();
+      window.EMVS.toast?.show('Datei lokal angehängt');
+    } catch (err) {
+      window.EMVS.toast?.show(err?.message || 'Datei konnte nicht gespeichert werden');
+    }
+  });
+  input.click();
+}
+
+async function openResourceAttachment(resourceId, fileId, onChange) {
+  const state = window.EMVS.getState();
+  const res = state.resources.find(r => r.id === resourceId);
+  const meta = (res?.attachments || []).find(a => a.id === fileId);
+  if (!res || !meta) return;
+
+  let record;
+  try {
+    record = await getAttachment(fileId);
+  } catch {
+    record = null;
+  }
+  if (!record?.blob) {
+    window.EMVS.toast?.show('Datei nicht gefunden — bitte neu anhängen');
+    return;
+  }
+
+  const url = attachmentUrl(record.blob);
+  const isImage = record.type?.startsWith('image/');
+  const isPdf = record.type === 'application/pdf';
+  openModal({
+    title: record.name,
+    body: `
+      <div class="attachment-preview">
+        ${isImage
+          ? `<img src="${url}" alt="${escapeHtml(record.name)}">`
+          : isPdf
+            ? `<iframe src="${url}" title="${escapeHtml(record.name)}"></iframe>`
+            : `<p class="muted">Vorschau für diesen Dateityp nicht verfügbar.</p>`}
+      </div>
+      <p class="today-empty-line">${formatBytes(record.size)} · lokal gespeichert, nicht in der Cloud.</p>
+    `,
+    footer: `
+      <button class="btn" data-action="close">Schliessen</button>
+      <a class="btn" href="${url}" download="${escapeHtml(record.name)}">Herunterladen</a>
+      <button class="btn danger" data-action="delete-file">Entfernen</button>
+    `,
+    onClose: () => URL.revokeObjectURL(url),
+  });
+
+  setTimeout(() => {
+    document.querySelector('#modal-footer [data-action="close"]')?.addEventListener('click', () => closeModal());
+    document.querySelector('#modal-footer [data-action="delete-file"]')?.addEventListener('click', async () => {
+      if (!confirm('Angehängte Datei entfernen?')) return;
+      try { await deleteAttachment(fileId); } catch {}
+      res.attachments = (res.attachments || []).filter(a => a.id !== fileId);
+      res.updatedAt = Date.now();
+      window.EMVS.save();
+      closeModal();
+      onChange?.();
+      window.EMVS.toast?.show('Datei entfernt');
+    });
+  }, 50);
 }
 
 // ---------------------------------------------------------------------------

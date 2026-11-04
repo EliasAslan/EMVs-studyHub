@@ -30,7 +30,7 @@ export function renderWeakSpots(state) {
   el.innerHTML = `
     <div class="eyebrow">Diagnose · alle Module</div>
     <h1 class="page-title">Schwachstellen</h1>
-    <p class="page-lede">Wonach du wahrscheinlich falsch liegst — als Rangliste mit Begründung. Die Reihenfolge ist eine nützliche Schätzung, keine exakte Wissenschaft.</p>
+    <p class="page-lede">Wo Wiederholung am meisten bringt — als Rangliste mit Begründung. Die Reihenfolge ist eine nützliche Schätzung, keine exakte Wissenschaft.</p>
     <div class="res-filters" role="group" aria-label="Modul filtern" id="ws-modules"></div>
     <div class="ws-list" id="ws-list"></div>
   `;

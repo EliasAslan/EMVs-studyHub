@@ -16,7 +16,7 @@ import { formatCountdown, getOpenPlanItems, getRecentCaptures } from '../utils/n
 import { navigate } from './router.js';
 import { startPomodoroFor, openSessionModal } from './module-sessions.js';
 import { openObjectiveHistory } from './module-objectives.js';
-import { openCaptureModal } from './captures.js';
+import { openCaptureModal, setCaptureModuleFilter } from './captures.js';
 import { renderToday } from './today.js';
 
 export function renderModuleHomeSection(state, m) {
@@ -65,7 +65,7 @@ export function renderModuleHomeSection(state, m) {
     ${spots.length ? renderSpots(state, m, spots) : ''}
     ${renderSessions(state, m, recentSessions)}
     ${todos.length ? renderTodos(state, todos) : ''}
-    ${notes.length ? renderNotes(state, notes) : ''}
+    ${notes.length ? renderNotes(state, notes, m) : ''}
   `;
 
   wireModuleHome(el, state, m);
@@ -125,7 +125,7 @@ function renderContinue(m, weak) {
 
 function renderSessions(state, m, sessions) {
   return `
-    <div class="section-head">
+    <div class="section-head" style="margin-top: 24px;">
       <h2 class="section-label" style="margin: 0;">Sitzungen</h2>
       <button type="button" class="btn ghost btn-sm" data-log-session>＋ Sitzung</button>
     </div>
@@ -157,15 +157,18 @@ function renderSpots(state, m, spots) {
             <div class="mod-spot-title">${escapeHtml(o.title)}</div>
             <div class="mod-spot-meta">LZ ${o.number ?? '–'} · ${escapeHtml(b.signals.slice(0, 2).map(s => s.label).join(' · ') || b.level)}</div>
           </div>
-          <span class="badge ${b.level === 'hoch' ? 'in-progress' : 'todo'}">${escapeHtml(b.level)}</span>
+          <span class="badge ${b.level === 'hoch' ? 'in-progress' : 'todo'}">${escapeHtml({ hoch: 'Hohe Schwäche', mittel: 'Mittlere Schwäche', niedrig: 'Leichte Schwäche' }[b.level] || b.level)}</span>
         </div>`).join('')}
     </div>
     <button type="button" class="today-prompt-link" data-weak-all>Alle Schwachstellen →</button>`;
 }
 
-function renderNotes(state, notes) {
+function renderNotes(state, notes, m) {
   return `
-    <h2 class="section-label" style="margin-top: 24px;">Notizen</h2>
+    <div class="section-head" style="margin-top: 24px;">
+      <h2 class="section-label">Notizen</h2>
+      <button type="button" class="today-prompt-link" data-all-notes>Alle Notizen →</button>
+    </div>
     <div class="list">
       ${notes.map(c => `
         <div class="list-item mod-note" role="link" tabindex="0" data-open-capture="${c.id}">
@@ -260,6 +263,10 @@ function wireModuleHome(el, state, m) {
         open();
       }
     });
+  });
+  el.querySelector('[data-all-notes]')?.addEventListener('click', () => {
+    setCaptureModuleFilter(m.id);
+    navigate('captures');
   });
   el.querySelectorAll('[data-open-capture]').forEach(row => {
     const open = () => {

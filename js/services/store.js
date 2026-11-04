@@ -157,6 +157,8 @@ export function load() {
     normalized.resources.forEach(ensureResourceFields);
     // Adaptive plan: items carry notes + dropped state.
     normalized.planItems.forEach(ensurePlanItemFields);
+    // Notes can carry tags and local file metadata.
+    normalized.captures.forEach(ensureCaptureFields);
     return normalized;
   } catch (e) {
     console.error('Failed to load data:', e);
@@ -579,7 +581,17 @@ export function ensureResourceFields(res) {
   if (!('lastUsed' in res)) res.lastUsed = null;
   if (typeof res.notes !== 'string') res.notes = '';
   if (typeof res.url !== 'string') res.url = '';
+  if (!Array.isArray(res.attachments)) res.attachments = [];
   return res;
+}
+
+/** Notes carry optional tags and locally stored attachment metadata. */
+export function ensureCaptureFields(capture) {
+  if (!capture) return capture;
+  if (!Array.isArray(capture.tags)) capture.tags = [];
+  if (!Array.isArray(capture.attachments)) capture.attachments = [];
+  if (typeof capture.pinned !== 'boolean') capture.pinned = false;
+  return capture;
 }
 
 /**
@@ -1039,6 +1051,7 @@ export function importData(jsonString) {
     imported.exams.forEach(ensureExamFields);
     imported.resources.forEach(ensureResourceFields);
     imported.planItems.forEach(ensurePlanItemFields);
+    imported.captures.forEach(ensureCaptureFields);
     
     return { success: true, data: imported };
   } catch (e) {

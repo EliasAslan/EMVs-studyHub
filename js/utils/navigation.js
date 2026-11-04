@@ -63,7 +63,7 @@ export function shortcutMap() {
 export const CONTEXT_MODES = [
   { id: 'learn', label: 'Lernen', ico: '◈', lede: 'Stoff verstehen und einordnen',
     items: ['overview', 'module:home', 'module:ziele', 'module:material'] },
-  { id: 'practice', label: 'Üben', ico: '✦', lede: 'Fokus und Prüfungen trainieren',
+  { id: 'practice', label: 'Üben', ico: '✦', lede: 'Fokus und Prüfungen',
     items: ['focus', 'exams-global'] },
   { id: 'plan', label: 'Planen', ico: '❏', lede: 'Heute, Woche und Termine',
     items: ['today', 'module:plan'] },

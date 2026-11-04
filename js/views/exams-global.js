@@ -96,7 +96,7 @@ function examItemHtml(state, e, { actions = false, showGrade = true } = {}) {
   return `
     <div class="exam-item exam-row" data-exam-id="${e.id}">
       <div class="exam-main">
-        <div class="exam-name">${escapeHtml(e.name)}${e.isMock ? ' <span class="badge">Mock</span>' : ''}</div>
+        <div class="exam-name">${escapeHtml(e.name)}${e.isMock && !/mock/i.test(e.name) ? ' <span class="badge">Mock</span>' : ''}</div>
         <div class="exam-meta">
           <span class="exam-mod" style="color:${e.module.accent};">Modul ${escapeHtml(e.module.code)}</span>
           <span>${e.date ? formatDate(e.date) : 'ohne Datum'}</span>

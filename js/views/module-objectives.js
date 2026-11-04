@@ -12,7 +12,7 @@
 import { escapeHtml } from '../utils/helpers.js';
 import {
   buildObjectiveTimeline, rhythmOf, formatLastTouched, formatNextReview,
-  linkedResourceCount, resourcesForObjective,
+  linkedResourceCount, resourcesForObjective, formatDate,
   examsForObjective, getExamGrade, isDue, capturesForObjective,
   CAPTURE_TYPE_LABELS, RESOURCE_TYPE_LABELS,
 } from '../utils/helpers.js';
@@ -310,7 +310,7 @@ function historyBodyHtml(state, obj) {
         ${exams.map(e => {
           const g = getExamGrade(e);
           return `<div class="obj-hist-res-row"><span class="obj-hist-res-name">${escapeHtml(e.name)}</span>
-            <span class="muted" style="font-size:12px;">${e.date || 'ohne Datum'}${e.weight ? ` · ${e.weight}%` : ''}${g !== null ? ` · Note ${g.toFixed(2)}` : ''}</span></div>`;
+            <span class="muted" style="font-size:12px;">${e.date ? formatDate(e.date) : 'ohne Datum'}${e.weight ? ` · ${e.weight} %` : ''}${g !== null ? ` · Note ${g.toFixed(2)}` : ''}</span></div>`;
         }).join('')}
       </div>` : ''}
 

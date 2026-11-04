@@ -14,9 +14,22 @@ import { openModal, closeModal } from '../components/modal.js';
 import { generateId, deleteWithTombstone } from '../services/store.js';
 import { CAPTURE_TYPES, CAPTURE_TYPE_LABELS } from '../utils/helpers.js';
 import { navigate, getCurrentView } from './router.js';
+import {
+  saveAttachment, getAttachment, deleteAttachment, deleteAttachmentsForResource,
+  attachmentUrl, formatBytes, validateAttachmentFile,
+} from '../services/attachments.js';
 
 // List filter state (module-level so list-only repaints keep it).
-const listFilters = { q: '', type: 'all', unlinked: false };
+const listFilters = { q: '', type: 'all', unlinked: false, module: 'all' };
+
+/**
+ * Open Notizen narrowed to one module (used by the module dashboard link).
+ * `null`/`'all'` clears the module filter.
+ */
+export function setCaptureModuleFilter(moduleId = 'all') {
+  listFilters.module = moduleId || 'all';
+  listFilters.unlinked = false;
+}
 
 export function renderCaptures(state) {
   const modules = state.modules;
@@ -38,6 +51,15 @@ export function renderCaptures(state) {
         placeholder="Notizen durchsuchen…" value="${escapeHtml(listFilters.q)}" aria-label="Notizen durchsuchen">
     </div>
 
+    <div class="capture-module-filter" style="margin:-4px 0 10px;">
+      <label class="sr-only" for="capture-module-filter">Modul filtern</label>
+      <select id="capture-module-filter" style="max-width: 260px;">
+        <option value="all" ${listFilters.module === 'all' ? 'selected' : ''}>Alle Module</option>
+        <option value="none" ${listFilters.module === 'none' ? 'selected' : ''}>Ohne Modul</option>
+        ${modules.map(m => `<option value="${m.id}" ${listFilters.module === m.id ? 'selected' : ''}>Modul ${escapeHtml(m.code)}</option>`).join('')}
+      </select>
+    </div>
+
     <div class="capture-filters mb-3" style="display: flex; gap: 8px; flex-wrap: wrap;">
       <button class="badge filter-btn ${listFilters.type === 'all' && !listFilters.unlinked ? 'active' : ''}" data-filter="all">Alle</button>
       ${CAPTURE_TYPES.map(t => `<button class="badge filter-btn ${listFilters.type === t ? 'active' : ''}" data-filter="${t}">${CAPTURE_TYPE_LABELS[t]}</button>`).join('')}
@@ -56,12 +78,22 @@ export function renderCaptures(state) {
     paintCaptureList(el, state, modules, allObjectives);
   });
 
+  el.querySelector('#capture-module-filter')?.addEventListener('change', e => {
+    listFilters.module = e.target.value || 'all';
+    paintCaptureList(el, state, modules, allObjectives);
+  });
+
   el.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const f = btn.dataset.filter;
       if (f === '__unlinked') {
         listFilters.unlinked = !listFilters.unlinked;
-        if (listFilters.unlinked) listFilters.type = 'all';
+        if (listFilters.unlinked) {
+          listFilters.type = 'all';
+          listFilters.module = 'all';
+          const moduleSelect = el.querySelector('#capture-module-filter');
+          if (moduleSelect) moduleSelect.value = 'all';
+        }
       } else {
         listFilters.type = f;
         listFilters.unlinked = false;
@@ -78,20 +110,28 @@ export function renderCaptures(state) {
   return el;
 }
 
-function filteredCaptures(state) {
+function filteredCaptures(state, modules, allObjectives) {
   const q = listFilters.q.trim().toLowerCase();
   return [...state.captures]
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .filter(c => {
+      if (listFilters.module === 'none' && c.moduleId) return false;
+      if (listFilters.module !== 'all' && listFilters.module !== 'none' && c.moduleId !== listFilters.module) return false;
       if (listFilters.unlinked && (c.moduleId || c.objectiveId)) return false;
       if (!listFilters.unlinked && listFilters.type !== 'all' && c.type !== listFilters.type) return false;
-      if (q && !(c.content || '').toLowerCase().includes(q)) return false;
+      if (q) {
+        const module = modules.find(m => m.id === c.moduleId);
+        const objective = allObjectives.find(o => o.id === c.objectiveId);
+        const hay = [c.content, ...(c.tags || []), module?.code, module?.title, objective?.title]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       return true;
     });
 }
 
 function paintCaptureList(el, state, modules, allObjectives) {
-  const captures = filteredCaptures(state);
+  const captures = filteredCaptures(state, modules, allObjectives);
   const host = el.querySelector('#captures-list');
   host.innerHTML = captures.length
     ? captures.map(c => renderCaptureItem(c, modules, allObjectives)).join('')
@@ -107,6 +147,16 @@ function paintCaptureList(el, state, modules, allObjectives) {
       openCaptureModal(capture);
     });
 
+    item.querySelector('.attach-capture-btn')?.addEventListener('click', e => {
+      e.stopPropagation();
+      pickCaptureAttachment(capture, () => paintCaptureList(el, state, modules, allObjectives));
+    });
+
+    item.querySelectorAll('[data-note-file]').forEach(btn => btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openCaptureAttachment(capture.id, btn.dataset.noteFile, () => paintCaptureList(el, state, modules, allObjectives));
+    }));
+
     item.querySelector('.delete-capture-btn')?.addEventListener('click', async e => {
       e.stopPropagation();
       const snapshot = JSON.parse(JSON.stringify(state.captures));
@@ -116,6 +166,7 @@ function paintCaptureList(el, state, modules, allObjectives) {
         snapshot,
         remove: () => {
           deleteWithTombstone(state, 'captures', id);
+          deleteAttachmentsForResource(id).catch(() => {});
         },
         restore: (snap) => {
           state.captures = snap;
@@ -124,6 +175,79 @@ function paintCaptureList(el, state, modules, allObjectives) {
       paintCaptureList(el, state, modules, allObjectives);
     });
   });
+}
+
+function pickCaptureAttachment(capture, onChange) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf,image/*';
+  input.hidden = true;
+  document.body.appendChild(input);
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    input.remove();
+    if (!file) return;
+    const error = validateAttachmentFile(file);
+    if (error) { window.EMVS.toast?.show(error); return; }
+    try {
+      const meta = await saveAttachment(file, { resourceId: capture.id });
+      capture.attachments = [...(capture.attachments || []), meta];
+      capture.updatedAt = Date.now();
+      window.EMVS.save();
+      onChange?.();
+      window.EMVS.toast?.show('Datei lokal angehängt');
+    } catch (err) {
+      window.EMVS.toast?.show(err?.message || 'Datei konnte nicht gespeichert werden');
+    }
+  });
+  input.click();
+}
+
+async function openCaptureAttachment(captureId, fileId, onChange) {
+  const state = window.EMVS.getState();
+  const capture = state.captures.find(c => c.id === captureId);
+  if (!capture) return;
+  let record;
+  try { record = await getAttachment(fileId); } catch { record = null; }
+  if (!record?.blob) {
+    window.EMVS.toast?.show('Datei nicht gefunden — bitte neu anhängen');
+    return;
+  }
+  const url = attachmentUrl(record.blob);
+  const isImage = record.type?.startsWith('image/');
+  const isPdf = record.type === 'application/pdf';
+  openModal({
+    title: record.name,
+    body: `
+      <div class="attachment-preview">
+        ${isImage
+          ? `<img src="${url}" alt="${escapeHtml(record.name)}">`
+          : isPdf
+            ? `<iframe src="${url}" title="${escapeHtml(record.name)}"></iframe>`
+            : `<p class="muted">Vorschau für diesen Dateityp nicht verfügbar.</p>`}
+      </div>
+      <p class="today-empty-line">${formatBytes(record.size)} · lokal gespeichert, nicht in der Cloud.</p>
+    `,
+    footer: `
+      <button class="btn" data-action="close">Schliessen</button>
+      <a class="btn" href="${url}" download="${escapeHtml(record.name)}">Herunterladen</a>
+      <button class="btn danger" data-action="delete-file">Entfernen</button>
+    `,
+    onClose: () => URL.revokeObjectURL(url),
+  });
+  setTimeout(() => {
+    document.querySelector('#modal-footer [data-action="close"]')?.addEventListener('click', () => closeModal());
+    document.querySelector('#modal-footer [data-action="delete-file"]')?.addEventListener('click', async () => {
+      if (!confirm('Angehängte Datei entfernen?')) return;
+      try { await deleteAttachment(fileId); } catch {}
+      capture.attachments = (capture.attachments || []).filter(a => a.id !== fileId);
+      capture.updatedAt = Date.now();
+      window.EMVS.save();
+      closeModal();
+      onChange?.();
+      window.EMVS.toast?.show('Datei entfernt');
+    });
+  }, 50);
 }
 
 function renderCaptureItem(capture, modules, allObjectives) {
@@ -154,8 +278,18 @@ function renderCaptureItem(capture, modules, allObjectives) {
           </div>
           <div style="color: var(--ink); line-height: 1.6; white-space: pre-wrap;">${escapeHtml(capture.content)}</div>
           ${capture.tags?.length ? `<div style="margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap;">${capture.tags.map(t => `<span class="badge" style="font-size: 10px;">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+          ${capture.attachments?.length ? `
+          <div class="res-attachments capture-attachments">
+            ${capture.attachments.map(a => `
+              <button type="button" class="res-file" data-note-file="${a.id}" title="Öffnen: ${escapeHtml(a.name)}">
+                <span class="res-file-ico">${a.type?.startsWith('image/') ? '🖼' : '📄'}</span>
+                <span class="res-file-name">${escapeHtml(a.name)}</span>
+                <span class="res-file-size">${formatBytes(a.size)}</span>
+              </button>`).join('')}
+          </div>` : ''}
         </div>
         <div style="display: flex; gap: 4px;">
+          <button class="attach-capture-btn" style="padding: 4px 8px; font-size: 11px; color: var(--ink-3);" title="PDF oder Foto anhängen" aria-label="Datei anhängen">📎</button>
           <button class="edit-capture-btn" style="padding: 4px 8px; font-size: 11px; color: var(--ink-3);" title="Bearbeiten">✎</button>
           <button class="delete-capture-btn" style="padding: 4px 8px; font-size: 11px; color: var(--red);" title="Löschen">✕</button>
         </div>

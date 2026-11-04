@@ -414,7 +414,7 @@ export function openSessionModal(session = null, moduleId = null, preset = {}) {
           </select>
         </div>
         <div class="field-row">
-          <label>Verknüpfte Material</label>
+          <label>Verknüpftes Material</label>
           <select name="linkedResources" multiple style="min-height: 100px;">
             ${resources.map(r => `<option value="${r.id}" ${s.linkedResourceIds?.includes(r.id) ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
           </select>

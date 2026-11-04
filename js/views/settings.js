@@ -29,6 +29,7 @@ import {
   sendTestNotification,
 } from '../services/pomodoroEngine.js';
 import { openPdfImport } from './pdf-import.js';
+import { clearAllAttachments } from '../services/attachments.js';
 
 const NOTIFY_LABELS = {
   granted: 'Erlaubt',
@@ -249,6 +250,9 @@ export function renderSettings(state) {
       <p style="font-size: 13.5px; color: var(--ink-2); max-width: 52ch; margin-bottom: 16px;">
         Study Hub speichert Daten standardmäßig lokal im Browser. Supabase-Sync erfolgt manuell im Konto-Bereich; exportiere regelmäßig Backups.
       </p>
+      <p style="font-size: 13px; color: var(--ink-3); max-width: 52ch; margin-bottom: 16px;">
+        Das JSON-Backup enthält Notizen, Pläne und Material-Metadaten. Angehängte PDFs und Fotos bleiben lokal im Browser und sind <strong>nicht</strong> im JSON enthalten.
+      </p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap;">
         <button class="btn primary" id="btn-export">Backup exportieren (JSON)</button>
         <button class="btn" id="btn-import">Backup importieren</button>
@@ -420,6 +424,7 @@ export function renderSettings(state) {
   el.querySelector('#btn-import')?.addEventListener('click', () => importBackup());
   el.querySelector('#btn-reset')?.addEventListener('click', async () => {
     if (await confirmDialog('Wirklich ALLE Daten unwiderruflich löschen? Dies kann nicht rückgängig gemacht werden.', 'Daten zurücksetzen')) {
+      try { await clearAllAttachments(); } catch {}
       const fresh = clearAll();
       window.EMVS.setState(fresh);
       // Dismiss the storage-failure banner only once saving verifiably
@@ -557,7 +562,7 @@ export function importBackup() {
       // confirmation AFTER the file parsed, so a wrong-file click or a
       // corrupt file can never silently destroy current data.
       const ok = await confirmDialog(
-        'Backup importieren? Dies ersetzt alle aktuellen Daten unwiderruflich. Exportiere zuerst ein Backup, falls du den aktuellen Stand behalten willst.',
+        'Backup importieren? Dies ersetzt alle aktuellen Daten unwiderruflich. Angehängte PDFs und Fotos sind nicht im JSON enthalten und müssen danach neu angehängt werden. Exportiere zuerst ein Backup, falls du den aktuellen Stand behalten willst.',
         'Backup importieren'
       );
       if (!ok) return;
@@ -565,6 +570,11 @@ export function importBackup() {
       // Choosing a backup file is explicit consent to replace storage,
       // so it lifts the failed-load save latch (see save()).
       clearStorageError();
+      // JSON backups carry no blobs. Clear the local file store too so a
+      // restored resource never points at a file from the previous dataset.
+      try { await clearAllAttachments(); } catch {}
+      data.resources.forEach(r => { r.attachments = []; });
+      data.captures.forEach(c => { c.attachments = []; });
       window.EMVS.setState(data);
       // Dismiss the storage-failure banner only once the recovery save
       // verifiably succeeded — a failed save keeps warning and latch.
