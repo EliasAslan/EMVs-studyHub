@@ -12,7 +12,6 @@
   import Icon from './Icon.svelte';
   import { toast } from '../stores/toast.js';
   import { paletteOpen, openPalette, togglePalette, closePalette } from '../stores/ui.js';
-  import { initCloud } from '../stores/cloud.js';
   import { downloadBackup } from '../services/backup.js';
 
   let captureOpen = false;
@@ -30,7 +29,15 @@
     const stopRouter = initRouter();
     applyTheme($appState.settings.theme);
     initPomodoro();
-    initCloud().catch(() => {});
+
+    // Cloud code (and the Supabase client) is a separate chunk. Start it
+    // quietly after the first paint so the app stays usable immediately.
+    const startCloud = () => import('../stores/cloud.js').then((m) => m.initCloud()).catch(() => {});
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(startCloud, { timeout: 3000 });
+    } else {
+      setTimeout(startCloud, 1500);
+    }
 
     const onKey = (event) => {
       const target = event.target;

@@ -1,46 +1,49 @@
 <script>
   import { route, navigate } from './lib/router.js';
   import Shell from './lib/components/Shell.svelte';
-  import Today from './lib/views/Today.svelte';
-  import Homework from './lib/views/Homework.svelte';
-  import Modules from './lib/views/Modules.svelte';
-  import ModuleDetail from './lib/views/ModuleDetail.svelte';
-  import Notes from './lib/views/Notes.svelte';
-  import NoteDetail from './lib/views/NoteDetail.svelte';
-  import Exams from './lib/views/Exams.svelte';
-  import Calendar from './lib/views/Calendar.svelte';
-  import Links from './lib/views/Links.svelte';
-  import Focus from './lib/views/Focus.svelte';
-  import Settings from './lib/views/Settings.svelte';
-  import Tokens from './lib/views/Tokens.svelte';
   import EmptyState from './lib/components/EmptyState.svelte';
+
+  // One chunk per route keeps the first load small; the browser caches each
+  // chunk after its first visit.
+  const loaders = {
+    today: () => import('./lib/views/Today.svelte'),
+    homework: () => import('./lib/views/Homework.svelte'),
+    modules: () => import('./lib/views/Modules.svelte'),
+    module: () => import('./lib/views/ModuleDetail.svelte'),
+    notes: () => import('./lib/views/Notes.svelte'),
+    note: () => import('./lib/views/NoteDetail.svelte'),
+    exams: () => import('./lib/views/Exams.svelte'),
+    calendar: () => import('./lib/views/Calendar.svelte'),
+    links: () => import('./lib/views/Links.svelte'),
+    focus: () => import('./lib/views/Focus.svelte'),
+    settings: () => import('./lib/views/Settings.svelte'),
+    tokens: () => import('./lib/views/Tokens.svelte'),
+  };
+
+  let currentKey = null;
+  let viewPromise = null;
+
+  $: key = $route.name;
+  $: if (key !== currentKey) {
+    currentKey = key;
+    viewPromise = loaders[key] ? loaders[key]() : null;
+  }
 </script>
 
 <Shell>
-  {#if $route.name === 'today'}
-    <Today />
-  {:else if $route.name === 'homework'}
-    <Homework />
-  {:else if $route.name === 'modules'}
-    <Modules />
-  {:else if $route.name === 'module'}
-    <ModuleDetail />
-  {:else if $route.name === 'notes'}
-    <Notes />
-  {:else if $route.name === 'note'}
-    <NoteDetail />
-  {:else if $route.name === 'exams'}
-    <Exams />
-  {:else if $route.name === 'calendar'}
-    <Calendar />
-  {:else if $route.name === 'links'}
-    <Links />
-  {:else if $route.name === 'focus'}
-    <Focus />
-  {:else if $route.name === 'settings'}
-    <Settings />
-  {:else if $route.name === 'tokens'}
-    <Tokens />
+  {#if viewPromise}
+    {#await viewPromise}
+      <div class="route-loading" aria-busy="true" aria-label="Ansicht wird geladen"></div>
+    {:then module}
+      <svelte:component this={module.default} />
+    {:catch}
+      <EmptyState
+        title="Ansicht nicht geladen"
+        text="Bitte lade die Seite neu."
+        actionLabel="Zu Heute"
+        action={() => navigate('/')}
+      />
+    {/await}
   {:else}
     <EmptyState
       title="Seite nicht gefunden"
@@ -50,3 +53,9 @@
     />
   {/if}
 </Shell>
+
+<style>
+  .route-loading {
+    min-height: 40vh;
+  }
+</style>
