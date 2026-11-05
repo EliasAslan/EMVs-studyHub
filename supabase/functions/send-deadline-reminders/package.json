@@ -1,0 +1,13 @@
+{
+  "name": "send-deadline-reminders",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "build": "esbuild index.ts --bundle --minify --platform=deno --target=es2020 --outdir=dist",
+    "start": "esbuild index.ts --bundle --platform=deno --target=es2020 --watch=dist"
+  },
+  "dependencies": {
+    "@supabase/functions-js": "^2.1.0"
+  }
+}

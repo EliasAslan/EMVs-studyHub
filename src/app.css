@@ -399,6 +399,18 @@ ol {
   flex: none;
 }
 
+.sync-badge.on .sync-dot {
+  background: var(--ok);
+}
+
+.sync-badge.busy .sync-dot {
+  background: var(--accent);
+}
+
+.sync-badge.error .sync-dot {
+  background: var(--warn);
+}
+
 .section-title {
   display: flex;
   align-items: baseline;
@@ -409,10 +421,10 @@ ol {
 
 .section-title h2 {
   font-size: var(--text-sm);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-2);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
 }
 
 .empty {

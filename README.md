@@ -98,6 +98,56 @@ Semantics:
   links → lessons → checklist items → settings.
 - After upload the app re-fetches and verifies every row; mismatches fail loudly without
   touching local data.
+
+## Email reminders (v1.1)
+
+Requires a Resend account and Supabase Edge Function. Never block v1 on this feature.
+
+### Setup
+
+1. **Create a Resend account** at [resend.com](https://resend.com). The free tier allows 30 emails/day.
+
+2. **Verify a sender domain** in Resend (required for deliverability). Add a TXT record to your DNS:
+   ```
+   _resend._domainkey.yourdomain.com    (CNAME to s1.resend.net)
+   _resend._domainkey.yourdomain.com    (TXT with publisher key)
+   ```
+
+3. **Set environment variables** in your Supabase project:
+   - `RESEND_API_KEY` — Your Resend secret key from the dashboard
+   - `SUPABASE_SERVICE_ROLE_KEY` — Required for the Edge Function to invoke admin functions
+
+4. **Deploy the Edge Function**:
+   - `supabase/functions/send-deadline-reminders/` contains the Edge Function code
+   - Deploy with: `supabase functions deploy send-deadline-reminders`
+
+5. **Set up pg_cron** to run the Edge Function weekly (e.g., Friday at 18:00 UTC):
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS pg_cron;
+   SELECT cron.schedule(
+     '0 18 * * 5',  -- Every Friday at 18:00 UTC
+     $$SELECT supabase_admin.invoke_function('send-deadline-reminders')$$
+   );
+   ```
+   - Adjust the cron expression for Saturday: change `5` to `6`
+   - Adjust the time by changing `18` to your preferred hour
+
+6. **Configure Supabase credentials** in the Edge Function:
+   - The function reads `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` from environment variables
+   - Set these in the Supabase Dashboard → Functions → Reveal Secrets
+
+### Usage
+
+- In **Settings → Erinnerungen**, toggle "E-Mail-Erinnerungen" on
+- Change the recipient email if needed (defaults to `e3953s@hotmail.com`)
+- Click "Test-E-Mail senden" to verify the setup
+- Emails are sent weekly with homework and exams due the next day
+
+### Notes
+
+- If `RESEND_API_KEY` is not configured, the "Test-E-Mail senden" button returns the email content for manual sending
+- The app fully works without email reminders — it is a v1.1 feature, deferred from v1
+- Opt-out anytime in Settings; no data is sent without explicit opt-in
 - Failures show one quiet status dot plus a translated German message in Settings. No toasts,
   no blocking dialogs.
 

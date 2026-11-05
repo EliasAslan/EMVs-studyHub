@@ -15,6 +15,7 @@
   import { sortedLessons, lessonLabel as lessonTitle } from '../data/schedule.js';
   import { toast } from '../stores/toast.js';
   import { cloud, signIn, signUp, signOut, runSync, loadCloud } from '../stores/cloud.js';
+  import { sendDeadlineReminders } from '../services/sendDeadlineReminders.js';
   import Modal from '../components/Modal.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -39,6 +40,13 @@
   let authMessage = '';
   let authError = '';
 
+  // Email reminders state
+  let remindersEmail = settings.email || '';
+  let remindersOptIn = settings.emailReminders || false;
+  let remindersBusy = false;
+  let remindersMessage = '';
+  let remindersError = '';
+
   $: signedIn = !!$cloud.session;
   $: syncStateLabel = $cloud.syncing
     ? 'läuft'
@@ -56,6 +64,7 @@
     lessons: lessons.filter((l) => l.dayOfWeek === day.value),
   }));
   $: lastExport = settings.lastExportAt ? formatDate(dateKey(new Date(settings.lastExportAt)), 'long') : 'nie';
+  $: remindersOptIn = settings.emailReminders || false;
 
   async function doExport() {
     busy = true;
@@ -221,6 +230,28 @@
       // The cloud store already holds the translated error.
     }
   }
+
+  async function sendReminderTest() {
+    if (!remindersOptIn) return;
+    remindersBusy = true;
+    remindersError = '';
+    remindersMessage = '';
+    try {
+      const result = await sendDeadlineReminders();
+      if (result?.note) {
+        remindersMessage = result.note;
+      } else if (result?.error) {
+        remindersError = result.error;
+      } else if (result?.content) {
+        remindersMessage = `E-Mail-Inhalt: ${result.content.slice(0, 100)}...`;
+      }
+    } catch (e) {
+      remindersError = e?.message || 'Fehler beim Senden der Test-E-Mail';
+      remindersMessage = '';
+    } finally {
+      remindersBusy = false;
+    }
+  }
 </script>
 
 <div class="page">
@@ -368,17 +399,32 @@
   <section class="card section" aria-labelledby="email-title">
     <div class="section-title">
       <h2 id="email-title">Erinnerungen</h2>
-      <span class="badge">v1.1</span>
+      <span class="badge" class:is-on={remindersOptIn} class:is-busy={remindersBusy} class:is-error={!!remindersError}>
+        <span class="sync-dot" aria-hidden="true"></span>
+        {remindersOptIn ? 'ein' : 'aus'}
+      </span>
     </div>
-    <label class="field">
-      <span>E-Mail</span>
-      <input class="input" type="email" value={settings.email} placeholder="name@beispiel.ch" disabled />
-    </label>
-    <label class="pref-row disabled">
-      <input type="checkbox" checked={settings.emailReminders} disabled />
-      <span>E-Mail am Tag vorher</span>
-    </label>
-    <p class="muted small">Kommt später. Nichts wird ohne Zustimmung gesendet.</p>
+
+    {#if !signedIn}
+      <p class="muted small">Bitte dich zuerst bei Supabase anmelden.</p>
+    {:else if !remindersOptIn}
+      <label class="field">
+        <span>E-Mail</span>
+        <input class="input" type="email" bind:value={remindersEmail} placeholder="name@beispiel.ch" />
+      </label>
+      <label class="pref-row">
+        <input type="checkbox" bind:checked={remindersOptIn} />
+        <span>E-Mail am Tag vorher</span>
+      </label>
+      <p class="muted small small">Wöchentlich am Freitag. Opt-out jederzeit in Einstellungen.</p>
+    {:else}
+      <p class="muted small">E-Mail-Erinnerungen aktiviert für {@html remindersEmail}.</p>
+      <button class="btn btn-ghost small" type="button" on:click={() => sendReminderTest()} disabled={remindersBusy}>
+        Test-E-Mail senden
+      </button>
+    {/if}
+    {#if remindersError}<p class="error small" role="alert">{remindersError}</p>{/if}
+    {#if remindersMessage}<p class="muted small">{remindersMessage}</p>{/if}
   </section>
 
   <section class="card section" aria-labelledby="sync-title">
