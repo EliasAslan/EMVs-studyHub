@@ -43,8 +43,9 @@
   // Email reminders state
   let remindersEmail = settings.email || '';
   let remindersOptIn = settings.emailReminders || false;
+  let remindersDay = 5; // Friday per plan; WEEKDAYS.index from 1=Montag to 7Sonntag
+  let remindersContent = 'todo'; // todo, summary, none
   let remindersBusy = false;
-  let remindersMessage = '';
   let remindersError = '';
 
   $: signedIn = !!$cloud.session;
@@ -407,24 +408,36 @@
 
     {#if !signedIn}
       <p class="muted small">Bitte dich zuerst bei Supabase anmelden.</p>
-    {:else if !remindersOptIn}
-      <label class="field">
-        <span>E-Mail</span>
-        <input class="input" type="email" bind:value={remindersEmail} placeholder="name@beispiel.ch" />
-      </label>
-      <label class="pref-row">
-        <input type="checkbox" bind:checked={remindersOptIn} />
-        <span>E-Mail am Tag vorher</span>
-      </label>
-      <p class="muted small small">Wöchentlich am Freitag. Opt-out jederzeit in Einstellungen.</p>
     {:else}
-      <p class="muted small">E-Mail-Erinnerungen aktiviert für {@html remindersEmail}.</p>
-      <button class="btn btn-ghost small" type="button" on:click={() => sendReminderTest()} disabled={remindersBusy}>
-        Test-E-Mail senden
-      </button>
+      <div>
+        <label class="field">
+          <span>E-Mail</span>
+          <input class="input" type="email" bind:value={remindersEmail} placeholder="name@beispiel.ch" />
+        </label>
+        <label class="field">
+          <span>Tag</span>
+          <select class="select" bind:value={remindersDay}>
+            {#each WEEKDAYS as day (day.value)}
+              <option value={day.value}>{day.label}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="field">
+          <span>Inhalt</span>
+          <select class="select" bind:value={remindersContent}>
+            <option value="todo">Als To-Do-Liste (Hausaufgaben + Prüfungen fällig morgen)</option>
+            <option value="summary">Als Zusammenfassung</option>
+            <option value="none">Kein Inhalt</option>
+          </select>
+        </label>
+        <label class="pref-row">
+          <input type="checkbox" bind:checked={remindersOptIn} />
+          <span>Erinnerungen aktivieren</span>
+        </label>
+      </div>
+      {#if remindersError}<p class="error small" role="alert">{remindersError}</p>{/if}
+      {#if remindersMessage}<p class="muted small">{remindersMessage}</p>{/if}
     {/if}
-    {#if remindersError}<p class="error small" role="alert">{remindersError}</p>{/if}
-    {#if remindersMessage}<p class="muted small">{remindersMessage}</p>{/if}
   </section>
 
   <section class="card section" aria-labelledby="sync-title">
