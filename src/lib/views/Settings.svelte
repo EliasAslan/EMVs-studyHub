@@ -40,6 +40,10 @@
   let authMessage = '';
   let authError = '';
 
+  // Backup reminder state
+  let reminderDismissed = false;
+  let reminderDismissedAtChangeCount = 0;
+
   // Email reminders state
   let remindersEmail = settings.email || '';
   let remindersOptIn = settings.emailReminders || false;
@@ -392,8 +396,13 @@
       </button>
       <input class="sr-only" type="file" accept="application/json,.json" bind:this={importInput} on:change={onImport} />
     </div>
-    {#if settings.changeCount >= 25}
-      <p class="reminder">25 Änderungen seit dem letzten Export.</p>
+    {#if settings.changeCount >= 25 && (reminderDismissed === false || settings.changeCount >= reminderDismissedAtChangeCount)}
+      <div class="reminder-banner">
+        <p class="reminder">25 Änderungen seit dem letzten Export.</p>
+        <button class="btn btn-ghost btn-xs" type="button" on:click={() => { reminderDismissed = true; reminderDismissedAtChangeCount = settings.changeCount + 25; }} aria-label="Erinnerung ausblenden">
+          <Icon name="x" size={12} aria-hidden="true" />
+        </button>
+      </div>
     {/if}
   </section>
 
