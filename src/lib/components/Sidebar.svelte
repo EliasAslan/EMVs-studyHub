@@ -1,27 +1,27 @@
 <script>
-  import { appState, openHomework, updateSettings } from '../stores/app.js';
-  import { route, navigate, modulePath } from '../router.js';
-  import Icon from './Icon.svelte';
+import { appState, openHomework, updateSettings } from '../stores/app.js';
+import { route, navigate, modulePath } from '../router.js';
+import Icon from './Icon.svelte';
 
-  $: modules = $appState.modules || [];
-  $: programs = $appState.programs || [];
-  $: currentProgramId = $appState.settings.currentProgramId;
-  $: collapsed = !!$appState.settings.navCollapsed;
-  $: openCount = $openHomework.length;
+$: modules = $appState.modules || [];
+$: programs = $appState.programs || [];
+$: currentProgramId = $appState.settings.currentProgramId;
+$: collapsed = !!$appState.settings.navCollapsed;
+$: openCount = $openHomework.length;
 
-  function isActive(prefix) {
+function isActive(prefix) {
     return $route.path === prefix || $route.path.startsWith(`${prefix}/`);
-  }
+}
 
-  function toggleCollapsed() {
+function toggleCollapsed() {
     updateSettings({ navCollapsed: !collapsed });
-  }
+}
 
-  function programModules(programId) {
+function programModules(programId) {
     return modules
       .filter((m) => m.programId === programId)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
-  }
+}
 </script>
 
 <aside class="sidebar" class:collapsed aria-label="Hauptnavigation">
@@ -112,13 +112,11 @@
     position: fixed;
     inset: 0 auto 0 0;
     z-index: 40;
-    display: none;
     flex-direction: column;
     width: var(--sidebar-w);
     padding: var(--space-4) var(--space-3) var(--space-3);
     background: var(--surface);
     border-right: 1px solid var(--rule);
-    overflow-y: auto;
     transition: width var(--motion);
   }
   .sidebar.collapsed {
