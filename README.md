@@ -1,100 +1,134 @@
-# EMVS Study Hub
+# Study Hub
 
-German (de-CH) single-user study manager. Vanilla ES modules, no framework, no build step.
+A calm, offline-first personal school hub for one EMVs apprentice doing the BM at BFO.
+German UI (`de-CH`), English code and docs. Svelte 5 + Vite, no backend required for daily use.
 
-## Quick Start
+The previous vanilla app is preserved on the `archive/vanilla-app` tag. This branch is the
+clean-slate rebuild: new storage keys, new data model, new Supabase schema.
+
+## Quick start
 
 ```bash
-npm install   # only for test runner dependencies (none — uses Node built-ins)
-npm start     # serves on http://localhost:8080
-npm test      # runs all 17 test suites
+npm install
+npm run dev       # http://localhost:5173
+npm run build     # production build in dist/
+npm run preview   # serve the production build
+npm test          # Vitest unit tests
 ```
+
+Node 20+ is expected.
+
+## What is in v1
+
+- **Heute** — one "start here" item (earliest open homework, else next exam within 14 days),
+  daily checklist, deadlines and recent notes.
+- **Hausaufgaben** — open/done homework, module and topic filters, quick capture.
+- **Module** — program → module → notes, homework, exams, links, topics and local PDFs/images.
+- **Notizen** — global notes with optional module/topic, text or photo, `[[wiki links]]` and
+  backlinks.
+- **Prüfungen** — date, countdown, notes, Swiss grade 1–6 in .5 steps plus a free-text note.
+  No averages.
+- **Kalender** — month grid with homework and exam deadlines.
+- **Links**, **Fokus** (standalone Pomodoro), **Einstellungen**.
+- **PWA** — installable, app shell precached, works offline.
+- **JSON backup** — export/import all state. Attachments never enter the JSON file.
+
+Not in v1: email reminders (v1.1), tags, Markdown/ICS/CSV export, AI/PDF extraction.
 
 ## Architecture
 
 | Concern | File |
-|---------|------|
-| App bootstrap, `window.EMVS` global | `js/app.js` |
-| Persistence (localStorage), data model, entity mutators | `js/services/store.js` |
-| Storage adapter + failure latch | `js/services/storageAdapter.js` |
-| Cloud schema (Supabase) | `PHASE_4_SETUP.sql` (v1), `PHASE_5_SETUP.sql` (v2) |
-| Cloud camelCase↔snake_case mapping | `js/services/cloudMap.js` |
-| Cloud sync primitives + merge engine | `js/services/cloudSync.js` |
-| Supabase client + publishable key | `js/services/supabaseClient.js` |
-| Auth UI + sync buttons | `js/services/auth.js` |
-| Sync status persistence + error translation | `js/services/syncStatus.js` |
-| Field/pure helpers (weakness, grades) | `js/utils/helpers.js` |
-| Layout registry (6 layouts) | `js/utils/navLayout.js` |
-| Nav layout renderers | `js/components/nav/{index,context,tree,mega,dock,bento,mobile,shared}.js` |
-| Classic shell + module section | `js/components/sidebar.js` |
-| Bottom tabbar + More sheet | `js/components/tabbar.js` |
-| Views (one per route) | `js/views/*.js` (router: `js/views/router.js`) |
-| Tests (plain Node, no framework) | `tests/*.test.mjs` |
+|---|---|
+| Bootstrap, global CSS | `src/main.js`, `src/app.css` |
+| Router | `src/lib/router.js` |
+| Pure data helpers | `src/lib/data/*.js` |
+| Persistence + entity store | `src/lib/services/store.js`, `storageAdapter.js` |
+| Reactive app store + mutators | `src/lib/stores/app.js` |
+| Attachments (IndexedDB blobs) | `src/lib/services/attachments.js` |
+| Pomodoro engine | `src/lib/services/pomodoro.js`, `pomodoroEngine.js` |
+| JSON backup | `src/lib/services/backup.js` |
+| Cloud mapping / sync | `src/lib/services/cloudMap.js`, `cloudSync.js` |
+| Supabase client / row access | `src/lib/services/supabaseClient.js`, `supabaseData.js` |
+| Sync status + German errors | `src/lib/services/syncStatus.js` |
+| Reactive cloud store | `src/lib/stores/cloud.js` |
+| Shell, navigation, palette | `src/lib/components/Shell.svelte`, `CommandPalette.svelte` |
+| Views | `src/lib/views/*.svelte` |
+| PWA manifest / icons | `public/manifest.webmanifest`, `public/icons/` |
+| Supabase schema | `PHASE_6_SETUP.sql` |
+| Unit tests | `tests/*.test.js` (Vitest) |
 
-## Data Model (camelCase, key `emvs_data_v1`)
+## Local data
 
-Top-level collections: `modules`, `learningObjectives`, `resources`, `studySessions`, `exams`, `examResults`, `planItems`, `captures`, `weeklyReviews`, `settings`, `tombstones`.
+| Key | Contents |
+|---|---|
+| `studyhub_v1` | whole app state as JSON |
+| `studyhub_attachments_v1` | IndexedDB blobs for PDFs/photos |
+| `studyhub_timer_v1` | focus timer state |
+| `studyhub_pomodoro_prefs_v1` | focus preferences |
+| `studyhub_sync_status_v1` | last sync attempt/success |
+| `studyhub_cloud_uid_v1` | account binding for the last successful sync |
 
-Every entity has `id` (`generateId()` = `<base36-time>-<base36-random>`), `createdAt`, `updatedAt` (epoch ms).
+The old `emvs_data_v1` key is intentionally ignored. Attachments are limited to PDF/image,
+max 40 MB, and stay on the device: never in JSON backups and never in Postgres.
 
-**Review ladder**: `REVIEW_INTERVALS = [1, 4, 10, 21, 45, 90]` days.
+Tombstones are kept for 90 days. Deleting a module cascades to its topics, notes, homework,
+exams, links and lessons, and removes the module's attachment blobs.
 
-**History arrays** (capped at 100): `confidenceHistory`, `sessionHistory`, `reviewHistory`, `usageHistory`, `understoodHistory`.
+## Cloud sync (Supabase)
 
-## Cloud (Supabase)
+Sync is optional. The device is the datastore; the cloud is a convergent copy.
 
-- 10 tables: `modules`, `learning_objectives`, `resources`, `study_sessions`, `exams`, `exam_results`, `plan_items`, `captures`, `weekly_reviews`, `user_settings`
-- Composite PKs `(user_id, id)`; RLS `own_rows` policies; grants to `authenticated` only
-- **v2 schema** (`PHASE_5_SETUP.sql`): adds `deleted_at BIGINT` on 9 tables for tombstones; `study_sessions.start_time` and `captures.timestamp` as `BIGINT` epoch ms
+1. Create/choose a Supabase project.
+2. Run `PHASE_6_SETUP.sql` in the SQL editor. The rollback block at the top removes the
+   archived vanilla-app tables and any previous v3 tables — **export a JSON backup first**.
+3. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in
+   `src/lib/services/supabaseClient.js`. Only the publishable/anon key belongs in the browser.
+4. In Settings → Cloud, sign in or create an account with email/password.
+5. Sync runs silently 25 s after the last local change, on sign-in, and when the tab becomes
+   visible. Settings also has manual "Synchronisieren" and "Cloud laden" buttons.
 
-## Sync Semantics (v2)
+Semantics:
 
-- **Cloud is source of truth**; localStorage is offline cache
-- **Silent auto-sync**: on sign-in, app start (if session exists), 25s debounced after `save()`, `visibilitychange → hidden`, multi-tab `storage` event
-- **Merge engine** (`syncState()`): 9-step LWW by `updatedAt` (examResults by `createdAt`); tombstones propagate both ways; FK closure enforced; >10 local erasures → backup prompt
-- **Manual buttons** (Settings): force upload / force download for recovery
-- **No routine dialogs**; failures show red dot + retry, never toast-spam
+- Last-write-wins by `updatedAt`; deletes are soft (`deleted_at` epoch ms).
+- A live record newer than its tombstone revives it (undo/restore wins).
+- Module deletion closes over children; topic deletion only clears references.
+- Account binding prevents uploading local data into a different account.
+- Empty local datasets never overwrite a non-empty cloud.
+- Upload order is parent-first: programs → modules → topics → notes → homework → exams →
+  links → lessons → checklist items → settings.
+- After upload the app re-fetches and verifies every row; mismatches fail loudly without
+  touching local data.
+- Failures show one quiet status dot plus a translated German message in Settings. No toasts,
+  no blocking dialogs.
 
-## Navigation (6 layouts kept)
+RLS: every table has `own_rows` (`auth.uid() = user_id`) and grants only to `authenticated`.
+Attachments are metadata-only JSONB; blobs are never uploaded.
 
-| Layout | Group | Description |
-|--------|-------|-------------|
-| `tree` | sidebar | **Default** — hierarchical subjects → chapters → topics |
-| `mega` | bar | Top bar with grouped mega menus |
-| `dock` | bar | Floating pill dock |
-| `context` | smart | Goal-based: Learn / Practice / Plan / Review |
-| `bento` | smart | Visual launchpad of grouped cards |
-| `mobile` | bar | Phone-first: bottom bar + contextual header |
+## PWA
 
-**Removed**: `rail`, `workspace`, `command`, `focus` (legacy IDs migrate automatically).
+`vite-plugin-pwa` generates the service worker at build time. `npm run build && npm run preview`
+then install from the browser. The app shell and icons are precached, so reloading with the
+server stopped still renders the app. There is no offline banner; sync is best-effort.
 
-## Key Decisions (locked)
+Regenerate icons with:
 
-- Cloud primary, local cache; login optional (no wall)
-- Tombstones for deletes; 90-day prune
-- `shaky` review = repeat current rung (doc wins)
-- `markUnderstood` never writes `confidence` (confirmDialog if <4)
-- Swiss grade 1–6 (6 best, <4 fail); `de-CH` formatting
-- XSS discipline: all user content → `escapeHtml`/`escapeAttr`
-- No frameworks, no build, no new deps (CDN vendors documented in `VENDORING.md`)
-- Services DOM-free/pure for plain-Node tests
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\make-icons.ps1
+```
 
-## Testing
+## Tests
 
 ```bash
 npm test
 ```
 
-- 17 test suites, plain Node (no framework)
-- Auto-discovered via `tests/run.mjs` glob
-- Cover: storage, reliability, navigation, sync, PDF, planning, weaknesses, plan rollover
+Vitest covers pure data helpers, persistence, checklist/deadlines/search, pomodoro,
+attachments metadata, cloud row mapping, merge/LWW/tombstone behavior and upload verification.
+The archived vanilla `.test.mjs` suites are not part of the rebuild test run.
 
-## Out of Scope
+## Out of scope for v1
 
-- `localAI.js` / `pdfExtract.js` internals (prompts, model `qwen3:8b`, caps)
-- CRDTs / conflict-free replicated data types
-- Any change to Swiss grade direction or `generateId()`
-
-## License
-
-Private / educational use.
+- Email reminders (deferred to v1.1: Supabase Edge Function + Resend).
+- Multiple users, sharing, social features.
+- Streaks, scores, progress bars, percentages, averages or guilt mechanics.
+- Server-side rendering.

@@ -1,134 +1,21 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="EMVS Study Hub — Module, Lernziele, Sitzungen und Prüfungen lokal und fokussiert verwalten.">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f3ea">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16120c">
-  <title>EMVS Study Hub</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/main.css">
-</head>
-<body>
-<a class="skip-link" href="#main">Zum Inhalt springen</a>
-
-<header id="topchrome" class="topchrome" hidden></header>
-
-<div class="app">
-  <header class="mobile-header">
-    <button class="icon-btn" id="mobileBack" aria-label="Zurück" hidden>‹</button>
-    <span class="mobile-brand" id="mobileTitle" aria-live="polite">EMVS</span>
-    <div class="mobile-actions">
-      <button class="icon-btn" id="mobileAction" aria-label="Sitzung starten (25 Min)" title="Sitzung starten (25 Min)" hidden>▶</button>
-      <button class="icon-btn" id="mobileLaunch" aria-label="Launchpad öffnen" title="Launchpad" aria-haspopup="dialog" hidden>⊞</button>
-      <button class="icon-btn" id="searchBtn" aria-label="Suchen und Befehle (Strg+K)">⌕</button>
-      <button class="icon-btn" id="moreBtn" data-open-more aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
-      <button class="menu-btn" id="menuBtn" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sidebar">☰</button>
-    </div>
-  </header>
-  <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
-
-  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Hauptnavigation">
-    <div class="brand">
-      <span class="brand-mark">EMVS</span>
-      <span class="brand-sub">study hub</span>
-    </div>
-
-    <div id="context-nav" class="context-nav" hidden></div>
-
-    <div class="toc-label">Menü</div>
-    <nav class="toc" id="nav-global">
-      <button type="button" class="toc-item" data-view="today" title="Heute — Tagesfokus"><span class="toc-ico" aria-hidden="true">◉</span><span class="toc-num">01</span> <span class="toc-lb">Heute</span></button>
-      <button type="button" class="toc-item" data-view="overview" title="Module — alle Module im Überblick"><span class="toc-ico" aria-hidden="true">▦</span><span class="toc-num">02</span> <span class="toc-lb">Module</span></button>
-      <div class="nav-quick" role="group" aria-label="Schnellaktionen">
-        <button class="nav-quick-capture" id="railCapture" data-capture aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" data-tip="Schnell erfassen: Frage, Fehler oder Gedanke festhalten"><span class="nav-quick-plus" aria-hidden="true">+</span><span class="nav-quick-label">Schnell erfassen</span></button>
-      </div>
-      <button type="button" class="toc-item" data-view="weak-spots" title="Schwachstellen"><span class="toc-ico" aria-hidden="true">△</span><span class="toc-num">03</span> <span class="toc-lb">Schwachstellen</span><span class="nav-badge" id="railBadgeWeak" data-badge="weak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></button>
-      <button type="button" class="toc-item" data-view="exams-global" title="Prüfungen — alle Termine"><span class="toc-ico" aria-hidden="true">◷</span><span class="toc-num">04</span> <span class="toc-lb">Prüfungen</span><span class="nav-badge" id="railBadgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></button>
-      <button type="button" class="toc-item" data-view="focus" title="Fokus — Pomodoro-Fokusraum"><span class="toc-ico" aria-hidden="true">◐</span><span class="toc-num">05</span> <span class="toc-lb">Fokus</span><span class="focus-rail-time" data-focus-rail-time hidden></span></button>
-      <div class="nav-quick" role="group" aria-label="Weitere Bereiche">
-        <button class="nav-quick-more" id="railMore" data-open-more aria-label="Weitere Bereiche öffnen: Fokusraum, Notizen, Einstellungen" title="Weitere Bereiche: Fokusraum, Notizen, Einstellungen" aria-expanded="false" aria-controls="more-sheet"><span aria-hidden="true">⋯</span><span class="toc-lb">Mehr</span></button>
-      </div>
-    </nav>
-    <div class="sidebar-overflow" id="sidebar-overflow" hidden>
-      <button class="overflow-toggle" type="button" aria-label="Weitere allgemeine Ansichten">Mehr <span>▾</span></button>
-      <div class="overflow-menu" id="overflow-menu"></div>
-    </div>
-
-    <div class="toc-label mod-label">Module</div>
-    <div id="nav-modules"></div>
-  </aside>
-
-  <main class="main" id="main" role="main" tabindex="-1">
-    <div class="page" id="view-root"></div>
-  </main>
-
-  <nav class="tabbar" id="tabbar" aria-label="Hauptbereiche">
-    <button class="tab" data-route="today" aria-current="false"><span class="tab-ico" aria-hidden="true">◉</span><span class="tab-lb">Heute</span></button>
-    <button class="tab" data-route="overview" aria-current="false"><span class="tab-ico" aria-hidden="true">▦</span><span class="tab-lb">Module</span></button>
-    <button class="tab fab" id="tabCapture" data-capture aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen"><span class="tab-fab-plus" aria-hidden="true">+</span></button>
-    <button class="tab" data-route="weak-spots" aria-current="false"><span class="tab-ico" aria-hidden="true">△</span><span class="tab-lb">Schwach</span><span class="tab-badge" id="badgeWeak" data-badge="weak" role="status" title="Anzahl fälliger Wiederholungen" hidden></span></button>
-    <button class="tab" data-route="exams-global" aria-current="false"><span class="tab-ico" aria-hidden="true">◷</span><span class="tab-lb">Prüfungen</span><span class="tab-badge" id="badgeExam" data-badge="exam" role="status" title="Prüfungen in den nächsten 14 Tagen" hidden></span></button>
-  </nav>
-
-  <div class="sheet-overlay" id="more-overlay" aria-hidden="true">
-    <div class="sheet" id="more-sheet" role="dialog" aria-modal="true" aria-labelledby="more-title">
-      <div class="sheet-handle" aria-hidden="true"></div>
-      <h2 class="sheet-title" id="more-title">Weitere Bereiche</h2>
-      <div class="sheet-list">
-        <button class="sheet-item" data-route="focus"><span aria-hidden="true">◐</span> Fokusraum</button>
-        <button class="sheet-item" data-route="captures"><span aria-hidden="true">⚡</span> Notizen</button>
-        <button class="sheet-item" data-route="settings"><span aria-hidden="true">⚙</span> Einstellungen</button>
-      </div>
-      <button class="btn ghost sheet-close" id="more-close">Schließen</button>
-    </div>
-  </div>
-</div>
-
-<nav id="dock" aria-label="Hauptnavigation" hidden>
-  <button data-route="today" aria-current="false" aria-label="Heute"><span aria-hidden="true">◉</span></button>
-  <button data-route="overview" aria-current="false" aria-label="Module"><span aria-hidden="true">▦</span></button>
-  <button id="dockCapture" data-capture aria-label="Schnell erfassen: Frage, Fehler oder Gedanke festhalten" title="Schnell erfassen">+</button>
-  <button data-route="weak-spots" aria-current="false" aria-label="Schwachstellen"><span aria-hidden="true">△</span><span class="tb-badge" data-badge="weak" role="status" hidden></span></button>
-  <button data-route="exams-global" aria-current="false" aria-label="Prüfungen"><span aria-hidden="true">◷</span><span class="tb-badge" data-badge="exam" role="status" hidden></span></button>
-  <button id="dockMore" data-open-more aria-label="Weitere Bereiche öffnen" aria-expanded="false" aria-controls="more-sheet">⋯</button>
-</nav>
-
-<div class="launchpad" id="launchpad" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="lp-title">
-  <div class="lp-sheet" id="lp-sheet"></div>
-</div>
-
-<!-- Modal Overlay -->
-<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title">
-  <div class="modal" id="modal" role="document">
-    <div class="modal-header">
-      <h2 class="modal-title" id="modal-title">Titel</h2>
-      <button class="modal-close" id="modal-close" aria-label="Schließen">×</button>
-    </div>
-    <div class="modal-body" id="modal-body"></div>
-    <div class="modal-footer" id="modal-footer"></div>
-  </div>
-</div>
-
-<!-- Command Palette -->
-<div class="palette-overlay" id="palette-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Befehlspalette">
-  <div class="palette" role="document">
-    <input class="palette-input" id="palette-input" type="search" enterkeyhint="go" placeholder="Springe zu… oder führe aus…" autocomplete="off" aria-label="Befehlsuche" aria-controls="palette-list" aria-expanded="false">
-    <div class="palette-list" id="palette-list" role="listbox" aria-label="Treffer"></div>
-    <div class="palette-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> wählen</span><span><kbd>↵</kbd> öffnen</span><span><kbd>Esc</kbd> schließen</span></div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div class="toast" id="toast" role="status" aria-live="polite">
-  <span id="toast-message"></span>
-  <button class="btn ghost" id="toast-action" style="display:none"></button>
-  <button class="btn ghost" id="toast-undo" style="display:none">Rückgängig</button>
-</div>
-
-<script type="module" src="js/app.js?v=20261025"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#faf9f7" />
+    <meta name="description" content="Study Hub — dein ruhiger Schulalltag." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Study Hub" />
+    <title>Study Hub</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>
