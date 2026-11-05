@@ -1,6 +1,8 @@
 /**
  * Pomodoro engine — one global ticker, persistence, quiet notifications.
  * The UI subscribes here; it never runs its own timer.
+ * 
+ * Enhanced: session history, statistics, break activities.
  */
 
 import { loadTimerState, saveTimerState, clearTimerState, loadPomodoroPrefs, savePomodoroPrefs } from './store.js';
@@ -17,7 +19,17 @@ import {
   startNextWork,
   remainingMs,
   recommendedBreakType,
+  phaseLabel,
+  roundLabel,
 } from './pomodoro.js';
+import {
+  addPomodoroSession,
+  getTodaySessions,
+  getLastWeekSessions,
+  getSessionStats,
+  defaultPomodoroHistory,
+  MAX_SESSION_HISTORY,
+} from './store.js';
 
 let current = null;
 let prefs = null;
@@ -44,8 +56,17 @@ function emit(reason = 'change') {
 
 function persist() {
   try {
-    if (current) saveTimerState(current);
-    else clearTimerState();
+    if (current) {
+      // Save timer state
+      saveTimerState(current);
+      // Optionally: also save session if session tracking is enabled
+      const prefs = ensurePrefs();
+      if (prefs && prefs.saveSessionHistory !== false) {
+        // Session will be added when event handlers explicitly call addPomodoroSession
+      }
+    } else {
+      clearTimerState();
+    }
   } catch (e) {
     console.error('Failed to persist Pomodoro state:', e);
   }
@@ -77,10 +98,36 @@ function tickNow() {
       if (current.status !== STATUS.running) stopTicking();
       announce(event);
       emit(event);
+      // Save session history when session ends
+      if (event === 'workDone' || event === 'breakDone') {
+        saveSessionFromCurrent();
+      }
       return;
     }
   }
   emit('tick');
+}
+
+function saveSessionFromCurrent() {
+  const prefs = ensurePrefs();
+  if (!current) return;
+  const session = {
+    id: Date.now().toString(),
+    startedAt: current.startedAt || Date.now(),
+    durationMs: current.durationMs || 0,
+    phase: current.phase,
+    status: current.status,
+    completedRounds: current.completedRounds || 0,
+    minutes: current.minutes || POMODORO_DEFAULTS.workMinutes,
+  };
+  const newState = addPomodoroSession(loadPomodoroHistoryState(), session);
+  // Save the updated history state
+  const historyJson = JSON.stringify(newState);
+  try {
+    activeAdapter.setItem('studyhub_pomodoro_history_v1', historyJson);
+  } catch (e) {
+    console.error('Failed to save pomodoro session history:', e);
+  }
 }
 
 function notificationStatus() {

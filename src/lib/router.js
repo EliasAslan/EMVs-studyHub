@@ -40,6 +40,8 @@ export function parseHash(hash = typeof location !== 'undefined' ? location.hash
       return { name: 'links', path: '/links', query };
     case 'focus':
       return { name: 'focus', path: '/focus', query };
+    case 'pomodoro':
+      return { name: 'pomodoro', path: '/pomodoro', query };
     case 'settings':
       return { name: 'settings', path: '/settings', query };
     case 'tokens':

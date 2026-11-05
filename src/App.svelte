@@ -18,6 +18,7 @@
     focus: () => import('./lib/views/Focus.svelte'),
     settings: () => import('./lib/views/Settings.svelte'),
     tokens: () => import('./lib/views/Tokens.svelte'),
+    pomodoro: () => import('./lib/components/PomodoroStats.svelte'),
   };
 
   let currentKey = null;
