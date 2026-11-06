@@ -110,12 +110,12 @@
     font-size: var(--text-sm);
   }
   .tag {
-    padding: 0 var(--space-2);
+    padding: 1px 6px;
     border-radius: var(--radius-pill);
-    background: var(--tint-homework);
+    background: var(--surface-2);
     color: var(--ink-2);
-    font-size: 10px;
-    font-weight: 650;
+    font-size: 0.6875rem;
+    font-weight: 500;
   }
   .remove {
     display: grid;

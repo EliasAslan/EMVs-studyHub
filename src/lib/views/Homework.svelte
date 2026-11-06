@@ -220,11 +220,10 @@
     gap: var(--space-4);
   }
   .eyebrow {
-    font-size: var(--text-xs);
-    font-weight: 650;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink-2);
   }
   h1 {
     font-size: clamp(1.9rem, 4vw, 2.4rem);
@@ -258,11 +257,9 @@
   }
   .section-label {
     margin-bottom: var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-2);
   }
   .done-block {
     margin-top: var(--space-2);

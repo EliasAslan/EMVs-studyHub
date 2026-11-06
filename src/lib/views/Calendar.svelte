@@ -186,11 +186,10 @@
     gap: var(--space-4);
   }
   .eyebrow {
-    font-size: var(--text-xs);
-    font-weight: 650;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink-2);
   }
   h1 {
     font-size: clamp(1.9rem, 4vw, 2.4rem);
@@ -240,10 +239,8 @@
   .weekdays span {
     padding: var(--space-1);
     text-align: center;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-size: 0.6875rem;
+    font-weight: 500;
     color: var(--ink-3);
   }
   .grid {

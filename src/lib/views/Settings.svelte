@@ -45,8 +45,8 @@
   let reminderDismissedAtChangeCount = 0;
 
   // Email reminders state
-  let remindersEmail = settings.email || '';
-  let remindersOptIn = settings.emailReminders || false;
+  let remindersEmail = $appState.settings.email || '';
+  let remindersOptIn = $appState.settings.emailReminders || false;
   let remindersDay = 5; // Friday per plan; WEEKDAYS.index from 1=Montag to 7Sonntag
   let remindersContent = 'todo'; // todo, summary, none
   let remindersBusy = false;
@@ -559,11 +559,10 @@
     gap: var(--space-4);
   }
   .eyebrow {
-    font-size: var(--text-xs);
-    font-weight: 650;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink-2);
   }
   h1 {
     font-size: clamp(1.9rem, 4vw, 2.4rem);
@@ -585,11 +584,10 @@
     gap: var(--space-3);
   }
   .section-title h2 {
-    font-size: var(--text-sm);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-2);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
   }
   .hint,
   .small {
@@ -666,40 +664,48 @@
     border-radius: var(--radius-2);
     background: var(--surface-2);
     min-height: 84px;
+    overflow: hidden;
   }
   .day-name {
     margin-bottom: var(--space-1);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-size: 0.6875rem;
+    font-weight: 600;
     color: var(--ink-3);
   }
   .lesson-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    margin-bottom: 2px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'time icon'
+      'main icon';
+    align-items: start;
+    gap: 1px var(--space-1);
+    margin-bottom: var(--space-1);
+    min-width: 0;
   }
   .lesson-time {
-    font-size: 10px;
+    grid-area: time;
+    font-size: 9px;
     color: var(--ink-3);
     white-space: nowrap;
   }
   .lesson-main {
+    grid-area: main;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    flex: 1;
     min-width: 0;
     border: 0;
     background: transparent;
     color: var(--ink);
-    font-size: var(--text-xs);
+    font-size: 0.75rem;
     text-align: left;
     line-height: 1.3;
     padding: 0;
+  }
+  .lesson-main span {
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
   .lesson-main:hover {
     color: var(--accent-strong);
@@ -722,6 +728,10 @@
     background: transparent;
     color: var(--ink-3);
   }
+  .lesson-row .icon {
+    grid-area: icon;
+    align-self: center;
+  }
   .icon:hover {
     background: var(--surface);
     color: var(--danger);
@@ -734,11 +744,9 @@
     border-top: 1px solid var(--rule);
   }
   .form-title {
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-2);
   }
   .form-grid {
     display: grid;
@@ -825,9 +833,6 @@
     align-items: center;
     gap: var(--space-3);
     font-size: var(--text-sm);
-  }
-  .pref-row.disabled {
-    color: var(--ink-3);
   }
   .pref-row input[type='checkbox'] {
     width: 18px;

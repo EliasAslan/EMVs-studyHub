@@ -10,11 +10,24 @@
   $: excerpt = (note.body || '').replace(/\s+/g, ' ').trim().slice(0, 160);
   $: module = note.moduleId ? moduleTitle($appState, note.moduleId) : '';
   $: date = formatDate(dateKey(new Date(note.updatedAt || note.createdAt)), 'short');
+
+  const TYPE_LABELS = {
+    note: 'Notiz',
+    mistake: 'Fehler',
+    summary: 'Zusammenfassung',
+    question: 'Frage',
+    idea: 'Idee',
+  };
+
+  function typeLabel(type) {
+    if (!type) return 'Notiz';
+    return TYPE_LABELS[type] || type.charAt(0).toUpperCase() + type.slice(1);
+  }
 </script>
 
 <a class="note-card" href="#{notePath(note.id)}">
   <div class="note-top">
-    <span class="type">{note.type === 'note' ? 'Notiz' : note.type}</span>
+    <span class="type">{typeLabel(note.type)}</span>
     {#if showModule && module}<span class="module">{module}</span>{/if}
     {#if note.attachments?.length}<span class="att" aria-label="Mit Datei"><Icon name="photo" size={13} /></span>{/if}
   </div>
@@ -44,14 +57,12 @@
   .note-top {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    font-size: 10px;
+    gap: 6px;
+    font-size: 0.6875rem;
     color: var(--ink-3);
   }
   .type {
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-weight: 600;
   }
   .module {
     overflow: hidden;

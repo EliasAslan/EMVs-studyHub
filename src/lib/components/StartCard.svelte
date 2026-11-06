@@ -32,7 +32,7 @@
 {#if entry}
   <section class="start-card" aria-labelledby="start-title">
     <div class="start-top">
-      <p class="eyebrow"><Icon name="today" size={14} /> Hier starten</p>
+      <p class="eyebrow"><Icon name="today" size={14} /> Als Nächstes</p>
       <span class="reason" class:overdue={entry.reason === 'overdue'}>{reasonLabel}</span>
     </div>
     <h2 id="start-title">{item.title}</h2>
@@ -54,7 +54,7 @@
   </section>
 {:else}
   <section class="start-card calm" aria-labelledby="start-title">
-    <p class="eyebrow"><Icon name="today" size={14} /> Hier starten</p>
+    <p class="eyebrow"><Icon name="today" size={14} /> Als Nächstes</p>
     <h2 id="start-title">Nichts Dringendes.</h2>
     <p class="meta">Wenn du bereit bist: eine Notiz oder eine Hausaufgabe erfassen.</p>
   </section>
@@ -64,13 +64,11 @@
   .start-card {
     padding: var(--space-5);
     border: 1px solid var(--rule);
-    border-left: 4px solid var(--accent);
     border-radius: var(--radius-3);
-    background: linear-gradient(180deg, var(--surface), var(--tint-today));
-    box-shadow: var(--shadow-1);
+    background: var(--surface);
   }
   .start-card.calm {
-    border-left-color: var(--rule-strong);
+    color: var(--ink-2);
   }
   .start-top {
     display: flex;
@@ -83,29 +81,27 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--ink-2);
   }
   .reason {
     padding: 2px var(--space-2);
     border-radius: var(--radius-pill);
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    font-size: var(--text-xs);
-    font-weight: 650;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: 0.75rem;
+    font-weight: 500;
   }
   .reason.overdue {
     background: var(--warn-soft);
     color: var(--warn);
   }
   h2 {
-    font-family: var(--font-read);
-    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-size: clamp(1.35rem, 2.4vw, 1.7rem);
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.03em;
     margin-bottom: var(--space-2);
   }
   .meta {
@@ -116,6 +112,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-    margin-top: var(--space-5);
+    margin-top: var(--space-4);
   }
 </style>

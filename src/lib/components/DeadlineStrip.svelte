@@ -20,12 +20,14 @@
           <Icon name={d.kind === 'exam' ? 'exams' : 'homework'} size={13} />
           {d.kind === 'exam' ? 'Prüfung' : 'Hausaufgabe'}
         </span>
-        <span class="title">{d.item.title}</span>
+        <span class="body">
+          <span class="title">{d.item.title}</span>
+          {#if d.item.moduleId}<span class="module">{moduleTitle($appState, d.item.moduleId)}</span>{/if}
+        </span>
         <span class="meta">
           <span class="date mono">{formatDate(d.date, 'short')}</span>
           <span class="rel">{relativeDayLabel(d.date)}</span>
         </span>
-        {#if d.item.moduleId}<span class="module">{moduleTitle($appState, d.item.moduleId)}</span>{/if}
       </button>
     {/each}
   </div>
@@ -35,46 +37,53 @@
 
 <style>
   .strip {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(190px, 1fr);
-    gap: var(--space-3);
-    overflow-x: auto;
-    padding-bottom: var(--space-2);
-    scrollbar-width: thin;
-  }
-  .deadline {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-1);
-    min-height: 110px;
-    padding: var(--space-3);
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-2);
-    background: var(--surface);
+    border-top: 1px solid var(--rule);
+  }
+  .deadline {
+    display: grid;
+    grid-template-columns: 116px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 52px;
+    padding: var(--space-2) var(--space-1);
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    background: transparent;
     text-align: left;
   }
   .deadline:hover {
-    border-color: var(--rule-strong);
     background: var(--surface-2);
+    border-radius: var(--radius-1);
   }
-  .deadline.overdue {
-    border-color: var(--warn);
-    background: var(--warn-soft);
+  .deadline.overdue .kind,
+  .deadline.overdue .rel {
+    color: var(--warn);
+  }
+  .deadline.overdue .rel {
+    font-weight: 600;
   }
   .kind {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
   }
   .title {
-    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
     font-size: var(--text-sm);
     line-height: 1.3;
   }
@@ -82,18 +91,21 @@
     display: flex;
     align-items: baseline;
     gap: var(--space-2);
-    margin-top: auto;
-    font-size: var(--text-xs);
+    font-size: 0.75rem;
     color: var(--ink-2);
+    white-space: nowrap;
   }
   .date {
-    font-size: var(--text-xs);
+    font-size: 0.75rem;
   }
   .rel {
     color: var(--ink-3);
   }
   .module {
-    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
     color: var(--ink-3);
   }
   .empty-line {

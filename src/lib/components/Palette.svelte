@@ -196,11 +196,9 @@
   }
   .group {
     padding: var(--space-3) var(--space-3) var(--space-1);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-2);
   }
   .item {
     display: flex;

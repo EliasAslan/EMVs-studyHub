@@ -13,6 +13,17 @@
   let title = '';
   let body = '';
   let type = 'note';
+
+  const TYPE_LABELS = {
+    note: 'Notiz',
+    mistake: 'Fehler',
+    question: 'Frage',
+    summary: 'Zusammenfassung',
+  };
+
+  function typeLabel(value) {
+    return TYPE_LABELS[value] || value;
+  }
   let moduleId = '';
   let topicId = '';
   let mode = 'edit';
@@ -111,7 +122,7 @@
 
     <div class="note-head">
       <div class="head-meta">
-        <span class="type">{type === 'note' ? 'Notiz' : type}</span>
+        <span class="type">{typeLabel(type)}</span>
         {#if savedAt}<span class="saved mono">{dirty ? 'speichert…' : `gespeichert ${formatDate(dateKey(new Date(savedAt)), 'short')}`}</span>{/if}
       </div>
       <div class="head-actions">
@@ -242,9 +253,7 @@
     color: var(--ink-3);
   }
   .type {
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-weight: 600;
   }
   .head-actions {
     display: flex;

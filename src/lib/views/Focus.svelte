@@ -255,11 +255,10 @@
     gap: var(--space-2);
   }
   .eyebrow {
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink-2);
   }
   h1 {
     font-family: var(--font-read);
@@ -295,9 +294,7 @@
     color: var(--ink-3);
   }
   .phase {
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-weight: 600;
     color: var(--ink-2);
   }
   .round,
@@ -346,9 +343,7 @@
   }
   .clock-label {
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-weight: 600;
     color: var(--ink-3);
   }
   .duration {
@@ -392,11 +387,10 @@
     gap: var(--space-2);
   }
   .prefs-head h2 {
-    font-size: var(--text-sm);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-2);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
     margin-bottom: var(--space-1);
   }
   .pref-row {

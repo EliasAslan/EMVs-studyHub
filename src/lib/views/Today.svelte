@@ -214,15 +214,15 @@
     gap: var(--space-4);
   }
   .eyebrow {
-    font-size: var(--text-xs);
-    font-weight: 650;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink-2);
   }
   h1 {
-    font-size: clamp(2rem, 4vw, 2.6rem);
-    letter-spacing: -0.03em;
+    font-size: clamp(1.9rem, 3.4vw, 2.4rem);
+    font-weight: 600;
+    letter-spacing: -0.035em;
   }
   .search-pill {
     display: none;
@@ -266,7 +266,7 @@
   .side-col {
     display: flex;
     flex-direction: column;
-    gap: var(--space-6);
+    gap: var(--space-5);
     min-width: 0;
   }
   .block {
@@ -296,55 +296,59 @@
   .capture-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-2);
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--radius-2);
+    background: var(--surface-2);
   }
   .capture {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--space-2);
-    min-height: 78px;
+    gap: 6px;
+    min-height: 66px;
     padding: var(--space-2);
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-2);
-    background: var(--surface);
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
     color: var(--ink-2);
-    font-size: var(--text-xs);
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 500;
   }
   .capture:hover {
-    background: var(--surface-2);
+    background: var(--surface);
     color: var(--ink);
-    border-color: var(--rule-strong);
+    box-shadow: var(--shadow-1);
   }
   .segmented {
     display: flex;
     gap: 2px;
     padding: 3px;
-    border: 1px solid var(--rule);
+    border: 0;
     border-radius: var(--radius-2);
     background: var(--surface-2);
   }
   .seg {
     flex: 1;
-    min-height: 34px;
+    min-height: 32px;
     border: 0;
-    border-radius: var(--radius-1);
+    border-radius: 7px;
     background: transparent;
     color: var(--ink-2);
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
   .seg.active {
     background: var(--surface);
     color: var(--ink);
+    font-weight: 600;
     box-shadow: var(--shadow-1);
   }
   .module-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: 6px;
     margin-top: var(--space-3);
   }
   .chip {
@@ -360,9 +364,12 @@
     padding: var(--space-3);
     border: 1px solid var(--rule);
     border-radius: var(--radius-2);
-    background: var(--tint-today);
+    background: var(--surface);
     color: var(--ink);
     text-decoration: none;
+  }
+  .lesson-card:hover {
+    background: var(--surface-2);
   }
   .lesson-day {
     display: grid;
@@ -370,10 +377,9 @@
     width: 36px;
     height: 36px;
     border-radius: var(--radius-1);
-    background: var(--surface);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    font-weight: 700;
+    background: var(--surface-2);
+    font-size: 0.75rem;
+    font-weight: 600;
   }
   .lesson-main {
     display: flex;

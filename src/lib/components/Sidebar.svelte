@@ -80,7 +80,7 @@
         title={`Programm: ${currentProgram?.name || '—'} — wechseln`}
         aria-label={`Programm wechseln, aktuell ${currentProgram?.name || '—'}`}
       >
-        <span class="dot" style:--dot={currentProgram?.accent} aria-hidden="true"></span>
+        <span class="rail-code">{currentProgram?.code || currentProgram?.name?.slice(0, 2)}</span>
       </button>
     {:else}
       <div class="program-switch" role="group" aria-label="Programm wählen">
@@ -130,8 +130,10 @@
           aria-current={$route.name === 'module' && $route.id === mod.id ? 'page' : undefined}
           title={collapsed ? moduleTitle(mod) : undefined}
         >
-          <span class="mod-dot" style:--dot={mod.accent} aria-hidden="true"></span>
-          {#if !collapsed}
+          {#if collapsed}
+            <span class="rail-code">{mod.code || mod.title?.slice(0, 2)}</span>
+          {:else}
+            <span class="mod-dot" style:--dot={mod.accent} aria-hidden="true"></span>
             {#if mod.code}<span class="module-code">{mod.code}</span>{/if}
             <span class="module-title">{mod.title}</span>
           {/if}
@@ -293,11 +295,6 @@
   .program-rail:hover {
     background: var(--surface-2);
   }
-  .program-rail .dot {
-    width: 10px;
-    height: 10px;
-    background: var(--dot);
-  }
   .nav-scroll {
     display: flex;
     flex: 1 1 auto;
@@ -343,17 +340,20 @@
     color: var(--ink);
   }
   .nav-link.active {
-    background: var(--accent-soft);
-    color: var(--accent-strong);
+    background: var(--surface-2);
+    color: var(--ink);
     font-weight: 600;
+  }
+  .nav-link.active :global(svg) {
+    color: var(--accent-strong);
   }
   .nav-link.active .mod-dot {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot) 18%, transparent);
   }
   .group-label {
     margin: 12px 10px 4px;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 0.6875rem;
+    font-weight: 500;
     letter-spacing: 0;
     color: var(--ink-3);
   }
@@ -426,6 +426,13 @@
     gap: 0;
     color: var(--ink-3);
   }
+  .rail-code {
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ink-2);
+  }
   .nav-count {
     display: grid;
     place-items: center;
@@ -467,6 +474,9 @@
     justify-content: center;
     gap: 0;
     padding: 0;
+  }
+  .sidebar.collapsed .nav-link.active .rail-code {
+    color: var(--accent-strong);
   }
   .sidebar.collapsed .nav-count {
     position: absolute;
