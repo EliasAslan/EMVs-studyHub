@@ -5,7 +5,7 @@
 
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = 'http://127.0.0.1:5173';
 
 test.describe('Study Hub v2 — Core Flows', () => {
   test('Heute answers "what now?" with one clear start action', async ({ page }) => {
