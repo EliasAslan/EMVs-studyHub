@@ -8,7 +8,6 @@
   import Palette from './Palette.svelte';
   import QuickCapture from './QuickCapture.svelte';
   import Toast from './Toast.svelte';
-  import Modal from './Modal.svelte';
   import Icon from './Icon.svelte';
   import { toast } from '../stores/toast.js';
   import { paletteOpen, openPalette, togglePalette, closePalette } from '../stores/ui.js';
@@ -16,7 +15,8 @@
 
   let captureOpen = false;
   let captureMode = 'note';
-  let moreOpen = false;
+  let drawerOpen = false;
+  let menuButton = null;
   let pendingG = false;
   let pendingTimer = null;
 
@@ -25,10 +25,66 @@
     captureOpen = true;
   }
 
+  function openDrawer() {
+    if (drawerOpen) return;
+    drawerOpen = true;
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => {
+      document.querySelector('#app-sidebar .collapse')?.focus();
+    });
+  }
+
+  function closeDrawer({ restoreFocus = false } = {}) {
+    if (!drawerOpen) return;
+    drawerOpen = false;
+    document.body.style.overflow = '';
+    if (restoreFocus) menuButton?.focus();
+  }
+
+  function toggleDrawer() {
+    if (drawerOpen) closeDrawer({ restoreFocus: true });
+    else openDrawer();
+  }
+
+  // Keep Tab inside the open drawer until it is closed.
+  function trapDrawerFocus(event) {
+    const sidebar = document.getElementById('app-sidebar');
+    if (!sidebar) return;
+    const focusables = [...sidebar.querySelectorAll('a[href], button:not([disabled])')].filter(
+      (el) => el.getClientRects().length > 0
+    );
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+
+    if (!sidebar.contains(active)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+      return;
+    }
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   onMount(() => {
     const stopRouter = initRouter();
     applyTheme($appState.settings.theme);
     initPomodoro();
+
+    // The drawer is a mobile-only surface: close it when the hash changes or
+    // when the viewport grows past the drawer breakpoint.
+    const stopRoute = route.subscribe(() => closeDrawer());
+    const desktop = window.matchMedia('(min-width: 900px)');
+    const onDesktop = (event) => {
+      if (event.matches) closeDrawer();
+    };
+    desktop.addEventListener('change', onDesktop);
 
     // Cloud code (and the Supabase client) is a separate chunk. Start it
     // quietly after the first paint so the app stays usable immediately.
@@ -51,8 +107,19 @@
         return;
       }
 
+      if (event.key === 'Escape' && drawerOpen) {
+        event.preventDefault();
+        closeDrawer({ restoreFocus: true });
+        return;
+      }
+
+      if (drawerOpen && event.key === 'Tab') {
+        trapDrawerFocus(event);
+        return;
+      }
+
       if (editable) return;
-      if ($paletteOpen || captureOpen || moreOpen) return;
+      if ($paletteOpen || captureOpen || drawerOpen) return;
 
       if (event.key === '/') {
         event.preventDefault();
@@ -87,16 +154,21 @@
     };
 
     const onHide = () => flush();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
     window.addEventListener('keydown', onKey);
     window.addEventListener('pagehide', onHide);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') flush();
-    });
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       stopRouter();
+      stopRoute();
+      desktop.removeEventListener('change', onDesktop);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pagehide', onHide);
+      document.removeEventListener('visibilitychange', onVisibility);
+      document.body.style.overflow = '';
     };
   });
 
@@ -119,11 +191,30 @@
 <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
 <div class="app" class:collapsed={$appState.settings.navCollapsed}>
-  <Sidebar />
+  <button
+    class="scrim"
+    class:open={drawerOpen}
+    type="button"
+    tabindex="-1"
+    aria-label="Navigation schließen"
+    on:click={() => closeDrawer({ restoreFocus: true })}
+  ></button>
+  <Sidebar open={drawerOpen} onClose={() => closeDrawer({ restoreFocus: true })} />
 
   <div class="main-wrap">
     <header class="mobile-head">
-      <a class="mobile-brand" href="#/" aria-label="Study Hub — Heute">
+      <button
+        class="icon-btn"
+        type="button"
+        bind:this={menuButton}
+        on:click={openDrawer}
+        aria-label="Navigation öffnen"
+        aria-expanded={drawerOpen}
+        aria-controls="app-sidebar"
+      >
+        <Icon name="menu" />
+      </button>
+      <a class="mobile-brand" href="#/">
         <span class="brand-mark" aria-hidden="true">S</span>
         <span>Study Hub</span>
       </a>
@@ -141,22 +232,11 @@
     <Icon name="plus" size={22} />
   </button>
 
-  <TabBar onMore={() => (moreOpen = true)} />
+  <TabBar onMore={toggleDrawer} expanded={drawerOpen} />
 </div>
 
 <Palette open={$paletteOpen} on:close={closePalette} on:create={onPaletteCreate} on:action={onPaletteAction} />
 <QuickCapture open={captureOpen} initialMode={captureMode} on:close={() => (captureOpen = false)} />
-
-<Modal open={moreOpen} title="Mehr" on:close={() => (moreOpen = false)}>
-  <nav class="more-nav" aria-label="Mehr">
-    <a class="more-link" href="#/exams" on:click={() => (moreOpen = false)}><Icon name="exams" /> Prüfungen</a>
-    <a class="more-link" href="#/modules" on:click={() => (moreOpen = false)}><Icon name="modules" /> Module</a>
-    <a class="more-link" href="#/calendar" on:click={() => (moreOpen = false)}><Icon name="calendar" /> Kalender</a>
-    <a class="more-link" href="#/links" on:click={() => (moreOpen = false)}><Icon name="links" /> Links</a>
-    <a class="more-link" href="#/focus" on:click={() => (moreOpen = false)}><Icon name="focus" /> Fokus</a>
-    <a class="more-link" href="#/settings" on:click={() => (moreOpen = false)}><Icon name="settings" /> Einstellungen</a>
-  </nav>
-</Modal>
 
 <Toast />
 
@@ -178,7 +258,7 @@
   .mobile-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--space-2);
     padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--rule);
     background: var(--bg);
@@ -190,9 +270,33 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    flex: 1;
+    min-width: 0;
     color: var(--ink);
     text-decoration: none;
     font-weight: 700;
+  }
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgb(15 23 42 / 38%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity var(--motion),
+      visibility var(--motion);
+  }
+  .scrim.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
   }
   .brand-mark {
     display: grid;
@@ -233,26 +337,10 @@
   .fab:active {
     transform: scale(0.97);
   }
-  .more-nav {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .more-link {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 48px;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-2);
-    color: var(--ink);
-    text-decoration: none;
-    font-weight: 550;
-  }
-  .more-link:hover {
-    background: var(--surface-2);
-  }
   @media (min-width: 900px) {
+    .scrim {
+      display: none;
+    }
     .main-wrap {
       margin-left: var(--sidebar-w);
       padding-bottom: var(--space-6);

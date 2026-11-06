@@ -17,6 +17,7 @@ import { isValidDateKey } from '../data/dates.js';
 export const STORAGE_KEY = 'studyhub_v1';
 export const TIMER_KEY = 'studyhub_timer_v1';
 export const POMODORO_PREFS_KEY = 'studyhub_pomodoro_prefs_v1';
+export const POMODORO_HISTORY_KEY = 'studyhub_pomodoro_history_v1';
 
 let lastStorageError = null;
 
@@ -473,13 +474,42 @@ export function savePomodoroPrefs(prefs) {
 
 export function loadPomodoroHistoryState() {
   try {
-    const raw = activeAdapter.getItem('studyhub_pomodoro_history_v1');
-    if (!raw || typeof raw !== 'object') return defaultPomodoroHistory();
-    // Validate basic shape
-    if (Array.isArray(raw.sessions)) return raw;
-    return defaultPomodoroHistory();
+    let raw = activeAdapter.getItem(POMODORO_HISTORY_KEY);
+    // Older builds double-encoded the payload; accept and repair it.
+    if (typeof raw === 'string') {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        return defaultPomodoroHistory();
+      }
+    }
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.sessions)) return defaultPomodoroHistory();
+    return {
+      sessions: raw.sessions.slice(0, MAX_SESSION_HISTORY),
+      lastSessionId: raw.lastSessionId ?? raw.sessions[0]?.id ?? null,
+    };
   } catch {
     return defaultPomodoroHistory();
+  }
+}
+
+export function savePomodoroHistoryState(state) {
+  try {
+    const sessions = (state?.sessions || []).slice(0, MAX_SESSION_HISTORY);
+    return activeAdapter.setItem(POMODORO_HISTORY_KEY, {
+      sessions,
+      lastSessionId: state?.lastSessionId ?? sessions[0]?.id ?? null,
+    });
+  } catch {
+    return false;
+  }
+}
+
+export function clearPomodoroHistory() {
+  try {
+    return activeAdapter.removeItem(POMODORO_HISTORY_KEY);
+  } catch {
+    return false;
   }
 }
 
@@ -497,10 +527,10 @@ export function defaultPomodoroHistory() {
 }
 
 export function addPomodoroSession(state, session) {
-  const sessions = state.sessions || [];
+  const sessions = [...(state?.sessions || [])];
   sessions.unshift(session); // newest first
   if (sessions.length > MAX_SESSION_HISTORY) {
-    sessions.pop();
+    sessions.length = MAX_SESSION_HISTORY;
   }
   return {
     ...state,
@@ -510,28 +540,39 @@ export function addPomodoroSession(state, session) {
 }
 
 export function getTodaySessions(state) {
-  const sessions = state.sessions || [];
+  const sessions = state?.sessions || [];
   const today = new Date().toDateString();
   return sessions.filter((s) => new Date(s.startedAt).toDateString() === today);
 }
 
 export function getLastWeekSessions(state) {
-  const sessions = state.sessions || [];
+  const sessions = state?.sessions || [];
   const now = Date.now();
   const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-  return sessions.filter((s) => s.startedAt >= weekAgo);
+  return sessions.filter((s) => Number(s.startedAt) >= weekAgo);
+}
+
+/** Aggregate completed rounds, focus time and breaks for a session list. */
+export function summarizeSessions(sessions = []) {
+  const work = sessions.filter((s) => s.phase === 'work' && s.status === 'workDone');
+  const breaks = sessions.filter((s) => s.phase !== 'work' && s.status === 'breakDone');
+  const focusMinutes = work.reduce((sum, s) => sum + (Number(s.durationMs) || 0), 0) / 60_000;
+  return {
+    workRounds: work.length,
+    focusMinutes: Math.round(focusMinutes),
+    breaks: breaks.length,
+    averageDuration: work.length > 0 ? Math.round(focusMinutes / work.length) : 0,
+  };
 }
 
 export function getSessionStats(state) {
-  const sessions = state.sessions || [];
-  if (sessions.length === 0) return { total: 0, completedWorkMinutes: 0, completedBreaks: 0, averageDuration: 0 };
-
-  const total = sessions.length;
-  const completedWorkMinutes = sessions
-    .filter((s) => s.phase === 'work' && s.status === 'workDone')
-    .reduce((sum, s) => sum + (s.durationMs || 0), 0) / (60_000);
-  const completedBreaks = sessions.filter((s) => s.phase === 'break' && s.status === 'breakDone').length;
-  const averageDuration = total > 0 ? completedWorkMinutes / total : 0;
-
-  return { total, completedWorkMinutes: Math.round(completedWorkMinutes), completedBreaks, averageDuration: Math.round(averageDuration) };
+  const sessions = state?.sessions || [];
+  const summary = summarizeSessions(sessions);
+  return {
+    total: sessions.length,
+    completedWorkMinutes: summary.focusMinutes,
+    completedBreaks: summary.breaks,
+    averageDuration: summary.averageDuration,
+    completedWorkRounds: summary.workRounds,
+  };
 }

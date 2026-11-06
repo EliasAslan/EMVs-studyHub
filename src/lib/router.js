@@ -41,7 +41,8 @@ export function parseHash(hash = typeof location !== 'undefined' ? location.hash
     case 'focus':
       return { name: 'focus', path: '/focus', query };
     case 'pomodoro':
-      return { name: 'pomodoro', path: '/pomodoro', query };
+      // Legacy bookmark: the focus room now contains the timer and history.
+      return { name: 'focus', path: '/focus', query };
     case 'settings':
       return { name: 'settings', path: '/settings', query };
     case 'tokens':

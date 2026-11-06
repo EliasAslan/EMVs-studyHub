@@ -3,9 +3,12 @@
   import Icon from './Icon.svelte';
 
   export let onMore;
+  export let expanded = false;
 
   $: isNotes = $route.name === 'notes' || $route.name === 'note';
-  $: isMore = ['exams', 'links', 'focus', 'settings', 'calendar', 'modules', 'module'].includes($route.name);
+  $: isMore =
+    expanded ||
+    ['exams', 'links', 'focus', 'settings', 'calendar', 'modules', 'module', 'tokens'].includes($route.name);
 </script>
 
 <nav class="tabbar" aria-label="Mobile Navigation">
@@ -21,7 +24,14 @@
     <Icon name="notes" size={20} />
     <span>Notizen</span>
   </a>
-  <button class="tab" class:active={isMore} type="button" on:click={onMore} aria-haspopup="dialog">
+  <button
+    class="tab"
+    class:active={isMore}
+    type="button"
+    on:click={onMore}
+    aria-expanded={expanded}
+    aria-controls="app-sidebar"
+  >
     <Icon name="more" size={20} />
     <span>Mehr</span>
   </button>

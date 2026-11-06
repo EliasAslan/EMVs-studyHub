@@ -17,6 +17,7 @@ import {
   resumeTimerState,
   startBreakState,
   startNextWork,
+  activeElapsedMs,
   remainingMs,
   recommendedBreakType,
   phaseLabel,
@@ -24,11 +25,8 @@ import {
 } from './pomodoro.js';
 import {
   addPomodoroSession,
-  getTodaySessions,
-  getLastWeekSessions,
-  getSessionStats,
-  defaultPomodoroHistory,
-  MAX_SESSION_HISTORY,
+  loadPomodoroHistoryState,
+  savePomodoroHistoryState,
 } from './store.js';
 
 let current = null;
@@ -56,17 +54,8 @@ function emit(reason = 'change') {
 
 function persist() {
   try {
-    if (current) {
-      // Save timer state
-      saveTimerState(current);
-      // Optionally: also save session if session tracking is enabled
-      const prefs = ensurePrefs();
-      if (prefs && prefs.saveSessionHistory !== false) {
-        // Session will be added when event handlers explicitly call addPomodoroSession
-      }
-    } else {
-      clearTimerState();
-    }
+    if (current) saveTimerState(current);
+    else clearTimerState();
   } catch (e) {
     console.error('Failed to persist Pomodoro state:', e);
   }
@@ -96,12 +85,11 @@ function tickNow() {
     persist();
     if (event) {
       if (current.status !== STATUS.running) stopTicking();
-      announce(event);
-      emit(event);
-      // Save session history when session ends
       if (event === 'workDone' || event === 'breakDone') {
         saveSessionFromCurrent();
       }
+      announce(event);
+      emit(event);
       return;
     }
   }
@@ -109,25 +97,20 @@ function tickNow() {
 }
 
 function saveSessionFromCurrent() {
-  const prefs = ensurePrefs();
   if (!current) return;
+  const durationMs = Math.max(0, Number(current.accumulatedMs) || Number(current.durationMs) || 0);
   const session = {
-    id: Date.now().toString(),
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     startedAt: current.startedAt || Date.now(),
-    durationMs: current.durationMs || 0,
+    endedAt: Date.now(),
+    durationMs,
     phase: current.phase,
     status: current.status,
     completedRounds: current.completedRounds || 0,
     minutes: current.minutes || POMODORO_DEFAULTS.workMinutes,
   };
-  const newState = addPomodoroSession(loadPomodoroHistoryState(), session);
-  // Save the updated history state
-  const historyJson = JSON.stringify(newState);
-  try {
-    activeAdapter.setItem('studyhub_pomodoro_history_v1', historyJson);
-  } catch (e) {
-    console.error('Failed to save pomodoro session history:', e);
-  }
+  const next = addPomodoroSession(loadPomodoroHistoryState(), session);
+  savePomodoroHistoryState(next);
 }
 
 function notificationStatus() {
@@ -287,9 +270,17 @@ export function chooseBreak(type) {
 export function skipBreak() {
   if (!current || current.phase === PHASE.work) return false;
   if (current.status !== STATUS.running && current.status !== STATUS.paused) return false;
-  current = { ...current, status: STATUS.breakDone, accumulatedMs: current.durationMs, runStartedAt: null, updatedAt: Date.now() };
+  const now = Date.now();
+  current = {
+    ...current,
+    status: STATUS.breakDone,
+    accumulatedMs: Math.min(current.durationMs, activeElapsedMs(current, now)),
+    runStartedAt: null,
+    updatedAt: now,
+  };
   persist();
   stopTicking();
+  saveSessionFromCurrent();
   emit('break-skip');
   return true;
 }

@@ -22,6 +22,7 @@
   import { formatClock, progressPct, phaseLabel, roundLabel } from '../services/pomodoro.js';
   import { toast } from '../stores/toast.js';
   import Icon from '../components/Icon.svelte';
+  import PomodoroStats from '../components/PomodoroStats.svelte';
 
   const presets = [15, 25, 45];
 
@@ -165,7 +166,7 @@
       <button class="btn btn-primary start" type="button" on:click={start}>
         <Icon name="focus" size={18} /> Fokus starten
       </button>
-      <p class="hint">{minutes} Minuten. Kein Task, keine Statistik.</p>
+      <p class="hint">{minutes} Minuten. Nur du und die Zeit.</p>
     {:else if isWork && !workDone}
       <div class="actions">
         <button class="btn btn-primary" type="button" on:click={toggle}>
@@ -217,7 +218,7 @@
     <div class="prefs-head">
       <h2 id="prefs-title">Ruhig bleiben</h2>
     </div>
-    <label class="pref-row">
+    <label class="pref-row check-row">
       <input
         type="checkbox"
         checked={prefs.sound}
@@ -237,7 +238,19 @@
         <button class="btn btn-sm" type="button" on:click={askNotifications}>Erlauben</button>
       {/if}
     </div>
+    <label class="pref-row check-row">
+      <input
+        type="checkbox"
+        checked={prefs.showStatistics !== false}
+        on:change={(e) => updatePomodoroPrefs({ showStatistics: e.target.checked })}
+      />
+      <span>Verlauf anzeigen</span>
+    </label>
   </section>
+
+  {#if prefs.showStatistics !== false}
+    <PomodoroStats />
+  {/if}
 </div>
 
 <style>
@@ -278,11 +291,10 @@
     padding: var(--space-5);
     border: 1px solid var(--rule);
     border-radius: var(--radius-3);
-    background: linear-gradient(180deg, var(--surface), var(--tint-today));
-    box-shadow: var(--shadow-1);
+    background: var(--surface);
   }
   .timer-card.is-break {
-    background: linear-gradient(180deg, var(--surface), var(--tint-notes));
+    background: var(--surface-2);
   }
   .status-row {
     display: flex;
@@ -400,6 +412,11 @@
     gap: var(--space-3);
     min-height: 40px;
     font-size: var(--text-sm);
+  }
+  .check-row {
+    justify-content: flex-start;
+    gap: var(--space-2);
+    cursor: pointer;
   }
   .pref-row input[type='checkbox'] {
     width: 18px;

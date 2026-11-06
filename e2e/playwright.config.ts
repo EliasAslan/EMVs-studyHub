@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: '.',
   timeout: 30000,
   retries: 0,
   expect: {
@@ -9,10 +9,11 @@ export default defineConfig({
   },
   fullyParallel: true,
   workers: 4,
-  reporter: ['list', ['html', { open: 'never' }]],
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:5173',
-    channel: 'chrome',
+    // Chrome is not installed everywhere; Edge is available on Windows.
+    channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     locale: 'de-CH',
