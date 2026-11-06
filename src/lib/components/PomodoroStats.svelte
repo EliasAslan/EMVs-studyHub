@@ -1,10 +1,11 @@
 <script>
-import { onMount, onDestroy, derived, writable } from 'svelte/store';
+import { onMount, onDestroy } from 'svelte';
+import { derived, writable } from 'svelte/store';
 import { loadPomodoroHistoryState, getSessionStats, getTodaySessions, getLastWeekSessions } from '../services/store.js';
 import { formatTimeRange } from '../data/dates.js';
 import { WEEKDAYS } from '../data/dates.js';
 
-import { createWorkTimer, tickPomodoro, STATUS, PHASE, MINUTE } from '../services/pomodoro.js';
+import { createWorkTimer, tickPomodoro, STATUS, PHASE } from '../services/pomodoro.js';
 import { initPomodoro, startPomodoro, pausePomodoro, resumePomodoro, skipBreak, getPomodoro, subscribePomodoro } from '../services/pomodoroEngine.js';
 
 let isMounted = false;

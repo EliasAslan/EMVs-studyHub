@@ -3,7 +3,7 @@
  * writes localStorage directly. Persistence is debounced, then sync is told.
  */
 
-import { writable, derived, get } from 'sellete/store';
+import { writable, derived, get } from 'svelte/store';
 import * as store from '../services/store.js';
 import { deleteAttachmentsForOwner, clearAllAttachments } from '../services/attachments.js';
 import { pickStartHere, openHomework as openHomeworkList, doneHomework as doneHomeworkList } from '../data/startHere.js';
@@ -27,6 +27,11 @@ export const appState = writable(initial);
 export const storageError = writable(store.getStorageError());
 export function getStore() {
   return store;
+}
+
+/** Read the current app state once (non-reactive). */
+export function getState() {
+  return get(appState);
 }
 
 /** Force the debounced save to run now (page hide, manual save). */
@@ -189,6 +194,12 @@ export function toggleHomework(id) {
 
 export function deleteHomework(id) {
   return commit((s) => store.deleteWithTombstone(s, 'homework', id));
+}
+
+/** Undo a delete by re-inserting the entity and clearing its tombstone. */
+export function restoreEntity(collection, entity) {
+  if (!collection || !entity) return null;
+  return commit((s) => store.restoreEntity(s, collection, entity));
 }
 
 /* ------------------------------------------------------------------ */
