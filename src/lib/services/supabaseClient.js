@@ -7,8 +7,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-export const SUPABASE_URL = 'https://atotphhdrsjcxjtpptkg.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_uRP3ELY3TJtQRxuL0aS5Uw_gaxfKSKx';
+export const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || 'https://atotphhdrsjcxjtpptkg.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_uRP3ELY3TJtQRxuL0aS5Uw_gaxfKSKx';
 
 export function isSupabaseConfigured() {
   return Boolean(

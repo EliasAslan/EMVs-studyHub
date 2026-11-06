@@ -24,7 +24,11 @@ export default defineEventHandler(async (event) => {
     .eq('user_id', user.id)
     .single();
 
-  const recipientEmail = settings?.email || 'e3953s@hotmail.com';
+  const recipientEmail = settings?.email || process.env.DEFAULT_REMINDER_EMAIL || '';
+
+  if (!recipientEmail) {
+    return { error: 'No recipient email configured. Set it in Settings → Erinnerungen.' };
+  }
 
   // Fetch homework due tomorrow and exams due tomorrow
   const tomorrow = new Date();

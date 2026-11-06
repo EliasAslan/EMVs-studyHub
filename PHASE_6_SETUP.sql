@@ -2,8 +2,8 @@
 -- Study Hub — v3 cloud schema (clean slate)
 --
 -- Run this on a fresh Supabase project, or run §R first to remove the
--- archived vanilla-app tables. Real study data is disposable in v1;
--- export a JSON backup before dropping anything.
+-- archived vanilla-app tables. The previous dataset is disposable for
+-- this release; export a JSON backup before dropping anything.
 --
 -- Model:
 --   * Every row belongs to auth.uid(); composite keys (user_id, id).

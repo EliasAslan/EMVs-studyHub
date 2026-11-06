@@ -3,8 +3,10 @@
 A calm, offline-first personal school hub for one EMVs apprentice doing the BM at BFO.
 German UI (`de-CH`), English code and docs. Svelte 5 + Vite, no backend required for daily use.
 
-The previous vanilla app is preserved on the `archive/vanilla-app` tag. This branch is the
-clean-slate rebuild: new storage keys, new data model, new Supabase schema.
+This is the deliberately reduced v2 rebuild: new storage keys, new data model, new Supabase
+schema, and a smaller, calmer feature set. The previous vanilla app is preserved on the
+`archive/vanilla-app` tag and in Git history. There is no data migration from the old app:
+the rebuild starts clean.
 
 ## Quick start
 
@@ -14,11 +16,13 @@ npm run dev       # http://localhost:5173
 npm run build     # production build in dist/
 npm run preview   # serve the production build
 npm test          # Vitest unit tests
+npm run test:e2e  # Playwright (Edge locally on Windows, Chromium in CI)
 ```
 
-Node 20+ is expected.
+Node 22+ is expected (Vite 8). Playwright starts the dev server automatically. On systems
+without Edge, run `npx playwright install chromium` once.
 
-## What is in v1
+## What is in v2
 
 - **Heute** — one "start here" item (earliest open homework, else next exam within 14 days),
   daily checklist, deadlines and recent notes.
@@ -29,11 +33,19 @@ Node 20+ is expected.
 - **Prüfungen** — date, countdown, notes, Swiss grade 1–6 in .5 steps plus a free-text note.
   No averages.
 - **Kalender** — month grid with homework and exam deadlines.
-- **Links**, **Fokus** (standalone Pomodoro), **Einstellungen**.
+- **Links**, **Fokus** (Pomodoro timer with session history and statistics), **Einstellungen**.
+- **Mobile shell** — sidebar drawer below 900 px with focus trap and a bottom tab bar.
 - **PWA** — installable, app shell precached, works offline.
 - **JSON backup** — export/import all state. Attachments never enter the JSON file.
+- **Cloud sync** — optional Supabase copy. The device stays the source of truth.
+- **Email reminders** — optional weekly deadline email via Supabase Edge Function and Resend.
 
-Not in v1: email reminders (v1.1), tags, Markdown/ICS/CSV export, AI/PDF extraction.
+### Intentionally not ported
+
+The vanilla app also had learning objectives with confidence/review history, weak spots and
+the Today review queue, study sessions, module plan/resources, exam preparation/mock/results,
+PDF/local-AI import, the captures inbox, and six switchable navigation layouts. These are out
+of scope for v2. The archived app remains available on the tag if one of them is needed later.
 
 ## Architecture
 
@@ -56,6 +68,7 @@ Not in v1: email reminders (v1.1), tags, Markdown/ICS/CSV export, AI/PDF extract
 | PWA manifest / icons | `public/manifest.webmanifest`, `public/icons/` |
 | Supabase schema | `PHASE_6_SETUP.sql` |
 | Unit tests | `tests/*.test.js` (Vitest) |
+| Browser tests | `e2e/study-hub-e2e.test.ts` (Playwright) |
 
 ## Local data
 
@@ -65,10 +78,12 @@ Not in v1: email reminders (v1.1), tags, Markdown/ICS/CSV export, AI/PDF extract
 | `studyhub_attachments_v1` | IndexedDB blobs for PDFs/photos |
 | `studyhub_timer_v1` | focus timer state |
 | `studyhub_pomodoro_prefs_v1` | focus preferences |
+| `studyhub_pomodoro_history_v1` | completed focus sessions |
 | `studyhub_sync_status_v1` | last sync attempt/success |
 | `studyhub_cloud_uid_v1` | account binding for the last successful sync |
 
-The old `emvs_data_v1` key is intentionally ignored. Attachments are limited to PDF/image,
+The old `emvs_data_v1` key is intentionally ignored. There is no importer: the vanilla app and
+the rebuild do not share data, and both start empty. Attachments are limited to PDF/image,
 max 40 MB, and stay on the device: never in JSON backups and never in Postgres.
 
 Tombstones are kept for 90 days. Deleting a module cascades to its topics, notes, homework,
@@ -79,10 +94,11 @@ exams, links and lessons, and removes the module's attachment blobs.
 Sync is optional. The device is the datastore; the cloud is a convergent copy.
 
 1. Create/choose a Supabase project.
-2. Run `PHASE_6_SETUP.sql` in the SQL editor. The rollback block at the top removes the
-   archived vanilla-app tables and any previous v3 tables — **export a JSON backup first**.
-3. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in
-   `src/lib/services/supabaseClient.js`. Only the publishable/anon key belongs in the browser.
+2. Run `PHASE_6_SETUP.sql` in the SQL editor. The optional §R rollback block drops the archived
+   vanilla-app tables and any previous v3 tables. Skip it if you still need that data.
+3. Optionally set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`; the current project
+   defaults live in `src/lib/services/supabaseClient.js`. Only the publishable/anon key belongs
+   in the browser.
 4. In Settings → Cloud, sign in or create an account with email/password.
 5. Sync runs silently 25 s after the last local change, on sign-in, and when the tab becomes
    visible. Settings also has manual "Synchronisieren" and "Cloud laden" buttons.
@@ -99,54 +115,49 @@ Semantics:
 - After upload the app re-fetches and verifies every row; mismatches fail loudly without
   touching local data.
 
-## Email reminders (v1.1)
+## Email reminders (optional)
 
-Requires a Resend account and Supabase Edge Function. Never block v1 on this feature.
+Requires a Resend account and Supabase Edge Function. The app works fully without it.
 
 ### Setup
 
 1. **Create a Resend account** at [resend.com](https://resend.com). The free tier allows 30 emails/day.
 
-2. **Verify a sender domain** in Resend (required for deliverability). Add a TXT record to your DNS:
-   ```
-   _resend._domainkey.yourdomain.com    (CNAME to s1.resend.net)
-   _resend._domainkey.yourdomain.com    (TXT with publisher key)
-   ```
+2. **Verify a sender domain** in Resend (required for deliverability). Add the DNS records shown
+   in the Resend dashboard for your domain.
 
 3. **Set environment variables** in your Supabase project:
-   - `RESEND_API_KEY` — Your Resend secret key from the dashboard
-   - `SUPABASE_SERVICE_ROLE_KEY` — Required for the Edge Function to invoke admin functions
+   - `RESEND_API_KEY` — your Resend secret key from the dashboard
+   - `SUPABASE_SERVICE_ROLE_KEY` — required for the Edge Function to invoke admin functions
+   - `DEFAULT_REMINDER_EMAIL` — optional fallback when no address is set in the app
 
 4. **Deploy the Edge Function**:
-   - `supabase/functions/send-deadline-reminders/` contains the Edge Function code
-   - Deploy with: `supabase functions deploy send-deadline-reminders`
+   ```bash
+   supabase functions deploy send-deadline-reminders
+   ```
 
 5. **Set up pg_cron** to run the Edge Function weekly (e.g., Friday at 18:00 UTC):
    ```sql
    CREATE EXTENSION IF NOT EXISTS pg_cron;
    SELECT cron.schedule(
-     '0 18 * * 5',  -- Every Friday at 18:00 UTC
+     '0 18 * * 5',
      $$SELECT supabase_admin.invoke_function('send-deadline-reminders')$$
    );
    ```
    - Adjust the cron expression for Saturday: change `5` to `6`
    - Adjust the time by changing `18` to your preferred hour
 
-6. **Configure Supabase credentials** in the Edge Function:
-   - The function reads `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` from environment variables
-   - Set these in the Supabase Dashboard → Functions → Reveal Secrets
-
 ### Usage
 
 - In **Settings → Erinnerungen**, toggle "E-Mail-Erinnerungen" on
-- Change the recipient email if needed (defaults to `e3953s@hotmail.com`)
+- Set the recipient address there; the Edge Function uses that address
 - Click "Test-E-Mail senden" to verify the setup
 - Emails are sent weekly with homework and exams due the next day
 
 ### Notes
 
-- If `RESEND_API_KEY` is not configured, the "Test-E-Mail senden" button returns the email content for manual sending
-- The app fully works without email reminders — it is a v1.1 feature, deferred from v1
+- If `RESEND_API_KEY` is not configured, the "Test-E-Mail senden" button returns the email
+  content for manual sending
 - Opt-out anytime in Settings; no data is sent without explicit opt-in
 - Failures show one quiet status dot plus a translated German message in Settings. No toasts,
   no blocking dialogs.
@@ -170,15 +181,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\make-icons.ps1
 
 ```bash
 npm test
+npm run test:e2e
 ```
 
 Vitest covers pure data helpers, persistence, checklist/deadlines/search, pomodoro,
 attachments metadata, cloud row mapping, merge/LWW/tombstone behavior and upload verification.
-The archived vanilla `.test.mjs` suites are not part of the rebuild test run.
+Playwright covers the core desktop flows, the mobile drawer, focus history and settings.
 
-## Out of scope for v1
+CI (`.github/workflows/ci.yml`) runs unit tests, the production build and Playwright on every
+push to `main`/`rebuild/svelte` and on pull requests.
 
-- Email reminders (deferred to v1.1: Supabase Edge Function + Resend).
+## Out of scope for v2
+
 - Multiple users, sharing, social features.
 - Streaks, scores, progress bars, percentages, averages or guilt mechanics.
 - Server-side rendering.
+- Porting the omitted vanilla features listed above.

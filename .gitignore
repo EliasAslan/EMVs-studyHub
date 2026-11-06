@@ -5,6 +5,8 @@ coverage/
 playwright-report/
 test-results/
 .vite/
+.env
+.env.*
 *.local
 .DS_Store
 Thumbs.db
