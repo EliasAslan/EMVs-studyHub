@@ -59,6 +59,10 @@
 
   function toggleCollapsed() {
     updateSettings({ navCollapsed: !collapsed });
+    // When collapsing the sidebar on desktop, also collapse the module list.
+    if (isDesktop) {
+      modulePrefs.update((prefs) => ({ ...prefs, collapsed: !prefs.collapsed }));
+    }
   }
 
   function toggleModules() {
