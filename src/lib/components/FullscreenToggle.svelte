@@ -68,8 +68,19 @@
     outline-offset: 1px;
   }
   .fullscreen-toggle[aria-pressed='true'] {
+    background: transparent;
+    color: var(--ink-3);
+    opacity: 0.2;
+    transition: opacity 300ms ease;
+  }
+  .fullscreen-toggle[aria-pressed='true']:hover {
     background: var(--surface-2);
-    color: var(--accent-strong);
+    color: var(--ink);
+    opacity: 0.85;
+  }
+  .fullscreen-toggle[aria-pressed='true']:focus-visible {
+    background: var(--surface-2);
+    color: var(--ink);
     opacity: 1;
   }
   @media (any-pointer: coarse) {
