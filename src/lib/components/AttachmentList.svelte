@@ -116,7 +116,7 @@
 
 <Modal open={previewOpen} title={previewRecord?.name || 'Datei'} wide on:close={closePreview}>
   {#if previewRecord?.type?.startsWith('image/')}
-    <img class="preview-img" src={previewUrl} alt={previewRecord.name} />
+    <img class="preview-img" src={previewUrl} alt={previewRecord.name} loading="lazy" decoding="async" />
   {:else}
     <iframe class="preview-pdf" src={previewUrl} title={previewRecord?.name || 'PDF'}></iframe>
   {/if}

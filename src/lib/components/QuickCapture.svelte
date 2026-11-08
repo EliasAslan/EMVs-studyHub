@@ -12,7 +12,17 @@
     createLink,
   } from '../stores/app.js';
   import { saveAttachment, formatBytes, validateAttachmentFile } from '../services/attachments.js';
-  import { todayKey } from '../data/dates.js';
+  import { todayKey, isValidDateKey } from '../data/dates.js';
+  import { RECURRENCE_OPTIONS, recurrenceFromValue } from '../data/recurrence.js';
+  import { aiSettings, aiReady } from '../stores/ai.js';
+
+  let aiClient = null;
+  function loadAiClient() {
+    if (!aiClient) aiClient = import('../services/localAI.js');
+    return aiClient;
+  }
+  import { SYSTEM_PROMPT } from '../data/aiContext.js';
+  import AiDraft from './AiDraft.svelte';
   import { toast } from '../stores/toast.js';
 
   export let open = false;
@@ -25,6 +35,7 @@
   let body = '';
   let dueDate = todayKey();
   let examDate = todayKey();
+  let recurrence = 'none';
   let code = '';
   let url = '';
   let moduleId = '';
@@ -33,6 +44,11 @@
   let error = '';
   let saving = false;
   let wasOpen = false;
+  let aiBusy = false;
+  let aiDraftOpen = false;
+  let aiDraftText = '';
+  let aiDraftError = '';
+  let aiParsed = null;
 
   $: if (open && !wasOpen) {
     wasOpen = true;
@@ -48,12 +64,18 @@
     body = '';
     dueDate = todayKey();
     examDate = todayKey();
+    recurrence = 'none';
     code = '';
     url = '';
     moduleId = '';
     clearFile();
     error = '';
     saving = false;
+    aiBusy = false;
+    aiDraftOpen = false;
+    aiDraftText = '';
+    aiDraftError = '';
+    aiParsed = null;
   }
 
   function clearFile() {
@@ -93,7 +115,12 @@
         error = 'Titel fehlt.';
         return;
       }
-      createHomework({ title, dueDate, moduleId: moduleId || null });
+      createHomework({
+        title,
+        dueDate,
+        moduleId: moduleId || null,
+        recurrence: recurrenceFromValue(recurrence),
+      });
       toast('Hausaufgabe erfasst');
       close();
       return;
@@ -163,6 +190,107 @@
     }
   }
 
+  function buildStructurePrompt() {
+    const moduleList = modules
+      .map((m) => `${m.id} = ${m.code ? `${m.code} · ` : ''}${m.title}`)
+      .join('\n');
+    return [
+      'Forme den folgenden Text in ein JSON-Objekt um.',
+      'Antworte ausschließlich mit JSON, ohne Codeblock und ohne Erklärung.',
+      'Schema: {"kind":"note"|"homework","title":string,"body":string,"dueDate":"YYYY-MM-DD"|null,"moduleId":string|null,"type":"note"|"mistake"|"question"|"summary"}',
+      `Heutiges Datum: ${todayKey()}`,
+      moduleList ? `Bekannte Module:\n${moduleList}` : 'Keine Module vorhanden.',
+      '',
+      `Text: ${body || title}`,
+    ].join('\n');
+  }
+
+  function parseStructure(raw) {
+    let text = String(raw || '').trim();
+    text = text.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    let data;
+    try {
+      data = JSON.parse(text.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+    if (!data || typeof data !== 'object') return null;
+    return {
+      kind: data.kind === 'homework' ? 'homework' : 'note',
+      title: typeof data.title === 'string' ? data.title.trim() : '',
+      body: typeof data.body === 'string' ? data.body : '',
+      dueDate: isValidDateKey(data.dueDate) ? data.dueDate : null,
+      moduleId: modules.some((m) => m.id === data.moduleId) ? data.moduleId : null,
+      type: ['note', 'mistake', 'question', 'summary'].includes(data.type) ? data.type : 'note',
+    };
+  }
+
+  async function structure() {
+    if (aiBusy) return;
+    aiBusy = true;
+    aiDraftError = '';
+    aiDraftText = '';
+    aiParsed = null;
+    let client;
+    try {
+      client = await loadAiClient();
+    } catch {
+      aiBusy = false;
+      aiDraftOpen = true;
+      aiDraftError = 'Das KI-Modul konnte nicht geladen werden.';
+      return;
+    }
+    const result = await client.chatComplete({
+      baseUrl: $aiSettings.baseUrl,
+      model: $aiSettings.model,
+      numCtx: $aiSettings.numCtx,
+      format: 'json',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: buildStructurePrompt() },
+      ],
+    });
+    aiBusy = false;
+    if (result.error) {
+      aiDraftOpen = true;
+      aiDraftError = client.describeAiError(result.error);
+      return;
+    }
+    const parsed = parseStructure(result.text);
+    if (!parsed) {
+      aiDraftOpen = true;
+      aiDraftError = 'Die Antwort war kein gültiges JSON. Der Text bleibt unverändert.';
+      return;
+    }
+    aiParsed = parsed;
+    const mod = modules.find((m) => m.id === parsed.moduleId);
+    aiDraftText = [
+      `Art: ${parsed.kind === 'homework' ? 'Hausaufgabe' : 'Notiz'}`,
+      `Titel: ${parsed.title || '—'}`,
+      `Fällig: ${parsed.dueDate || '—'}`,
+      `Modul: ${mod ? [mod.code, mod.title].filter(Boolean).join(' · ') : '—'}`,
+      '',
+      'Text:',
+      parsed.body || '—',
+    ].join('\n');
+    aiDraftOpen = true;
+  }
+
+  function applyStructure() {
+    if (!aiParsed) return;
+    mode = aiParsed.kind;
+    title = aiParsed.title || aiParsed.body || title;
+    body = aiParsed.body || body;
+    if (aiParsed.dueDate) dueDate = aiParsed.dueDate;
+    if (aiParsed.moduleId) moduleId = aiParsed.moduleId;
+    aiDraftOpen = false;
+    aiParsed = null;
+    toast('Entwurf übernommen');
+  }
+
   $: modules = $appState.modules || [];
   $: primaryModes = ['note', 'photo', 'homework'];
   $: modalTitle =
@@ -199,6 +327,14 @@
       <label class="field">
         <span>Fällig</span>
         <input class="input" type="date" bind:value={dueDate} />
+      </label>
+      <label class="field">
+        <span>Wiederholen</span>
+        <select class="select" bind:value={recurrence}>
+          {#each RECURRENCE_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
       </label>
     {:else if mode === 'exam'}
       <label class="field">
@@ -261,6 +397,15 @@
       </div>
     {/if}
 
+    {#if $aiReady && (mode === 'note' || mode === 'homework')}
+      <div class="ai-row">
+        <button class="btn btn-sm btn-ghost" type="button" on:click={structure} disabled={aiBusy}>
+          <Icon name="sparkle" size={14} /> {aiBusy ? 'Strukturiere…' : 'Strukturieren'}
+        </button>
+        <span class="muted small">Füllt Titel, Text, Datum und Modul aus.</span>
+      </div>
+    {/if}
+
     {#if mode !== 'module'}
       <label class="field">
         <span>Modul (optional)</span>
@@ -285,6 +430,18 @@
     </button>
   </svelte:fragment>
 </Modal>
+
+<AiDraft
+  open={aiDraftOpen}
+  title="Strukturieren"
+  text={aiDraftText}
+  busy={aiBusy}
+  error={aiDraftError}
+  applyLabel="Übernehmen"
+  on:close={() => (aiDraftOpen = false)}
+  on:apply={applyStructure}
+  on:retry={structure}
+/>
 
 <style>
   .modes {
@@ -313,6 +470,12 @@
     color: var(--accent-strong);
   }
   .file-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .ai-row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;

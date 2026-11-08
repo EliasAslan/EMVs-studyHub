@@ -19,12 +19,18 @@ test.describe('Study Hub v2 — Core Flows', () => {
     await page.goto(BASE_URL);
     const routes = [
       '/homework', '/modules', '/notes', '/exams',
-      '/calendar', '/links', '/focus', '/settings', '/tokens',
+      '/calendar', '/links', '/focus', '/settings',
     ];
     for (const route of routes) {
       await page.goto(`${BASE_URL}/#${route}`);
       await expect(page.locator('main')).toBeVisible();
     }
+  });
+
+  test('Dev-only token gallery is not shipped', async ({ page }) => {
+    await page.goto(`${BASE_URL}/#/tokens`);
+    await expect(page.locator('#checklist-title')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tokens', exact: true })).toHaveCount(0);
   });
 
   test('Legacy /pomodoro bookmark opens Focus', async ({ page }) => {

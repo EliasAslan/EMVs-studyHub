@@ -17,14 +17,27 @@
     toggleHomework,
     deleteHomework,
     restoreEntity,
+    createOverviewNote,
+    updateNote,
   } from '../stores/app.js';
   import { route, navigate, modulePath, notePath } from '../router.js';
   import { todayKey, formatDate, relativeDayLabel, daysUntil } from '../data/dates.js';
+  import { bodySegments, resolveLink } from '../data/wikiLinks.js';
+  import {
+    RECURRENCE_OPTIONS,
+    recurrenceFromValue,
+    recurrenceValue,
+  } from '../data/recurrence.js';
+  import { aiSettings, aiReady } from '../stores/ai.js';
+  import { chatComplete, describeAiError } from '../services/localAI.js';
+  import { SYSTEM_PROMPT, buildContextBlock, resolveContext } from '../data/aiContext.js';
   import { toast } from '../stores/toast.js';
   import NoteCard from '../components/NoteCard.svelte';
   import HomeworkRow from '../components/HomeworkRow.svelte';
   import LinkRow from '../components/LinkRow.svelte';
   import AttachmentList from '../components/AttachmentList.svelte';
+  import AiButton from '../components/AiButton.svelte';
+  import AiDraft from '../components/AiDraft.svelte';
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
@@ -49,9 +62,11 @@
 
   let hwTitle = '';
   let hwDue = todayKey();
+  let hwRecurrence = 'none';
   let hwEditing = null;
   let hwEditTitle = '';
   let hwEditDue = '';
+  let hwEditRecurrence = 'none';
   let hwEditDone = false;
 
   let examOpen = false;
@@ -72,6 +87,11 @@
   let editAccent = '#4f46e5';
   let deleteOpen = false;
 
+  let aiDraftOpen = false;
+  let aiDraftText = '';
+  let aiDraftBusy = false;
+  let aiDraftError = '';
+
   $: mod = ($appState.modules || []).find((m) => m.id === $route.id) || null;
   $: if (mod && $route.tab && tabs.some((t) => t.id === $route.tab)) tab = $route.tab;
   $: program = mod ? ($appState.programs || []).find((p) => p.id === mod.programId) : null;
@@ -81,6 +101,25 @@
   $: openHw = homework.filter((h) => !h.done);
   $: exams = ($appState.exams || []).filter((e) => e.moduleId === mod?.id).sort((a, b) => (a.date < b.date ? 1 : -1));
   $: links = ($appState.links || []).filter((l) => l.moduleId === mod?.id);
+  $: overviewNote = mod?.overviewNoteId
+    ? ($appState.notes || []).find((n) => n.id === mod.overviewNoteId) || null
+    : null;
+  $: overviewSegments = overviewNote ? bodySegments(overviewNote.body || '') : [];
+
+  function openOverview() {
+    if (!mod) return;
+    const note = createOverviewNote(mod.id);
+    if (note) navigate(notePath(note.id));
+  }
+
+  function openOverviewLink(target) {
+    const entry = resolveLink($appState, target);
+    if (!entry) return;
+    if (entry.kind === 'note') navigate(notePath(entry.id));
+    else if (entry.kind === 'module') navigate(modulePath(entry.id));
+    else if (entry.kind === 'homework') navigate('/homework');
+    else if (entry.kind === 'exam') navigate('/exams');
+  }
 
   function setTab(id) {
     tab = id;
@@ -113,15 +152,22 @@
 
   function addHomework() {
     if (!hwTitle.trim() || !mod) return;
-    createHomework({ moduleId: mod.id, title: hwTitle, dueDate: hwDue || todayKey() });
+    createHomework({
+      moduleId: mod.id,
+      title: hwTitle,
+      dueDate: hwDue || todayKey(),
+      recurrence: recurrenceFromValue(hwRecurrence),
+    });
     hwTitle = '';
     hwDue = todayKey();
+    hwRecurrence = 'none';
   }
 
   function startHwEdit(hw) {
     hwEditing = hw;
     hwEditTitle = hw.title;
     hwEditDue = hw.dueDate || '';
+    hwEditRecurrence = recurrenceValue(hw.recurrence);
     hwEditDone = !!hw.done;
   }
 
@@ -130,6 +176,10 @@
     updateHomework(hwEditing.id, {
       title: hwEditTitle.trim() || hwEditing.title,
       dueDate: hwEditDue || null,
+      recurrence: recurrenceFromValue(
+        hwEditRecurrence,
+        hwEditing.recurrence?.seriesId || hwEditing.id,
+      ),
       done: hwEditDone,
     });
     hwEditing = null;
@@ -233,6 +283,43 @@
     if (typeof grade !== 'number') return '';
     return Number.isInteger(grade) ? String(grade) : grade.toFixed(1);
   }
+
+  async function draftOverview() {
+    if (!mod || aiDraftBusy) return;
+    aiDraftOpen = true;
+    aiDraftError = '';
+    aiDraftText = '';
+    aiDraftBusy = true;
+    const context = resolveContext($appState, $route, [`modul/${mod.id}`], { now: new Date() });
+    const result = await chatComplete({
+      baseUrl: $aiSettings.baseUrl,
+      model: $aiSettings.model,
+      numCtx: $aiSettings.numCtx,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `${buildContextBlock(context)}\n\nEntwirf einen kurzen Überblick über dieses Modul: 3–5 ruhige Sätze auf Deutsch, ausschließlich aus dem Kontext.`,
+        },
+      ],
+    });
+    aiDraftBusy = false;
+    if (result.error) {
+      aiDraftError = describeAiError(result.error);
+      return;
+    }
+    aiDraftText = result.text.trim();
+    if (!aiDraftText) aiDraftError = 'Kein Entwurf erhalten.';
+  }
+
+  function applyOverviewDraft() {
+    if (!mod || !aiDraftText) return;
+    const note = createOverviewNote(mod.id);
+    if (note) updateNote(note.id, { body: aiDraftText });
+    aiDraftOpen = false;
+    aiDraftText = '';
+    toast('Überblick übernommen');
+  }
 </script>
 
 {#if !mod}
@@ -259,6 +346,7 @@
         </p>
       </div>
       <div class="head-actions">
+        <AiButton label="KI fragen" kind="module" id={mod.id} />
         <button class="btn btn-sm" type="button" on:click={openModuleEdit}><Icon name="edit" size={14} /> Bearbeiten</button>
         <button class="icon-btn" type="button" aria-label="Modul löschen" on:click={() => (deleteOpen = true)}><Icon name="trash" size={16} /></button>
       </div>
@@ -274,6 +362,47 @@
 
     {#if tab === 'overview'}
       <div class="overview">
+        <section class="card pad overview-card" aria-labelledby="overview-title">
+          <div class="section-title">
+            <h2 id="overview-title">Überblick</h2>
+            <div class="overview-actions">
+              {#if $aiReady && (notes.length || homework.length)}
+                <button class="quiet" type="button" on:click={draftOverview} disabled={aiDraftBusy}>
+                  Überblick entwerfen
+                </button>
+              {/if}
+              {#if overviewNote}
+                <button class="quiet" type="button" on:click={openOverview}>Bearbeiten</button>
+              {/if}
+            </div>
+          </div>
+          {#if overviewNote}
+            <div class="overview-body reading">
+              {#if overviewNote.body.trim()}
+                {#each overviewSegments as segment, i (i)}
+                  {#if segment.type === 'text'}
+                    <span>{segment.text}</span>
+                  {:else}
+                    {@const entry = resolveLink($appState, segment.target)}
+                    {#if entry}
+                      <button class="wiki" type="button" on:click={() => openOverviewLink(segment.target)}>{segment.target}</button>
+                    {:else}
+                      <span class="wiki unresolved" title="Kein Ziel gefunden">{segment.target}</span>
+                    {/if}
+                  {/if}
+                {/each}
+              {:else}
+                <p class="muted small">Noch kein Text. <button class="quiet" type="button" on:click={openOverview}>Jetzt schreiben</button></p>
+              {/if}
+            </div>
+          {:else}
+            <div class="overview-empty">
+              <p class="muted small">Ein kurzer Überblick: Was zählt in diesem Modul?</p>
+              <button class="btn btn-sm" type="button" on:click={openOverview}>Überblick erstellen</button>
+            </div>
+          {/if}
+        </section>
+
         <section class="card pad" aria-labelledby="topics-title">
           <div class="section-title">
             <h2 id="topics-title">Themen</h2>
@@ -364,6 +493,11 @@
         <form class="inline-add card" on:submit|preventDefault={addHomework}>
           <input class="input" bind:value={hwTitle} placeholder="Neue Hausaufgabe" aria-label="Titel" />
           <input class="input" type="date" bind:value={hwDue} aria-label="Fällig" />
+          <select class="select" bind:value={hwRecurrence} aria-label="Wiederholen">
+            {#each RECURRENCE_OPTIONS as option (option.value)}
+              <option value={option.value}>{option.label}</option>
+            {/each}
+          </select>
           <button class="btn btn-primary" type="submit" disabled={!hwTitle.trim()}>Erfassen</button>
         </form>
         {#if homework.length}
@@ -473,11 +607,32 @@
   </svelte:fragment>
 </Modal>
 
+<!-- AI overview draft -->
+<AiDraft
+  open={aiDraftOpen}
+  title="Überblick entwerfen"
+  text={aiDraftText}
+  busy={aiDraftBusy}
+  error={aiDraftError}
+  applyLabel="Übernehmen"
+  on:close={() => (aiDraftOpen = false)}
+  on:apply={applyOverviewDraft}
+  on:retry={draftOverview}
+/>
+
 <!-- Homework edit -->
 <Modal open={!!hwEditing} title="Hausaufgabe bearbeiten" on:close={() => (hwEditing = null)}>
   <div class="stack">
     <label class="field"><span>Titel</span><input class="input" bind:value={hwEditTitle} data-autofocus /></label>
     <label class="field"><span>Fällig</span><input class="input" type="date" bind:value={hwEditDue} /></label>
+    <label class="field">
+      <span>Wiederholen</span>
+      <select class="select" bind:value={hwEditRecurrence}>
+        {#each RECURRENCE_OPTIONS as option (option.value)}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+    </label>
     <label class="check-row"><input type="checkbox" bind:checked={hwEditDone} /> Erledigt</label>
   </div>
   <svelte:fragment slot="footer">
@@ -646,6 +801,45 @@
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--space-4);
+  }
+  .overview-card {
+    grid-column: 1 / -1;
+  }
+  .overview-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .overview-body {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--font-read);
+    font-size: var(--text-sm);
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  .overview-body .wiki {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--accent-strong);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .overview-body .wiki.unresolved {
+    color: var(--ink-3);
+    text-decoration-style: dashed;
+    cursor: default;
+  }
+  .overview-empty {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
   }
   .pad {
     padding: var(--space-4);

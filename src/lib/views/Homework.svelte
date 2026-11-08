@@ -10,6 +10,11 @@
     restoreEntity,
   } from '../stores/app.js';
   import { todayKey } from '../data/dates.js';
+  import {
+    RECURRENCE_OPTIONS,
+    recurrenceFromValue,
+    recurrenceValue,
+  } from '../data/recurrence.js';
   import { persistedStore } from '../stores/viewPrefs.js';
   import { toast } from '../stores/toast.js';
   import HomeworkRow from '../components/HomeworkRow.svelte';
@@ -26,10 +31,12 @@
   let title = '';
   let dueDate = todayKey();
   let moduleId = '';
+  let recurrence = 'none';
   let editing = null;
   let editTitle = '';
   let editDue = '';
   let editModule = '';
+  let editRecurrence = 'none';
   let editDone = false;
 
   $: modules = $appState.modules || [];
@@ -50,9 +57,15 @@
 
   function add() {
     if (!title.trim()) return;
-    createHomework({ title, dueDate: dueDate || todayKey(), moduleId: moduleId || null });
+    createHomework({
+      title,
+      dueDate: dueDate || todayKey(),
+      moduleId: moduleId || null,
+      recurrence: recurrenceFromValue(recurrence),
+    });
     title = '';
     dueDate = todayKey();
+    recurrence = 'none';
     toast('Hausaufgabe erfasst');
   }
 
@@ -65,6 +78,7 @@
     editTitle = hw.title;
     editDue = hw.dueDate || '';
     editModule = hw.moduleId || '';
+    editRecurrence = recurrenceValue(hw.recurrence);
     editDone = !!hw.done;
   }
 
@@ -74,6 +88,7 @@
       title: editTitle.trim() || editing.title,
       dueDate: editDue || null,
       moduleId: editModule || null,
+      recurrence: recurrenceFromValue(editRecurrence, editing.recurrence?.seriesId || editing.id),
       done: editDone,
     });
     editing = null;
@@ -111,6 +126,11 @@
       <option value="">Kein Modul</option>
       {#each modules as m (m.id)}
         <option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>
+      {/each}
+    </select>
+    <select class="select recur-input" bind:value={recurrence} aria-label="Wiederholen">
+      {#each RECURRENCE_OPTIONS as option (option.value)}
+        <option value={option.value}>{option.label}</option>
       {/each}
     </select>
     <button class="btn btn-primary" type="submit" disabled={!title.trim()}>
@@ -196,6 +216,14 @@
         {/each}
       </select>
     </label>
+    <label class="field">
+      <span>Wiederholen</span>
+      <select class="select" bind:value={editRecurrence}>
+        {#each RECURRENCE_OPTIONS as option (option.value)}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+    </label>
     <label class="check-row">
       <input type="checkbox" bind:checked={editDone} /> Erledigt
     </label>
@@ -275,7 +303,7 @@
   }
   @media (min-width: 720px) {
     .add {
-      grid-template-columns: 1fr 150px 200px auto;
+      grid-template-columns: minmax(180px, 1fr) 150px 180px 150px auto;
       align-items: center;
     }
   }

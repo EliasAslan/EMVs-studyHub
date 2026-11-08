@@ -17,14 +17,19 @@
     links: () => import('./lib/views/Links.svelte'),
     focus: () => import('./lib/views/Focus.svelte'),
     settings: () => import('./lib/views/Settings.svelte'),
-    tokens: () => import('./lib/views/Tokens.svelte'),
+    assistant: () => import('./lib/views/Assistant.svelte'),
+    // Temporary token gallery: development only, never shipped to production.
+    ...(import.meta.env.DEV ? { tokens: () => import('./lib/views/Tokens.svelte') } : {}),
   };
 
   let currentKey = null;
   let viewPromise = null;
 
   $: key = $route.name;
-  $: if (key !== currentKey) {
+  $: if (key === 'tokens' && !import.meta.env.DEV) {
+    viewPromise = null;
+    navigate('/');
+  } else if (key !== currentKey) {
     currentKey = key;
     viewPromise = loaders[key] ? loaders[key]() : null;
   }

@@ -10,7 +10,7 @@
   import Toast from './Toast.svelte';
   import Icon from './Icon.svelte';
   import { toast } from '../stores/toast.js';
-  import { paletteOpen, openPalette, togglePalette, closePalette } from '../stores/ui.js';
+  import { paletteOpen, openPalette, togglePalette, closePalette, rememberRoute } from '../stores/ui.js';
   import { downloadBackup } from '../services/backup.js';
 
   let captureOpen = false;
@@ -79,7 +79,10 @@
 
     // The drawer is a mobile-only surface: close it when the hash changes or
     // when the viewport grows past the drawer breakpoint.
-    const stopRoute = route.subscribe(() => closeDrawer());
+    const stopRoute = route.subscribe((next) => {
+      rememberRoute(next);
+      closeDrawer();
+    });
     const desktop = window.matchMedia('(min-width: 900px)');
     const onDesktop = (event) => {
       if (event.matches) closeDrawer();

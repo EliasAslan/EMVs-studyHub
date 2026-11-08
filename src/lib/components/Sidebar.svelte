@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { appState, openHomework, updateSettings } from '../stores/app.js';
+  import { aiReady } from '../stores/ai.js';
   import { route, navigate, modulePath } from '../router.js';
   import { persistedStore } from '../stores/viewPrefs.js';
   import Icon from './Icon.svelte';
@@ -249,6 +250,12 @@
   </nav>
 
   <div class="foot" use:closeDrawerOnNavigation>
+    {#if $aiReady}
+      <a class="nav-link" class:active={$route.name === 'assistant'} href="#/assistant" aria-current={$route.name === 'assistant' ? 'page' : undefined} title={compact ? 'Assistent' : undefined}>
+        <Icon name="sparkle" />
+        {#if !compact}<span>Assistent</span>{/if}
+      </a>
+    {/if}
     <a class="nav-link" class:active={$route.name === 'links'} href="#/links" aria-current={$route.name === 'links' ? 'page' : undefined} title={compact ? 'Links' : undefined}>
       <Icon name="links" />
       {#if !compact}<span>Links</span>{/if}

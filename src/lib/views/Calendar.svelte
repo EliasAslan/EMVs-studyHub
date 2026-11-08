@@ -88,12 +88,14 @@
             class:today={day.isToday}
             class:selected={selected === day.key}
             type="button"
-            aria-label={`${formatDate(day.key, 'long')}${day.homework.length ? `, ${day.homework.length} Hausaufgaben` : ''}${day.exams.length ? `, ${day.exams.length} Prüfungen` : ''}`}
             aria-pressed={selected === day.key}
             on:click={() => (selected = day.key)}
           >
-            <span class="num mono">{Number(day.key.slice(8, 10))}</span>
-            <span class="marks">
+            <span class="sr-only">
+              {`${formatDate(day.key, 'long')}${day.homework.length ? `, ${day.homework.length} Hausaufgaben` : ''}${day.exams.length ? `, ${day.exams.length} Prüfungen` : ''}`}
+            </span>
+            <span class="num mono" aria-hidden="true">{Number(day.key.slice(8, 10))}</span>
+            <span class="marks" aria-hidden="true">
               {#if day.homework.length}<span class="mark hw" title={`${day.homework.length} Hausaufgaben`}>{day.homework.length}</span>{/if}
               {#if day.exams.length}<span class="mark exam" title={`${day.exams.length} Prüfungen`}>{day.exams.length}</span>{/if}
             </span>
@@ -266,7 +268,6 @@
   }
   .day.out {
     color: var(--ink-3);
-    opacity: 0.55;
   }
   .day.today .num {
     display: grid;

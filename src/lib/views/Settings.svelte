@@ -16,6 +16,9 @@
   import { toast } from '../stores/toast.js';
   import { cloud, signIn, signUp, signOut, runSync, loadCloud } from '../stores/cloud.js';
   import { sendDeadlineReminders } from '../services/sendDeadlineReminders.js';
+  import { aiSettings, saveAiSettings } from '../stores/ai.js';
+  import { checkConnection, describeAiError } from '../services/localAI.js';
+  import { isLoopbackUrl, normalizeBaseUrl } from '../data/aiConfig.js';
   import Modal from '../components/Modal.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -52,6 +55,17 @@
   let remindersBusy = false;
   let remindersError = '';
 
+  // Local AI settings (device only).
+  let aiBase = $aiSettings.baseUrl;
+  let aiModel = $aiSettings.model;
+  let aiNumCtx = $aiSettings.numCtx;
+  let aiModels = [];
+  let aiStatus = '';
+  let aiStatusKind = '';
+  let aiBusy = false;
+  let aiRefreshing = false;
+  let aiProbed = false;
+
   $: signedIn = !!$cloud.session;
   $: syncStateLabel = $cloud.syncing
     ? 'läuft'
@@ -70,6 +84,13 @@
   }));
   $: lastExport = settings.lastExportAt ? formatDate(dateKey(new Date(settings.lastExportAt)), 'long') : 'nie';
   $: remindersOptIn = settings.emailReminders || false;
+  $: ai = $aiSettings;
+  $: aiModelOptions = [...new Set([aiModel, ...aiModels].filter(Boolean))];
+  $: aiIsLocal = isLoopbackUrl(normalizeBaseUrl(aiBase));
+  $: if (ai.enabled && !aiProbed) {
+    aiProbed = true;
+    probeAi();
+  }
 
   async function doExport() {
     busy = true;
@@ -104,6 +125,48 @@
     await resetAll();
     resetOpen = false;
     toast('Alles zurückgesetzt');
+  }
+
+  function toggleAi(event) {
+    const next = saveAiSettings({ enabled: event.target.checked });
+    if (next.enabled) {
+      aiProbed = true;
+      probeAi();
+    } else {
+      aiStatus = '';
+      aiStatusKind = '';
+    }
+  }
+
+  async function probeAi() {
+    if (aiRefreshing) return;
+    aiRefreshing = true;
+    const result = await checkConnection({ baseUrl: aiBase });
+    aiRefreshing = false;
+    if (result.ok) {
+      aiModels = result.models;
+      aiStatus = result.models.length ? `Verbunden · ${result.models.length} Modelle` : 'Verbunden';
+      aiStatusKind = 'ok';
+    } else {
+      aiModels = [];
+      aiStatus = describeAiError(result.error);
+      aiStatusKind = 'error';
+    }
+  }
+
+  async function testAiConnection() {
+    aiBusy = true;
+    aiStatus = '';
+    aiStatusKind = '';
+    await probeAi();
+    aiBusy = false;
+  }
+
+  function saveAiBase() {
+    saveAiSettings({ baseUrl: aiBase });
+    aiBase = normalizeBaseUrl(aiBase);
+    aiProbed = true;
+    probeAi();
   }
 
   function openProgram(program) {
@@ -307,6 +370,62 @@
     </div>
   </section>
 
+  <section class="card section" aria-labelledby="ai-title">
+    <div class="section-title">
+      <h2 id="ai-title">Lokale KI</h2>
+      <span class="hint">optional</span>
+    </div>
+    <label class="check-row">
+      <input type="checkbox" checked={ai.enabled} on:change={toggleAi} />
+      Lokale KI verwenden
+    </label>
+    {#if !ai.enabled}
+      <p class="muted small">Die KI bleibt aus, bis du sie hier aktivierst. Es wird nichts gesendet.</p>
+    {:else}
+      <div class="ai-grid">
+        <label class="field">
+          <span>Adresse</span>
+          <input class="input" bind:value={aiBase} on:change={saveAiBase} placeholder="http://localhost:11434" />
+        </label>
+        <label class="field">
+          <span>Modell</span>
+          <select class="select" bind:value={aiModel} on:change={() => saveAiSettings({ model: aiModel })}>
+            {#each aiModelOptions as name (name)}
+              <option value={name}>{name}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="field">
+          <span>Kontextfenster</span>
+          <input
+            class="input"
+            type="number"
+            min="1024"
+            max="32768"
+            step="1024"
+            bind:value={aiNumCtx}
+            on:change={() => saveAiSettings({ numCtx: Number(aiNumCtx) })}
+          />
+        </label>
+      </div>
+      {#if !aiIsLocal}
+        <p class="ai-warn">Nicht lokal — Daten gehen an dieses Gerät im Netzwerk.</p>
+      {/if}
+      <div class="ai-actions">
+        <button class="btn btn-sm" type="button" on:click={testAiConnection} disabled={aiBusy || aiRefreshing}>
+          {aiBusy || aiRefreshing ? 'Prüfe…' : 'Verbindung testen'}
+        </button>
+        <button class="btn btn-sm btn-ghost" type="button" on:click={() => { aiProbed = true; probeAi(); }} disabled={aiBusy || aiRefreshing}>
+          Modelle aktualisieren
+        </button>
+      </div>
+      {#if aiStatus}
+        <p class="ai-status" class:ok={aiStatusKind === 'ok'} class:error={aiStatusKind === 'error'} role="status">{aiStatus}</p>
+      {/if}
+      <p class="muted small">Diese Einstellungen bleiben auf diesem Gerät.</p>
+    {/if}
+  </section>
+
   <section class="card section" aria-labelledby="schedule-title">
     <div class="section-title">
       <h2 id="schedule-title">Stundenplan</h2>
@@ -394,7 +513,15 @@
       <button class="btn" type="button" on:click={() => importInput?.click()} disabled={busy}>
         Importieren
       </button>
-      <input class="sr-only" type="file" accept="application/json,.json" bind:this={importInput} on:change={onImport} />
+      <input
+        class="sr-only"
+        type="file"
+        accept="application/json,.json"
+        aria-label="Datensicherung importieren"
+        tabindex="-1"
+        bind:this={importInput}
+        on:change={onImport}
+      />
     </div>
     {#if settings.changeCount >= 25 && (reminderDismissed === false || settings.changeCount >= reminderDismissedAtChangeCount)}
       <div class="reminder-banner">
@@ -652,6 +779,41 @@
     background: var(--surface);
     color: var(--ink);
     box-shadow: var(--shadow-1);
+  }
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 32px;
+    font-size: var(--text-sm);
+  }
+  .ai-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+  .ai-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .ai-warn {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-1);
+    background: var(--warn-soft, var(--surface-2));
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+  }
+  .ai-status {
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+  .ai-status.ok {
+    color: var(--ok);
+  }
+  .ai-status.error {
+    color: var(--warn);
   }
   .schedule {
     display: grid;

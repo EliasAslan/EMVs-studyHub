@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import { appState, moduleTitle } from '../stores/app.js';
   import { formatDate, relativeDayLabel, daysUntil } from '../data/dates.js';
+  import { describeRecurrence } from '../data/recurrence.js';
   import Icon from './Icon.svelte';
 
   export let hw;
@@ -10,6 +11,7 @@
   $: days = hw.dueDate ? daysUntil(hw.dueDate) : null;
   $: overdue = !hw.done && days !== null && days < 0;
   $: module = hw.moduleId ? moduleTitle($appState, hw.moduleId) : '';
+  $: recurrenceLabel = describeRecurrence(hw.recurrence);
 </script>
 
 <div class="hw-row" class:done={hw.done} class:overdue>
@@ -33,6 +35,7 @@
       {:else}
         <span class="rel">ohne Datum</span>
       {/if}
+      {#if recurrenceLabel}<span class="recur">{recurrenceLabel}</span>{/if}
     </span>
   </button>
 
