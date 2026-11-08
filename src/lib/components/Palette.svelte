@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { appState } from '../stores/app.js';
+  import { aiReady } from '../stores/ai.js';
   import { searchAll, totalResults } from '../data/search.js';
   import { navigate, notePath, modulePath } from '../router.js';
   import Icon from './Icon.svelte';
@@ -25,6 +26,14 @@
     { id: 'nav-settings', label: 'Einstellungen', group: 'Gehen', icon: 'settings', href: '#/settings' },
   ];
 
+  const assistantNav = {
+    id: 'nav-assistant',
+    label: 'Assistent',
+    group: 'Gehen',
+    icon: 'sparkle',
+    href: '#/assistant',
+  };
+
   const creates = [
     { id: 'new-note', label: 'Neue Notiz', group: 'Erstellen', icon: 'notes', create: 'note', keys: 'n' },
     { id: 'new-homework', label: 'Neue Hausaufgabe', group: 'Erstellen', icon: 'homework', create: 'homework', keys: 'h' },
@@ -48,7 +57,8 @@
   }
 
   $: q = norm(query);
-  $: commandItems = [...navigation, ...creates, ...actions].filter((item) => !q || norm(item.label).includes(q) || norm(item.group).includes(q));
+  $: navigationItems = $aiReady ? [...navigation, assistantNav] : navigation;
+  $: commandItems = [...navigationItems, ...creates, ...actions].filter((item) => !q || norm(item.label).includes(q) || norm(item.group).includes(q));
   $: results = q ? searchAll($appState, query, 5) : { notes: [], homework: [], modules: [], exams: [], links: [] };
   $: resultItems = [
     ...results.notes.map((n) => ({ id: `note-${n.id}`, label: n.title || 'Ohne Titel', group: 'Notizen', icon: 'notes', href: `#${notePath(n.id)}` })),
@@ -57,7 +67,7 @@
     ...results.exams.map((e) => ({ id: `exam-${e.id}`, label: e.title, group: 'Prüfungen', icon: 'exams', href: '#/exams' })),
     ...results.links.map((l) => ({ id: `link-${l.id}`, label: l.label, group: 'Links', icon: 'links', href: '#/links' })),
   ];
-  $: items = q ? [...commandItems, ...resultItems] : [...creates, ...navigation, ...actions];
+  $: items = q ? [...commandItems, ...resultItems] : [...creates, ...navigationItems, ...actions];
   $: if (activeIndex >= items.length) activeIndex = Math.max(0, items.length - 1);
 
   function close() {

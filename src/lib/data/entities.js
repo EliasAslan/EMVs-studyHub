@@ -3,6 +3,8 @@
  * Pure and DOM-free so Node tests can import them.
  */
 
+import { normalizeRecurrence } from './recurrence.js';
+
 export const SCHEMA_VERSION = 1;
 
 export const NOTE_TYPES = ['note', 'mistake', 'question', 'summary'];
@@ -84,6 +86,8 @@ export function ensureModule(m, now = Date.now()) {
   m.accent = str(m.accent, '#4f46e5');
   m.order = num(m.order, 0);
   m.attachments = arr(m.attachments);
+  m.overviewNoteId =
+    typeof m.overviewNoteId === 'string' && m.overviewNoteId ? m.overviewNoteId : null;
   m.createdAt = num(m.createdAt, now);
   m.updatedAt = num(m.updatedAt, m.createdAt);
   return m;
@@ -120,6 +124,7 @@ export function ensureHomework(h, now = Date.now()) {
   h.dueDate = str(h.dueDate) || null;
   h.done = bool(h.done);
   h.doneAt = h.done ? num(h.doneAt, now) : null;
+  h.recurrence = normalizeRecurrence(h.recurrence, h.id);
   h.createdAt = num(h.createdAt, now);
   h.updatedAt = num(h.updatedAt, h.createdAt);
   return h;
@@ -226,6 +231,14 @@ export function normalizeState(input = {}) {
     date: typeof checklist.date === 'string' ? checklist.date : null,
     checked: checklist.checked && typeof checklist.checked === 'object' ? { ...checklist.checked } : {},
   };
+
+  // Drop overview references whose note was deleted or moved to another module.
+  const notesById = new Map(state.notes.map((n) => [n.id, n]));
+  for (const m of state.modules) {
+    if (!m.overviewNoteId) continue;
+    const note = notesById.get(m.overviewNoteId);
+    if (!note || note.moduleId !== m.id) m.overviewNoteId = null;
+  }
 
   const ninetyDays = 90 * 86400000;
   state.tombstones = state.tombstones.filter(

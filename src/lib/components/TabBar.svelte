@@ -8,7 +8,7 @@
   $: isNotes = $route.name === 'notes' || $route.name === 'note';
   $: isMore =
     expanded ||
-    ['exams', 'links', 'focus', 'settings', 'calendar', 'modules', 'module', 'tokens'].includes($route.name);
+    ['exams', 'links', 'focus', 'settings', 'calendar', 'modules', 'module', 'tokens', 'assistant'].includes($route.name);
 </script>
 
 <nav class="tabbar" aria-label="Mobile Navigation">

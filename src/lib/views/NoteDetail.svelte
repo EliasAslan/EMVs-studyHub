@@ -6,6 +6,7 @@
   import { formatDate, dateKey } from '../data/dates.js';
   import { toast } from '../stores/toast.js';
   import AttachmentList from '../components/AttachmentList.svelte';
+  import AiButton from '../components/AiButton.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -126,6 +127,8 @@
         {#if savedAt}<span class="saved mono">{dirty ? 'speichert…' : `gespeichert ${formatDate(dateKey(new Date(savedAt)), 'short')}`}</span>{/if}
       </div>
       <div class="head-actions">
+        <AiButton label="KI fragen" kind="note" id={note.id} />
+        <AiButton label="Zusammenfassen" kind="note" id={note.id} prompt="Fasse diese Notiz in 5 Punkten zusammen." />
         <div class="segmented" role="group" aria-label="Ansicht">
           <button class="seg" class:active={mode === 'edit'} type="button" aria-pressed={mode === 'edit'} on:click={() => (mode = 'edit')}>Schreiben</button>
           <button class="seg" class:active={mode === 'read'} type="button" aria-pressed={mode === 'read'} on:click={() => (mode = 'read')}>Lesen</button>
@@ -258,6 +261,8 @@
   .head-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: var(--space-2);
   }
   .segmented {

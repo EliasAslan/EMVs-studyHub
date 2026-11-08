@@ -45,6 +45,8 @@ export function parseHash(hash = typeof location !== 'undefined' ? location.hash
       return { name: 'focus', path: '/focus', query };
     case 'settings':
       return { name: 'settings', path: '/settings', query };
+    case 'assistant':
+      return { name: 'assistant', path: '/assistant', query };
     case 'tokens':
       return { name: 'tokens', path: '/tokens', query };
     default:

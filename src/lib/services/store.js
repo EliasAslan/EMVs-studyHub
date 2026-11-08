@@ -149,6 +149,15 @@ export function deleteWithTombstone(state, collection, id, now = Date.now()) {
     }
   }
 
+  if (collection === 'notes') {
+    for (const m of state.modules || []) {
+      if (m.overviewNoteId === id) {
+        m.overviewNoteId = null;
+        m.updatedAt = now;
+      }
+    }
+  }
+
   return deleted;
 }
 

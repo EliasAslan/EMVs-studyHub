@@ -14,3 +14,11 @@ export function closePalette() {
 export function togglePalette() {
   paletteOpen.update((open) => !open);
 }
+
+/** Last page that was not the assistant, used by @seite and inline AI links. */
+export const lastNonAssistantRoute = writable(null);
+
+export function rememberRoute(nextRoute) {
+  if (!nextRoute || nextRoute.name === 'assistant') return;
+  lastNonAssistantRoute.set(nextRoute);
+}

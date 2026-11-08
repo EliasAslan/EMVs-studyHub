@@ -123,6 +123,36 @@ describe('entities and cascades', () => {
     expect(state.exams[0].topicIds).toEqual([]);
   });
 
+  it('keeps module overview references valid', () => {
+    const state = defaultState();
+    store.addEntity(state, 'modules', { id: 'm1', programId: 'program-emvs', code: 'M1', title: 'Modul' });
+    store.addEntity(state, 'modules', { id: 'm2', programId: 'program-emvs', code: 'M2', title: 'Anderes' });
+    store.addEntity(state, 'notes', { id: 'n1', moduleId: 'm1', title: 'Überblick', body: '' });
+    state.modules[0].overviewNoteId = 'n1';
+
+    const normalized = normalizeState(state);
+    expect(normalized.modules[0].overviewNoteId).toBe('n1');
+
+    normalized.modules[0].overviewNoteId = 'missing';
+    expect(normalizeState(normalized).modules[0].overviewNoteId).toBeNull();
+
+    normalized.modules[0].overviewNoteId = 'n1';
+    normalized.notes[0].moduleId = 'm2';
+    expect(normalizeState(normalized).modules[0].overviewNoteId).toBeNull();
+  });
+
+  it('clears the module overview reference when its note is deleted', () => {
+    const state = defaultState();
+    store.addEntity(state, 'modules', { id: 'm1', programId: 'program-emvs', code: 'M1', title: 'Modul' });
+    store.addEntity(state, 'notes', { id: 'n1', moduleId: 'm1', title: 'Überblick', body: '' });
+    state.modules[0].overviewNoteId = 'n1';
+    const before = state.modules[0].updatedAt;
+
+    store.deleteWithTombstone(state, 'notes', 'n1');
+    expect(state.modules[0].overviewNoteId).toBeNull();
+    expect(state.modules[0].updatedAt).toBeGreaterThanOrEqual(before);
+  });
+
   it('restores a deleted entity and removes its tombstone', () => {
     const state = defaultState();
     const hw = store.addEntity(state, 'homework', { title: 'Auftrag' });

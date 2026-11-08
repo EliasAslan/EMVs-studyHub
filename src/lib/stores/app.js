@@ -10,6 +10,7 @@ import { pickStartHere, openHomework as openHomeworkList, doneHomework as doneHo
 import { checklistForDay } from '../data/checklist.js';
 import { upcomingDeadlines } from '../data/deadlines.js';
 import { todayKey } from '../data/dates.js';
+import { normalizeRecurrence, nextInstanceToAdd } from '../data/recurrence.js';
 
 let saveTimer = null;
 let syncHandler = null;
@@ -92,6 +93,7 @@ export function createModule(data) {
       accent: data.accent || '#4f46e5',
       order: (s.modules || []).length,
       attachments: [],
+      overviewNoteId: null,
     }),
   );
 }
@@ -110,6 +112,27 @@ export function deleteModule(id) {
   deleteAttachmentsForOwner(id).catch(() => {});
   noteIds.forEach((noteId) => deleteAttachmentsForOwner(noteId).catch(() => {}));
   return commit((s) => store.deleteWithTombstone(s, 'modules', id), { immediate: true });
+}
+
+/** Create (or return) the module's single overview note. */
+export function createOverviewNote(moduleId) {
+  return commit((s) => {
+    const mod = (s.modules || []).find((m) => m.id === moduleId);
+    if (!mod) return null;
+    const existing = (s.notes || []).find((n) => n.id === mod.overviewNoteId);
+    if (existing) return existing;
+    const note = store.addEntity(s, 'notes', {
+      moduleId,
+      topicId: null,
+      title: `${mod.code || mod.title || 'Modul'} Überblick`,
+      body: '',
+      type: 'summary',
+      attachments: [],
+    });
+    mod.overviewNoteId = note.id;
+    mod.updatedAt = Date.now();
+    return note;
+  });
 }
 
 export function createTopic(moduleId, name) {
@@ -158,24 +181,40 @@ export function deleteNote(id) {
 /* Homework                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Materialize at most one next instance for a completed recurring item. */
+function scheduleNextOccurrence(state, hw) {
+  const next = nextInstanceToAdd(state, hw);
+  return next ? store.addEntity(state, 'homework', next) : null;
+}
+
 export function createHomework(data = {}) {
-  return commit((s) =>
-    store.addEntity(s, 'homework', {
+  return commit((s) => {
+    const entity = store.addEntity(s, 'homework', {
       moduleId: data.moduleId || null,
       topicId: data.topicId || null,
       title: String(data.title || '').trim(),
       dueDate: data.dueDate || null,
       done: false,
       doneAt: null,
-    }),
-  );
+      recurrence: null,
+    });
+    entity.recurrence = normalizeRecurrence(data.recurrence, entity.id);
+    return entity;
+  });
 }
 
 export function updateHomework(id, patch) {
   return commit((s) => {
+    const before = (s.homework || []).find((h) => h.id === id);
+    const wasDone = !!before?.done;
     const entity = store.updateEntity(s, 'homework', id, patch);
-    if (entity && typeof patch.done === 'boolean') {
+    if (!entity) return null;
+    if ('recurrence' in patch) {
+      entity.recurrence = normalizeRecurrence(patch.recurrence, entity.id);
+    }
+    if (typeof patch.done === 'boolean') {
       entity.doneAt = patch.done ? Date.now() : null;
+      if (patch.done && !wasDone && entity.recurrence) scheduleNextOccurrence(s, entity);
     }
     return entity;
   });
@@ -185,9 +224,11 @@ export function toggleHomework(id) {
   return commit((s) => {
     const hw = (s.homework || []).find((h) => h.id === id);
     if (!hw) return null;
+    const wasDone = !!hw.done;
     hw.done = !hw.done;
     hw.doneAt = hw.done ? Date.now() : null;
     hw.updatedAt = Date.now();
+    if (hw.done && !wasDone && hw.recurrence) scheduleNextOccurrence(s, hw);
     return hw;
   });
 }

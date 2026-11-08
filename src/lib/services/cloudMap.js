@@ -6,6 +6,8 @@
  * always stripped by fromRow.
  */
 
+import { normalizeRecurrence } from '../data/recurrence.js';
+
 export const COLLECTIONS = Object.freeze([
   'programs',
   'modules',
@@ -110,6 +112,7 @@ function moduleToRow(m) {
     accent: str(m?.accent, '#4f46e5'),
     sort_order: num(m?.order),
     attachments: attachments(m?.attachments),
+    overview_note_id: emptyToNull(m?.overviewNoteId),
     created_at: num(m?.createdAt),
     updated_at: num(m?.updatedAt),
     deleted_at: null,
@@ -143,6 +146,17 @@ function noteToRow(n) {
   };
 }
 
+function recurrenceToRow(value) {
+  const rule = normalizeRecurrence(value);
+  if (!rule) return null;
+  return {
+    freq: rule.freq,
+    interval: rule.interval,
+    until: rule.until,
+    seriesId: rule.seriesId,
+  };
+}
+
 function homeworkToRow(h) {
   return {
     id: str(h?.id),
@@ -152,6 +166,7 @@ function homeworkToRow(h) {
     due_date: emptyToNull(h?.dueDate),
     done: !!h?.done,
     done_at: numOrNull(h?.doneAt),
+    recurrence: recurrenceToRow(h?.recurrence),
     created_at: num(h?.createdAt),
     updated_at: num(h?.updatedAt),
     deleted_at: null,
@@ -266,6 +281,7 @@ export function tombstoneToRow(collection, tombstone) {
         accent: '#4f46e5',
         sort_order: 0,
         attachments: [],
+        overview_note_id: null,
       };
     case 'topics':
       return { ...base, module_id: str(tombstone?.moduleId), name: '', sort_order: 0 };
@@ -288,6 +304,7 @@ export function tombstoneToRow(collection, tombstone) {
         due_date: null,
         done: false,
         done_at: null,
+        recurrence: null,
       };
     case 'exams':
       return {
@@ -350,6 +367,7 @@ function rowToModule(r) {
     accent: str(r?.accent, '#4f46e5'),
     order: num(r?.sort_order),
     attachments: attachments(r?.attachments),
+    overviewNoteId: r?.overview_note_id ?? null,
     createdAt: num(r?.created_at),
     updatedAt: num(r?.updated_at),
   };
@@ -398,6 +416,7 @@ function rowToHomework(r) {
     dueDate: r?.due_date ?? null,
     done: !!r?.done,
     doneAt: r?.done_at ?? null,
+    recurrence: normalizeRecurrence(r?.recurrence, r?.id),
     createdAt: num(r?.created_at),
     updatedAt: num(r?.updated_at),
   };

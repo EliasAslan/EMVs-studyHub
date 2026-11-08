@@ -63,6 +63,46 @@ describe('cloudMap row round-trips', () => {
     });
   });
 
+  it('round-trips a module overview note reference', () => {
+    const row = toRow('modules', {
+      id: 'm1',
+      programId: 'program-emvs',
+      code: 'M294',
+      title: 'Datenbanken',
+      overviewNoteId: 'n1',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    expect(row.overview_note_id).toBe('n1');
+    expect(fromRow('modules', row).overviewNoteId).toBe('n1');
+
+    const empty = toRow('modules', { id: 'm2', overviewNoteId: '' });
+    expect(empty.overview_note_id).toBeNull();
+    expect(fromRow('modules', empty).overviewNoteId).toBeNull();
+  });
+
+  it('round-trips a homework recurrence rule', () => {
+    const rule = { freq: 'weekly', interval: 2, until: '2027-01-31', seriesId: 'h1' };
+    const row = toRow('homework', {
+      id: 'h1',
+      title: 'Vokabeln',
+      dueDate: '2026-11-04',
+      done: false,
+      recurrence: rule,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    expect(row.recurrence).toEqual(rule);
+    expect(fromRow('homework', row).recurrence).toEqual(rule);
+
+    const plain = toRow('homework', { id: 'h2', title: 'Einmalig' });
+    expect(plain.recurrence).toBeNull();
+    expect(fromRow('homework', plain).recurrence).toBeNull();
+
+    const legacy = fromRow('homework', { ...plain, recurrence: { freq: 'hourly' } });
+    expect(legacy.recurrence).toBeNull();
+  });
+
   it('maps optional module/topic references to null', () => {
     const row = toRow('notes', note({ moduleId: '', topicId: null }));
     expect(row.module_id).toBeNull();
