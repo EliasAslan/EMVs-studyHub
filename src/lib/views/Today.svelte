@@ -21,6 +21,7 @@
   import QuickCapture from '../components/QuickCapture.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
+  import AiButton from '../components/AiButton.svelte';
 
   let captureOpen = false;
   let captureMode = 'note';
@@ -47,11 +48,14 @@
       <p class="eyebrow">{formatDate(today, 'long')}</p>
       <h1>Heute</h1>
     </div>
-    <button class="search-pill" type="button" on:click={openPalette}>
-      <Icon name="search" size={15} />
-      <span>Suchen</span>
-      <kbd>⌘K</kbd>
-    </button>
+    <div class="head-actions">
+      <AiButton ref="heute" prompt="Was steht heute an?" />
+      <button class="search-pill" type="button" on:click={openPalette}>
+        <Icon name="search" size={15} />
+        <span>Suchen</span>
+        <kbd>⌘K</kbd>
+      </button>
+    </div>
   </header>
 
   {#if $backupReminder}
@@ -212,6 +216,12 @@
     align-items: flex-end;
     justify-content: space-between;
     gap: var(--space-4);
+  }
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: none;
   }
   .eyebrow {
     font-size: 0.8125rem;

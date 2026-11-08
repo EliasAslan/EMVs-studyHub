@@ -26,14 +26,81 @@ function abortError() {
   return error;
 }
 
+export const MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
+export const MODELS_CACHE_KEY = 'studyhub_ai_models_v1';
+
+function isInjectedFetch(deps) {
+  return !!(deps && typeof deps.fetchFn === 'function');
+}
+
+function cacheStore() {
+  try {
+    return globalThis.localStorage || null;
+  } catch {
+    return null;
+  }
+}
+
+function readModelsCache(base) {
+  try {
+    const store = cacheStore();
+    if (!store) return null;
+    const raw = store.getItem(MODELS_CACHE_KEY);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (entry.base !== base || !Array.isArray(entry.models)) return null;
+    if (Date.now() - Number(entry.at || 0) > MODELS_CACHE_TTL_MS) return null;
+    return entry.models;
+  } catch {
+    return null;
+  }
+}
+
+function writeModelsCache(base, models) {
+  try {
+    const store = cacheStore();
+    if (!store) return;
+    store.setItem(MODELS_CACHE_KEY, JSON.stringify({ base, models, at: Date.now() }));
+  } catch {
+    // Quota or private mode: the live result still works.
+  }
+}
+
+// Dedupe concurrent checks so opening the assistant doesn't fire parallel /api/tags calls.
+const pendingChecks = new Map();
+
 /**
  * @returns {{ok:true, models:string[]}|{ok:false, error:string}}
  */
-export async function checkConnection({ baseUrl = DEFAULT_BASE_URL, timeoutMs = 4000 } = {}, deps = {}) {
+export async function checkConnection(
+  { baseUrl = DEFAULT_BASE_URL, timeoutMs = 4000, fresh = false } = {},
+  deps = {},
+) {
+  const base = normalizeBaseUrl(baseUrl);
+  const injected = isInjectedFetch(deps);
+  if (!injected && !fresh) {
+    const cached = readModelsCache(base);
+    if (cached) return { ok: true, models: cached };
+    const pending = pendingChecks.get(base);
+    if (pending) return pending;
+    const task = fetchConnection(base, timeoutMs, deps);
+    pendingChecks.set(base, task);
+    try {
+      const result = await task;
+      if (result.ok) writeModelsCache(base, result.models);
+      return result;
+    } finally {
+      pendingChecks.delete(base);
+    }
+  }
+  const result = await fetchConnection(base, timeoutMs, deps);
+  if (!injected && result.ok) writeModelsCache(base, result.models);
+  return result;
+}
+
+async function fetchConnection(base, timeoutMs, deps) {
   const fetchFn = resolveFetch(deps);
   if (!fetchFn) return { ok: false, error: 'unreachable' };
-
-  const base = normalizeBaseUrl(baseUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(1, timeoutMs));
   try {
@@ -58,8 +125,8 @@ export async function checkConnection({ baseUrl = DEFAULT_BASE_URL, timeoutMs = 
   }
 }
 
-export async function listModels({ baseUrl = DEFAULT_BASE_URL } = {}, deps = {}) {
-  const result = await checkConnection({ baseUrl }, deps);
+export async function listModels({ baseUrl = DEFAULT_BASE_URL, fresh = false } = {}, deps = {}) {
+  const result = await checkConnection({ baseUrl, fresh }, deps);
   return result.ok ? result.models : [];
 }
 

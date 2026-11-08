@@ -520,6 +520,27 @@ export function resolveContext(state, route, refs, opts = {}) {
   return { sections: out, totalChars: used, truncated };
 }
 
+/**
+ * Turn a deep-link `?ref=` value into a canonical reference.
+ * Accepts the historic `note:<id>` / `module:<id>` / `exam:<id>` format as well
+ * as canonical refs directly (`heute`, `modul/m1`, `code:m294`, …).
+ * @returns {string|null}
+ */
+export function resolveDeepLinkRef(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+  if (value.includes(':')) {
+    const [kind, id] = value.split(':');
+    if (!id) return null;
+    if (kind === 'note') return `notiz/${id}`;
+    if (kind === 'module') return `modul/${id}`;
+    if (kind === 'exam') return `prüfung/${id}`;
+    if (kind === 'code') return `code:${id.toLowerCase()}`;
+    return null;
+  }
+  return canonicalRef(value);
+}
+
 export function buildContextBlock(result) {
   const sections = result?.sections || [];
   if (!sections.length) return '<context>\nKein Kontext ausgewählt.\n</context>';

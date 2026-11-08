@@ -5,6 +5,7 @@
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
+  import AiButton from '../components/AiButton.svelte';
 
   let modalOpen = false;
   let editing = null;
@@ -109,6 +110,7 @@
                   </span>
                 </a>
                 <div class="card-actions">
+                  <AiButton kind="module" id={mod.id} label="KI fragen" iconOnly />
                   <button class="icon" type="button" aria-label={`${mod.title} bearbeiten`} on:click={() => openEdit(mod)}>
                     <Icon name="edit" size={15} />
                   </button>

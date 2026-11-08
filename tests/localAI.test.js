@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import {
   chatComplete,
   checkConnection,
   describeAiError,
   isLoopbackUrl,
   listModels,
+  MODELS_CACHE_KEY,
+  MODELS_CACHE_TTL_MS,
   normalizeBaseUrl,
 } from '../src/lib/services/localAI.js';
 
@@ -88,6 +90,83 @@ describe('checkConnection', () => {
       },
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe('model cache', () => {
+  function memoryStorage() {
+    const data = new Map();
+    return {
+      getItem: (key) => (data.has(key) ? data.get(key) : null),
+      setItem: (key, value) => data.set(key, String(value)),
+      removeItem: (key) => data.delete(key),
+    };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('serves a fresh cached model list without a second request', async () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    let calls = 0;
+    const fetchFn = async () => {
+      calls += 1;
+      return jsonResponse({ models: [{ name: 'qwen3:8b' }] });
+    };
+    vi.stubGlobal('fetch', fetchFn);
+
+    await expect(checkConnection({ baseUrl: 'http://localhost:11434' })).resolves.toEqual({
+      ok: true,
+      models: ['qwen3:8b'],
+    });
+    await expect(checkConnection({ baseUrl: 'http://localhost:11434' })).resolves.toEqual({
+      ok: true,
+      models: ['qwen3:8b'],
+    });
+    expect(calls).toBe(1);
+  });
+
+  it('ignores stale cache entries and honours the fresh flag', async () => {
+    const store = memoryStorage();
+    store.setItem(
+      MODELS_CACHE_KEY,
+      JSON.stringify({
+        base: 'http://localhost:11434',
+        models: ['old'],
+        at: Date.now() - MODELS_CACHE_TTL_MS - 1,
+      }),
+    );
+    vi.stubGlobal('localStorage', store);
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      async () => {
+        calls += 1;
+        return jsonResponse({ models: [{ name: 'qwen3:8b' }] });
+      },
+    );
+
+    await expect(checkConnection({ baseUrl: 'http://localhost:11434' })).resolves.toEqual({
+      ok: true,
+      models: ['qwen3:8b'],
+    });
+    await expect(
+      checkConnection({ baseUrl: 'http://localhost:11434', fresh: true }),
+    ).resolves.toEqual({ ok: true, models: ['qwen3:8b'] });
+    expect(calls).toBe(2);
+  });
+
+  it('never caches when the fetch function is injected (tests, custom clients)', async () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    let calls = 0;
+    const fetchFn = async () => {
+      calls += 1;
+      return jsonResponse({ models: [{ name: 'qwen3:8b' }] });
+    };
+    await checkConnection({ baseUrl: 'http://localhost:11434' }, { fetchFn });
+    await checkConnection({ baseUrl: 'http://localhost:11434' }, { fetchFn });
+    expect(calls).toBe(2);
   });
 });
 

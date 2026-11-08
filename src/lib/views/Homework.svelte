@@ -21,6 +21,7 @@
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
+  import AiButton from '../components/AiButton.svelte';
 
   const filters = persistedStore('studyhub_homework_filters', {
     programId: 'all',
@@ -116,7 +117,10 @@
       <p class="eyebrow">Arbeit</p>
       <h1>Hausaufgaben</h1>
     </div>
-    <span class="count mono">{open.length} offen</span>
+    <div class="head-actions">
+      <span class="count mono">{open.length} offen</span>
+      <AiButton ref="hausaufgaben" prompt="Was ist zuerst dran? Gib mir eine ruhige Reihenfolge." />
+    </div>
   </header>
 
   <form class="add card" on:submit|preventDefault={add}>
@@ -260,6 +264,12 @@
   .count {
     font-size: var(--text-sm);
     color: var(--ink-3);
+  }
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex: none;
   }
   .add {
     display: grid;

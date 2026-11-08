@@ -147,11 +147,24 @@ The assistant is off by default. Nothing is sent anywhere until you enable it in
   snapshot), module codes such as `@M294`, and stable picks such as `@notiz/<id>`.
 - The context tray shows exactly what will be sent and the character budget. Long references are
   trimmed per section and overall.
+- Quick actions: **Heute** and **Hausaufgaben** have a "KI fragen" button in their header;
+  **Module** cards have one per module; **Notizen** has "Zusammenfassen". They open the
+  assistant with the matching context already pinned and a sensible first prompt.
 - Deep links from notes and modules open the assistant with the reference and a suggested prompt:
-  `#/assistant?ref=note:<id>` (also `module:<id>` / `exam:<id>`) and optional `&prompt=…`.
+  `#/assistant?ref=note:<id>` (also `module:<id>` / `exam:<id>`, or a canonical ref such as
+  `heute` / `modul/<id>` / `code:m294`) and optional `&prompt=…`.
 - Draft buttons on notes and modules open a preview. A draft is only written after you press
   **Übernehmen**; closing or failing leaves the original text untouched.
 - Chat history is kept in memory for the current visit only. **Neu** clears it.
+
+### Performance
+
+- The model list (`/api/tags`) is cached on the device for 5 minutes, so reopening the
+  assistant is instant. Manual "Verbindung testen" / "Erneut prüfen" always re-checks live.
+- The Ollama client is split into its own chunk and loaded on first use; concurrent checks are
+  deduplicated.
+- Mention filtering stays local and cheap; the chat list auto-scrolls via a throttled
+  `requestAnimationFrame` instead of a reactive statement.
 
 ### Privacy and limits
 

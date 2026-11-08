@@ -55,7 +55,7 @@ test.describe('Study Hub v2.1 — local AI', () => {
     const option = page.getByRole('option', { name: /@prüfungen/ });
     await expect(option).toBeVisible();
     await box.press('Enter');
-    await expect(box).toHaveValue('@prüfungen ');
+    await expect(box).toHaveValue('@prüfungen Erzähl mir mehr dazu.');
     await box.pressSequentially('Welche Prüfung ist wichtig?');
 
     await expect(page.locator('.tray .chip').filter({ hasText: 'Prüfungen' })).toBeVisible();
@@ -90,6 +90,84 @@ test.describe('Study Hub v2.1 — local AI', () => {
 
     await expect(page.getByRole('button', { name: 'Zusammenfassen' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'KI fragen' })).toBeVisible();
+  });
+});
+
+test.describe('Study Hub v2.1 — quick actions', () => {
+  async function enableAi(page: any) {
+    await page.addInitScript((settings: unknown) => {
+      localStorage.setItem('studyhub_ai_v1', JSON.stringify(settings));
+    }, AI_ON);
+    await page.route('http://localhost:11434/api/tags', (route: any) =>
+      route.fulfill({ json: { models: [{ name: 'qwen3:8b' }] } }),
+    );
+  }
+
+  test('quick actions stay hidden when AI is off', async ({ page }) => {
+    await page.goto(`${BASE_URL}/#/`);
+    await expect(page.getByRole('button', { name: 'KI fragen' })).toHaveCount(0);
+
+    await page.goto(`${BASE_URL}/#/homework`);
+    await expect(page.getByRole('button', { name: 'KI fragen' })).toHaveCount(0);
+
+    await page.goto(`${BASE_URL}/#/notes`);
+    await expect(page.getByRole('button', { name: 'Zusammenfassen' })).toHaveCount(0);
+  });
+
+  test('Today quick action opens the assistant with Heute context', async ({ page }) => {
+    await enableAi(page);
+    await page.goto(`${BASE_URL}/#/`);
+
+    await page.getByRole('button', { name: 'KI fragen' }).click();
+    await expect(page).toHaveURL(/#\/assistant\?/);
+    await expect(page.getByText('Ollama verbunden')).toBeVisible();
+    await expect(page.getByLabel('Frage an den Assistenten')).toHaveValue('Was steht heute an?');
+    await expect(page.locator('.tray .chip').filter({ hasText: 'Heute' })).toBeVisible();
+  });
+
+  test('Homework quick action opens the assistant with Hausaufgaben context', async ({ page }) => {
+    await enableAi(page);
+    await page.goto(`${BASE_URL}/#/homework`);
+
+    await page.getByRole('button', { name: 'KI fragen' }).click();
+    await expect(page).toHaveURL(/#\/assistant\?/);
+    await expect(page.getByLabel('Frage an den Assistenten')).toHaveValue(
+      'Was ist zuerst dran? Gib mir eine ruhige Reihenfolge.',
+    );
+    await expect(page.locator('.tray .chip').filter({ hasText: 'Hausaufgaben' })).toBeVisible();
+  });
+
+  test('Notes summarise opens the assistant with Notizen context', async ({ page }) => {
+    await enableAi(page);
+    await page.goto(`${BASE_URL}/#/notes`);
+    await page.getByRole('button', { name: 'Notiz', exact: true }).click();
+    await page.getByPlaceholder('Kurz und klar').fill('Thema SQL');
+    await page.getByLabel('Text').fill('JOIN verbindet Tabellen.');
+    await page.getByRole('button', { name: 'Speichern' }).click();
+
+    await page.goto(`${BASE_URL}/#/notes`);
+    await page.getByRole('button', { name: 'Zusammenfassen' }).click();
+    await expect(page).toHaveURL(/#\/assistant\?/);
+    await expect(page.getByLabel('Frage an den Assistenten')).toHaveValue(
+      'Fasse meine wichtigsten Notizen in wenigen Sätzen zusammen.',
+    );
+    await expect(page.locator('.tray .chip').filter({ hasText: 'Notizen' })).toBeVisible();
+  });
+
+  test('Module card quick action opens the assistant with Modul context', async ({ page }) => {
+    await enableAi(page);
+    await page.goto(`${BASE_URL}/#/modules`);
+    await page.getByRole('button', { name: 'Modul', exact: true }).click();
+    await page.getByPlaceholder('z. B. M294').fill('M999');
+    await page.getByPlaceholder('z. B. Datenbanken').fill('Testmodul');
+    await page.getByRole('button', { name: 'Erstellen', exact: true }).click();
+
+    await page.goto(`${BASE_URL}/#/modules`);
+    await page.locator('.module-card').filter({ hasText: 'Testmodul' }).getByRole('button', { name: 'KI fragen' }).click();
+    await expect(page).toHaveURL(/#\/assistant\?/);
+    await expect(page.getByLabel('Frage an den Assistenten')).toHaveValue(
+      'Gib mir einen kurzen Überblick über dieses Modul.',
+    );
   });
 });
 

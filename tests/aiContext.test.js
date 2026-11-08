@@ -6,6 +6,7 @@ import {
   listContextRefs,
   parseMentions,
   resolveContext,
+  resolveDeepLinkRef,
 } from '../src/lib/data/aiContext.js';
 import { defaultState } from '../src/lib/data/entities.js';
 
@@ -156,6 +157,31 @@ describe('resolveContext', () => {
       totalChars: 0,
       truncated: false,
     });
+  });
+});
+
+describe('resolveDeepLinkRef', () => {
+  it('maps the historic note/module/exam format', () => {
+    expect(resolveDeepLinkRef('note:n1')).toBe('notiz/n1');
+    expect(resolveDeepLinkRef('module:m1')).toBe('modul/m1');
+    expect(resolveDeepLinkRef('exam:e1')).toBe('prüfung/e1');
+  });
+
+  it('accepts canonical refs directly', () => {
+    expect(resolveDeepLinkRef('heute')).toBe('heute');
+    expect(resolveDeepLinkRef('hausaufgaben')).toBe('hausaufgaben');
+    expect(resolveDeepLinkRef('notiz/n1')).toBe('notiz/n1');
+    expect(resolveDeepLinkRef('modul/m1')).toBe('modul/m1');
+    expect(resolveDeepLinkRef('code:M294')).toBe('code:m294');
+    expect(resolveDeepLinkRef('homework')).toBe('hausaufgaben');
+  });
+
+  it('rejects empty and unknown values', () => {
+    expect(resolveDeepLinkRef('')).toBeNull();
+    expect(resolveDeepLinkRef(null)).toBeNull();
+    expect(resolveDeepLinkRef('foo:bar')).toBeNull();
+    expect(resolveDeepLinkRef('module:')).toBeNull();
+    expect(resolveDeepLinkRef('quatsch')).toBeNull();
   });
 });
 

@@ -11,6 +11,7 @@
     listContextRefs,
     parseMentions,
     resolveContext,
+    resolveDeepLinkRef,
     buildContextBlock,
   } from '../data/aiContext.js';
   import ContextTray from '../components/ContextTray.svelte';
@@ -41,6 +42,7 @@
     lastRoute: $lastNonAssistantRoute,
     pomodoro: getPomodoro(),
   });
+
   $: connectionErrorText = connection.status === 'error' ? describeAiError(connection.error) : '';
   $: suggestions = buildSuggestions($lastNonAssistantRoute);
   $: mentionItems = mentionOpen
@@ -101,31 +103,37 @@
     const key = `${raw || ''}|${customPrompt || ''}`;
     if (!raw || key === appliedRef) return;
     appliedRef = key;
-    const [kind, id] = String(raw).split(':');
-    if (!id) return;
-    const mapped =
-      kind === 'note'
-        ? `notiz/${id}`
-        : kind === 'module'
-          ? `modul/${id}`
-          : kind === 'exam'
-            ? `prüfung/${id}`
-            : null;
+    const mapped = resolveDeepLinkRef(raw);
     if (!mapped) return;
-    pinnedRefs = [mapped];
     const prompts = {
-      note: 'Fasse diese Notiz in 5 Punkten zusammen.',
-      module: 'Gib mir einen kurzen Überblick über dieses Modul.',
-      exam: 'Was sollte ich für diese Prüfung zuerst wiederholen?',
+      heute: 'Was steht heute an?',
+      hausaufgaben: 'Was ist zuerst dran? Gib mir eine ruhige Reihenfolge.',
+      notizen: 'Fasse meine wichtigsten Notizen in wenigen Sätzen zusammen.',
+      prüfungen: 'Welche Prüfung braucht als Nächstes Vorbereitung?',
+      hub: 'Was ist diese Woche wichtig?',
+      module: 'Welche Module brauchen Aufmerksamkeit?',
+      kalender: 'Welche Fristen kommen auf mich zu?',
+      fokus: 'Worauf sollte ich mich jetzt fokussieren?',
     };
-    if (customPrompt) input = customPrompt;
-    else if (prompts[kind]) input = prompts[kind];
-    showContext = false;
+    let fallback = prompts[mapped] || '';
+    if (!fallback && mapped.startsWith('notiz/')) fallback = 'Fasse diese Notiz in 5 Punkten zusammen.';
+    if (!fallback && (mapped.startsWith('modul/') || mapped.startsWith('code:'))) {
+      fallback = 'Gib mir einen kurzen Überblick über dieses Modul.';
+    }
+    if (!fallback && mapped.startsWith('prüfung/')) fallback = 'Was sollte ich für diese Prüfung zuerst wiederholen?';
+    const nextInput = customPrompt || fallback;
+    // Assignments inside the route reactive statement are not flushed until the
+    // next interaction, so apply them after the current flush completes.
+    queueMicrotask(() => {
+      pinnedRefs = [mapped];
+      if (nextInput) input = nextInput;
+      showContext = false;
+    });
   }
 
-  async function refreshConnection() {
+  async function refreshConnection(fresh = false) {
     connection = { status: 'checking', models: connection.models, error: '' };
-    const result = await checkConnection({ baseUrl: $aiSettings.baseUrl });
+    const result = await checkConnection({ baseUrl: $aiSettings.baseUrl, fresh });
     connection = result.ok
       ? { status: 'ok', models: result.models, error: '' }
       : { status: 'error', models: [], error: result.error };
@@ -151,12 +159,17 @@
     const before = input.slice(0, position);
     const after = input.slice(position);
     const replaced = before.replace(/@[^\s@]*$/, `${item.token} `);
-    input = replaced + after;
+    let next = replaced + after;
+    // When the user only picked a mention, give them a ready-to-send question.
+    if (!parseMentions(next).cleanText) {
+      next = `${item.token} Erzähl mir mehr dazu.`;
+    }
+    input = next;
     mentionOpen = false;
     tick().then(() => {
       textarea?.focus();
-      const next = replaced.length;
-      textarea?.setSelectionRange(next, next);
+      const caret = input.length;
+      textarea?.setSelectionRange(caret, caret);
     });
   }
 
@@ -327,7 +340,7 @@
       </span>
       {#if connection.status === 'error'}
         <span class="muted small">{connectionErrorText}</span>
-        <button class="quiet" type="button" on:click={refreshConnection}>Erneut prüfen</button>
+        <button class="quiet" type="button" on:click={() => refreshConnection(true)}>Erneut prüfen</button>
       {/if}
     </div>
 

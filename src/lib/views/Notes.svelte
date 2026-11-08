@@ -7,6 +7,7 @@
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
+  import AiButton from '../components/AiButton.svelte';
 
   const filters = persistedStore('studyhub_notes_filters', {
     moduleId: 'all',
@@ -73,7 +74,16 @@
       <p class="eyebrow">Wissen</p>
       <h1>Notizen</h1>
     </div>
-    <button class="btn btn-primary" type="button" on:click={openCreate}><Icon name="plus" size={16} /> Notiz</button>
+    <div class="head-actions">
+      {#if ($appState.notes || []).length}
+        <AiButton
+          ref="notizen"
+          prompt="Fasse meine wichtigsten Notizen in wenigen Sätzen zusammen."
+          label="Zusammenfassen"
+        />
+      {/if}
+      <button class="btn btn-primary" type="button" on:click={openCreate}><Icon name="plus" size={16} /> Notiz</button>
+    </div>
   </header>
 
   <div class="filters">
@@ -171,6 +181,12 @@
     align-items: flex-end;
     justify-content: space-between;
     gap: var(--space-4);
+  }
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: none;
   }
   .eyebrow {
     font-size: 0.8125rem;

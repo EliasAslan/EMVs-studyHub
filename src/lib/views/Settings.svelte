@@ -141,7 +141,7 @@
   async function probeAi() {
     if (aiRefreshing) return;
     aiRefreshing = true;
-    const result = await checkConnection({ baseUrl: aiBase });
+    const result = await checkConnection({ baseUrl: aiBase, fresh: true });
     aiRefreshing = false;
     if (result.ok) {
       aiModels = result.models;
