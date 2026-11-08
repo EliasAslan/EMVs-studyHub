@@ -92,6 +92,23 @@ test.describe('Study Hub v2 — Core Flows', () => {
     await expect(page.locator('#sync-title')).toHaveText('Cloud');
     await expect(page.locator('text=Gerät ist die Wahrheit')).toBeVisible();
   });
+
+  test('Fullscreen toggle enters fullscreen and Esc leaves it', async ({ page }) => {
+    await page.goto(BASE_URL);
+    const supported = await page.evaluate(() => document.fullscreenEnabled === true);
+    test.skip(!supported, 'Fullscreen API is not available in this browser');
+
+    const enter = page.getByRole('button', { name: 'Vollbild', exact: true });
+    await expect(enter).toBeVisible();
+    await enter.click();
+
+    await expect(page.getByRole('button', { name: 'Vollbild verlassen' })).toBeVisible();
+    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Vollbild', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+  });
 });
 
 test.describe('Study Hub v2 — mobile shell', () => {

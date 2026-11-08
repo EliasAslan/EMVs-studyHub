@@ -110,6 +110,13 @@
         return;
       }
 
+      // Esc always leaves fullscreen, even if a drawer or dialog is open.
+      if (event.key === 'Escape' && document.fullscreenElement) {
+        event.preventDefault();
+        document.exitFullscreen?.().catch(() => {});
+        return;
+      }
+
       if (event.key === 'Escape' && drawerOpen) {
         event.preventDefault();
         closeDrawer({ restoreFocus: true });
