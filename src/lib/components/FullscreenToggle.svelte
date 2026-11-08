@@ -39,7 +39,7 @@
     aria-pressed={active}
     title={active ? 'Vollbild verlassen (Esc)' : 'Vollbild'}
   >
-    <Icon name={active ? 'compress' : 'expand'} size={16} />
+    <Icon name={active ? 'compress' : 'expand'} size={15} />
   </button>
 {/if}
 
@@ -47,21 +47,30 @@
   .fullscreen-toggle {
     display: grid;
     place-items: center;
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     padding: 0;
-    border: 1px solid var(--rule);
+    border: 0;
     border-radius: var(--radius-2);
-    background: var(--surface);
+    background: transparent;
     color: var(--ink-3);
+    opacity: 0.55;
+    transition: opacity var(--motion), background var(--motion), color var(--motion);
   }
-  .fullscreen-toggle:hover {
+  .fullscreen-toggle:hover,
+  .fullscreen-toggle:focus-visible {
     background: var(--surface-2);
     color: var(--ink);
+    opacity: 1;
+  }
+  .fullscreen-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
   .fullscreen-toggle[aria-pressed='true'] {
     background: var(--surface-2);
     color: var(--accent-strong);
+    opacity: 1;
   }
   @media (any-pointer: coarse) {
     .fullscreen-toggle {

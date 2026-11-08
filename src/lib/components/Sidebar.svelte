@@ -5,7 +5,6 @@
   import { route, navigate, modulePath } from '../router.js';
   import { persistedStore } from '../stores/viewPrefs.js';
   import Icon from './Icon.svelte';
-  import FullscreenToggle from './FullscreenToggle.svelte';
 
   /** Drawer visibility on small screens. Ignored on desktop. */
   export let open = false;
@@ -269,9 +268,6 @@
       <Icon name="settings" />
       {#if !compact}<span>Einstellungen</span>{/if}
     </a>
-    <div class="foot-tools">
-      <FullscreenToggle />
-    </div>
   </div>
 </aside>
 
@@ -547,11 +543,6 @@
     gap: 1px;
     padding-top: 8px;
     border-top: 1px solid var(--rule);
-  }
-  .foot-tools {
-    display: flex;
-    justify-content: flex-end;
-    padding: 6px 4px 2px;
   }
   .collapse {
     display: grid;

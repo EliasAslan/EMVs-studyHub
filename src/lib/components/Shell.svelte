@@ -9,6 +9,7 @@
   import QuickCapture from './QuickCapture.svelte';
   import Toast from './Toast.svelte';
   import Icon from './Icon.svelte';
+  import FullscreenToggle from './FullscreenToggle.svelte';
   import { toast } from '../stores/toast.js';
   import { paletteOpen, openPalette, togglePalette, closePalette, rememberRoute } from '../stores/ui.js';
   import { downloadBackup } from '../services/backup.js';
@@ -231,7 +232,10 @@
       <button class="icon-btn" type="button" on:click={openPalette} aria-label="Suchen">
         <Icon name="search" />
       </button>
+      <FullscreenToggle />
     </header>
+
+    <div class="fullscreen-corner"><FullscreenToggle /></div>
 
     <main id="main" tabindex="-1">
       <slot />
@@ -347,6 +351,9 @@
   .fab:active {
     transform: scale(0.97);
   }
+  .fullscreen-corner {
+    display: none;
+  }
   @media (min-width: 900px) {
     .scrim {
       display: none;
@@ -368,6 +375,13 @@
     .fab {
       bottom: var(--space-6);
       right: var(--space-6);
+    }
+    .fullscreen-corner {
+      display: block;
+      position: fixed;
+      top: var(--space-2);
+      right: var(--space-2);
+      z-index: 20;
     }
   }
 </style>
