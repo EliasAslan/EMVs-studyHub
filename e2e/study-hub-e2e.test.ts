@@ -123,6 +123,14 @@ test.describe('Study Hub v2 — mobile shell', () => {
     await expect(aside).toHaveClass(/\bopen\b/);
     await expect(page.getByRole('link', { name: 'Prüfungen' })).toBeVisible();
 
+    // The drawer slides in from the right on mobile.
+    await expect
+      .poll(async () => {
+        const box = await aside.boundingBox();
+        return box ? box.x + box.width : 0;
+      })
+      .toBeCloseTo(390, 0);
+
     await page.keyboard.press('Escape');
     await expect(aside).not.toHaveClass(/\bopen\b/);
 

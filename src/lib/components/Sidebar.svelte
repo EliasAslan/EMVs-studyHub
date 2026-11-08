@@ -247,15 +247,15 @@
       <Icon name="calendar" />
       {#if !compact}<span>Kalender</span>{/if}
     </a>
-  </nav>
-
-  <div class="foot" use:closeDrawerOnNavigation>
     {#if $aiReady}
       <a class="nav-link" class:active={$route.name === 'assistant'} href="#/assistant" aria-current={$route.name === 'assistant' ? 'page' : undefined} title={compact ? 'Assistent' : undefined}>
         <Icon name="sparkle" />
         {#if !compact}<span>Assistent</span>{/if}
       </a>
     {/if}
+  </nav>
+
+  <div class="foot" use:closeDrawerOnNavigation>
     <a class="nav-link" class:active={$route.name === 'links'} href="#/links" aria-current={$route.name === 'links' ? 'page' : undefined} title={compact ? 'Links' : undefined}>
       <Icon name="links" />
       {#if !compact}<span>Links</span>{/if}
@@ -607,6 +607,15 @@
     }
   }
   @media (max-width: 899px) {
+    .sidebar {
+      inset: 0 0 0 auto;
+      transform: translateX(100%);
+      border-right: none;
+      border-left: 1px solid var(--rule);
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
     .rail-toggle {
       display: none;
     }
