@@ -10,8 +10,9 @@
     homework: () => import('./lib/views/Homework.svelte'),
     modules: () => import('./lib/views/Modules.svelte'),
     module: () => import('./lib/views/ModuleDetail.svelte'),
+    // Both routes share the split view; the view itself handles list vs. detail.
     notes: () => import('./lib/views/Notes.svelte'),
-    note: () => import('./lib/views/NoteDetail.svelte'),
+    note: () => import('./lib/views/Notes.svelte'),
     exams: () => import('./lib/views/Exams.svelte'),
     calendar: () => import('./lib/views/Calendar.svelte'),
     links: () => import('./lib/views/Links.svelte'),

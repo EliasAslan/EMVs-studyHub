@@ -77,6 +77,13 @@ export function navigate(path) {
   if (typeof location !== 'undefined') location.hash = next;
 }
 
+/** Like navigate(), but replaces the current history entry (no back-stack noise). */
+export function replacePath(path) {
+  const next = path.startsWith('#') ? path : `#${path.startsWith('/') ? path : `/${path}`}`;
+  if (typeof history !== 'undefined') history.replaceState(null, '', next);
+  route.set(parseHash(next));
+}
+
 export function modulePath(id, tab) {
   return `/module/${id}${tab && tab !== 'overview' ? `/${tab}` : ''}`;
 }

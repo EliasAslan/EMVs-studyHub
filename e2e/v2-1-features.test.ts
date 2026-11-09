@@ -88,8 +88,10 @@ test.describe('Study Hub v2.1 — local AI', () => {
     await page.getByRole('button', { name: 'Speichern' }).click();
     await page.locator('text=AI Notiz').first().click();
 
-    await expect(page.getByRole('button', { name: 'Zusammenfassen' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'KI fragen' })).toBeVisible();
+    // Both panes are visible on wide screens; the detail pane owns these actions.
+    const detail = page.locator('.detail-pane');
+    await expect(detail.getByRole('button', { name: 'Zusammenfassen' })).toBeVisible();
+    await expect(detail.getByRole('button', { name: 'KI fragen' })).toBeVisible();
   });
 });
 
@@ -139,11 +141,10 @@ test.describe('Study Hub v2.1 — quick actions', () => {
 
   test('Notes summarise opens the assistant with Notizen context', async ({ page }) => {
     await enableAi(page);
-    await page.goto(`${BASE_URL}/#/notes`);
-    await page.getByRole('button', { name: 'Notiz', exact: true }).click();
-    await page.getByPlaceholder('Kurz und klar').fill('Thema SQL');
-    await page.getByLabel('Text').fill('JOIN verbindet Tabellen.');
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.goto(`${BASE_URL}/#/notes/new`);
+    await page.getByLabel('Titel').fill('Thema SQL');
+    await page.getByLabel('Notiztext').fill('JOIN verbindet Tabellen.');
+    await expect(page).toHaveURL(/#\/notes\/(?!new)/);
 
     await page.goto(`${BASE_URL}/#/notes`);
     await page.getByRole('button', { name: 'Zusammenfassen' }).click();

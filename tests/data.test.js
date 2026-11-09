@@ -19,7 +19,19 @@ import { checklistForDay, checkedForDay, remainingCount } from '../src/lib/data/
 import { upcomingDeadlines } from '../src/lib/data/deadlines.js';
 import { monthModel, itemsOnDate } from '../src/lib/data/calendar.js';
 import { searchAll, totalResults } from '../src/lib/data/search.js';
-import { parseWikiLinks, linkIndex, resolveLink, backlinks, bodySegments } from '../src/lib/data/wikiLinks.js';
+import {
+  parseWikiLinks,
+  linkIndex,
+  resolveLink,
+  resolveIn,
+  backlinks,
+  bodySegments,
+  outgoingLinks,
+  unlinkedMentions,
+  rewriteWikiTargets,
+  linkFirstMention,
+  norm,
+} from '../src/lib/data/wikiLinks.js';
 import { lessonsForDay, nextLesson, daysUntilLesson } from '../src/lib/data/schedule.js';
 
 const NOW = new Date(2026, 10, 4, 10, 30); // Wed 4 Nov 2026, local time
@@ -226,7 +238,7 @@ describe('wiki links', () => {
     const segments = bodySegments('A [[Ziel]] B');
     expect(segments).toEqual([
       { type: 'text', text: 'A ' },
-      { type: 'link', target: 'Ziel', raw: '[[Ziel]]' },
+      { type: 'link', target: 'Ziel', label: 'Ziel', raw: '[[Ziel]]' },
       { type: 'text', text: ' B' },
     ]);
   });
@@ -237,6 +249,67 @@ describe('wiki links', () => {
     expect(resolveLink(state, 'Fehlt')).toBeNull();
     expect(backlinks(state, 'n1').map((n) => n.id)).toEqual(['n2']);
     expect(linkIndex(state).size).toBeGreaterThan(0);
+  });
+
+  it('parses aliases and resolves by target only', () => {
+    const links = parseWikiLinks('A [[SQL Basics|Grundlagen]] B');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toMatchObject({ target: 'SQL Basics', label: 'Grundlagen' });
+    expect(resolveLink(state, 'SQL Basics')).toEqual({ kind: 'note', id: 'n1', label: 'SQL Basics' });
+    expect(resolveLink(state, 'Grundlagen')).toBeNull();
+    const segs = bodySegments('A [[SQL Basics|Grundlagen]]');
+    expect(segs).toContainEqual({ type: 'link', target: 'SQL Basics', label: 'Grundlagen', raw: '[[SQL Basics|Grundlagen]]' });
+    const index = linkIndex(state);
+    expect(resolveIn(index, 'sql basics')?.id).toBe('n1');
+    expect(linkIndex(state).has(norm('SQL Basics'))).toBe(true);
+  });
+
+  it('computes outgoing links unique with counts', () => {
+    const out = outgoingLinks(state, 'n1');
+    expect(out.map((o) => o.target)).toEqual(['Datenbanken', 'Joins']);
+    expect(out.find((o) => o.target === 'Joins')?.entry?.id).toBe('n2');
+    expect(out.find((o) => o.target === 'Joins')?.count).toBe(1);
+    const dup = baseState({
+      notes: [{ id: 'a', title: 'A', body: '[[B]] und [[B|anders]] und [[Fehlt]]' }, { id: 'b', title: 'B', body: '' }],
+    });
+    const dupOut = outgoingLinks(dup, 'a');
+    expect(dupOut).toHaveLength(2);
+    expect(dupOut[0]).toMatchObject({ target: 'B', count: 2 });
+    expect(dupOut[1].entry).toBeNull();
+  });
+
+  it('finds unlinked mentions without double counting linked notes', () => {
+    const s = baseState({
+      notes: [
+        { id: 'n1', title: 'Joins', body: '' },
+        { id: 'n2', title: 'A', body: 'Die Joins sind wichtig.' },
+        { id: 'n3', title: 'B', body: 'Siehe [[Joins]].' },
+        { id: 'n4', title: 'C', body: 'kein Treffer' },
+      ],
+    });
+    expect(unlinkedMentions(s, 'n1').map((n) => n.id)).toEqual(['n2']);
+    expect(unlinkedMentions(s, 'n4')).toEqual([]);
+    const short = baseState({ notes: [{ id: 'a', title: 'ab', body: 'ab ab' }, { id: 'b', title: 'B', body: 'ab hier' }] });
+    expect(unlinkedMentions(short, 'a')).toEqual([]);
+  });
+
+  it('brackets the first safe plain mention only', () => {
+    expect(linkFirstMention('Die Joins sind wichtig', 'Joins')).toBe('Die [[Joins]] sind wichtig');
+    expect(linkFirstMention('schon [[Joins]] verlinkt, Joins hier', 'Joins')).toBe(
+      'schon [[Joins]] verlinkt, [[Joins]] hier',
+    );
+    expect(linkFirstMention('kein Treffer', 'Joins')).toBe('kein Treffer');
+    expect(linkFirstMention('JOINS gross', 'joins')).toBe('[[JOINS]] gross');
+    expect(linkFirstMention('x', '')).toBe('x');
+  });
+
+  it('rewrites targets and preserves aliases', () => {
+    expect(rewriteWikiTargets('[[Old]] und [[Old|Alias]] und [[Andere]]', 'old', 'Neu')).toBe(
+      '[[Neu]] und [[Neu|Alias]] und [[Andere]]',
+    );
+    expect(rewriteWikiTargets('kein link', 'Old', 'Neu')).toBe('kein link');
+    expect(rewriteWikiTargets('[[Old]]', '', 'Neu')).toBe('[[Old]]');
+    expect(rewriteWikiTargets('[[Old]]', 'Old', '')).toBe('[[Old]]');
   });
 });
 

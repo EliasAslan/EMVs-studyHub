@@ -11,6 +11,7 @@ import { checklistForDay } from '../data/checklist.js';
 import { upcomingDeadlines } from '../data/deadlines.js';
 import { todayKey } from '../data/dates.js';
 import { normalizeRecurrence, nextInstanceToAdd } from '../data/recurrence.js';
+import { rewriteWikiTargets, norm as normNote } from '../data/wikiLinks.js';
 
 let saveTimer = null;
 let syncHandler = null;
@@ -175,6 +176,57 @@ export function updateNote(id, patch) {
 export function deleteNote(id) {
   deleteAttachmentsForOwner(id).catch(() => {});
   return commit((s) => store.deleteWithTombstone(s, 'notes', id), { immediate: true });
+}
+
+/**
+ * Rename a note and rewrite every [[Old]] / [[Old|alias]] reference.
+ * One commit; returns {note, updatedLinks:[{id, before, after}]}.
+ */
+export function renameNote(id, newTitle) {
+  const title = String(newTitle || '').trim();
+  return commit((s) => {
+    const note = (s.notes || []).find((n) => n.id === id);
+    if (!note || !title) return { note: note || null, updatedLinks: [] };
+    const oldTitle = note.title;
+    if (!oldTitle || normNote(oldTitle) === normNote(title)) return { note, updatedLinks: [] };
+    const updatedLinks = [];
+    for (const n of s.notes || []) {
+      const before = n.body || '';
+      const after = rewriteWikiTargets(before, oldTitle, title);
+      if (after !== before) {
+        updatedLinks.push({ id: n.id, before, after });
+        n.body = after;
+        n.updatedAt = Date.now();
+      }
+    }
+    note.title = title;
+    note.updatedAt = Date.now();
+    return { note, updatedLinks };
+  });
+}
+
+/**
+ * Apply body patches in one commit. Accepts a Map, a plain object
+ * {id: body}, or an array [{id, body}]. Used to link unlinked
+ * mentions and to undo rename rewrites.
+ */
+export function applyNoteBodies(patch) {
+  let entries;
+  if (patch instanceof Map) entries = [...patch.entries()];
+  else if (Array.isArray(patch)) entries = patch.map((p) => [p.id, p.body ?? p.after]);
+  else if (patch && typeof patch === 'object') entries = Object.entries(patch);
+  else return null;
+  const wanted = new Map(entries.map(([k, v]) => [k, String(v ?? '')]));
+  return commit((s) => {
+    const touched = [];
+    for (const n of s.notes || []) {
+      if (!wanted.has(n.id)) continue;
+      n.body = wanted.get(n.id);
+      n.updatedAt = Date.now();
+      touched.push(n);
+    }
+    return touched;
+  });
 }
 
 /* ------------------------------------------------------------------ */

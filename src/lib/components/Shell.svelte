@@ -16,6 +16,7 @@
 
   let captureOpen = false;
   let captureMode = 'note';
+  let switcherOpen = false;
   let drawerOpen = false;
   let menuButton = null;
   let pendingG = false;
@@ -111,6 +112,13 @@
         return;
       }
 
+      // Obsidian-style quick note switcher.
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'o') {
+        event.preventDefault();
+        switcherOpen = !switcherOpen;
+        return;
+      }
+
       // Esc always leaves fullscreen, even if a drawer or dialog is open.
       if (event.key === 'Escape' && document.fullscreenElement) {
         event.preventDefault();
@@ -130,7 +138,7 @@
       }
 
       if (editable) return;
-      if ($paletteOpen || captureOpen || drawerOpen) return;
+      if ($paletteOpen || switcherOpen || captureOpen || drawerOpen) return;
 
       if (event.key === '/') {
         event.preventDefault();
@@ -139,7 +147,9 @@
       }
       if (event.key === 'n') {
         event.preventDefault();
-        openCapture('note');
+        // Inside the notes section, create inline instead of opening capture.
+        if ($route.name === 'notes' || $route.name === 'note') navigate('/notes/new');
+        else openCapture('note');
         return;
       }
       if (event.key === 'h') {
@@ -250,6 +260,7 @@
 </div>
 
 <Palette open={$paletteOpen} on:close={closePalette} on:create={onPaletteCreate} on:action={onPaletteAction} />
+<Palette open={switcherOpen} mode="notes" on:close={() => (switcherOpen = false)} />
 <QuickCapture open={captureOpen} initialMode={captureMode} on:close={() => (captureOpen = false)} />
 
 <Toast />

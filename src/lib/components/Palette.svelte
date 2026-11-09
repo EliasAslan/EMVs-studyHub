@@ -1,12 +1,15 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { appState } from '../stores/app.js';
+  import { appState, createNote } from '../stores/app.js';
   import { aiReady } from '../stores/ai.js';
   import { searchAll, totalResults } from '../data/search.js';
+  import { norm } from '../data/wikiLinks.js';
   import { navigate, notePath, modulePath } from '../router.js';
   import Icon from './Icon.svelte';
 
   export let open = false;
+  /** 'all' = command palette, 'notes' = quick note switcher. */
+  export let mode = 'all';
   const dispatch = createEventDispatcher();
 
   let query = '';
@@ -44,6 +47,8 @@
 
   const actions = [{ id: 'export', label: 'JSON exportieren', group: 'Einstellungen', icon: 'file', action: 'export' }];
 
+  $: notesOnly = mode === 'notes';
+
   $: if (open && !wasOpen) {
     wasOpen = true;
     query = '';
@@ -52,22 +57,49 @@
   }
   $: if (!open) wasOpen = false;
 
-  function norm(v) {
+  function normText(v) {
     return String(v || '').toLowerCase();
   }
 
-  $: q = norm(query);
+  const recentItems = () =>
+    [...($appState.notes || [])]
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      .slice(0, 7)
+      .map((n) => ({ id: `note-${n.id}`, label: n.title || 'Ohne Titel', group: 'Zuletzt', icon: 'notes', href: `#${notePath(n.id)}` }));
+
+  $: q = normText(query);
   $: navigationItems = $aiReady ? [...navigation, assistantNav] : navigation;
-  $: commandItems = [...navigationItems, ...creates, ...actions].filter((item) => !q || norm(item.label).includes(q) || norm(item.group).includes(q));
-  $: results = q ? searchAll($appState, query, 5) : { notes: [], homework: [], modules: [], exams: [], links: [] };
-  $: resultItems = [
-    ...results.notes.map((n) => ({ id: `note-${n.id}`, label: n.title || 'Ohne Titel', group: 'Notizen', icon: 'notes', href: `#${notePath(n.id)}` })),
-    ...results.homework.map((h) => ({ id: `hw-${h.id}`, label: h.title, group: 'Hausaufgaben', icon: 'homework', href: '#/homework' })),
-    ...results.modules.map((m) => ({ id: `mod-${m.id}`, label: `${m.code ? m.code + ' · ' : ''}${m.title}`, group: 'Module', icon: 'modules', href: `#${modulePath(m.id)}` })),
-    ...results.exams.map((e) => ({ id: `exam-${e.id}`, label: e.title, group: 'Prüfungen', icon: 'exams', href: '#/exams' })),
-    ...results.links.map((l) => ({ id: `link-${l.id}`, label: l.label, group: 'Links', icon: 'links', href: '#/links' })),
-  ];
-  $: items = q ? [...commandItems, ...resultItems] : [...creates, ...navigationItems, ...actions];
+  $: commandItems = notesOnly
+    ? []
+    : [...navigationItems, ...creates, ...actions].filter(
+        (item) => !q || normText(item.label).includes(q) || normText(item.group).includes(q),
+      );
+  $: results = q ? searchAll($appState, query, notesOnly ? 8 : 5) : { notes: [], homework: [], modules: [], exams: [], links: [] };
+  $: resultItems = notesOnly
+    ? results.notes.map((n) => ({ id: `note-${n.id}`, label: n.title || 'Ohne Titel', group: 'Notizen', icon: 'notes', href: `#${notePath(n.id)}` }))
+    : [
+        ...results.notes.map((n) => ({ id: `note-${n.id}`, label: n.title || 'Ohne Titel', group: 'Notizen', icon: 'notes', href: `#${notePath(n.id)}` })),
+        ...results.homework.map((h) => ({ id: `hw-${h.id}`, label: h.title, group: 'Hausaufgaben', icon: 'homework', href: '#/homework' })),
+        ...results.modules.map((m) => ({ id: `mod-${m.id}`, label: `${m.code ? m.code + ' · ' : ''}${m.title}`, group: 'Module', icon: 'modules', href: `#${modulePath(m.id)}` })),
+        ...results.exams.map((e) => ({ id: `exam-${e.id}`, label: e.title, group: 'Prüfungen', icon: 'exams', href: '#/exams' })),
+        ...results.links.map((l) => ({ id: `link-${l.id}`, label: l.label, group: 'Links', icon: 'links', href: '#/links' })),
+      ];
+
+  $: trimmedQuery = query.trim();
+  $: exactNote = results.notes.some((n) => norm(n.title) === norm(trimmedQuery));
+  $: createItem =
+    notesOnly && trimmedQuery && !exactNote
+      ? { id: 'create-note', label: `Notiz «${trimmedQuery}» erstellen`, group: 'Erstellen', icon: 'plus', createNote: trimmedQuery }
+      : null;
+
+  $: items = notesOnly
+    ? q
+      ? [...resultItems, ...(createItem ? [createItem] : [])]
+      : recentItems()
+    : q
+      ? [...commandItems, ...resultItems]
+      : [...creates, ...navigationItems, ...actions];
+
   $: if (activeIndex >= items.length) activeIndex = Math.max(0, items.length - 1);
 
   function close() {
@@ -77,7 +109,10 @@
   function run(item) {
     if (!item) return;
     close();
-    if (item.href) navigate(item.href.replace(/^#/, ''));
+    if (item.createNote) {
+      const created = createNote({ title: item.createNote });
+      navigate(notePath(created.id));
+    } else if (item.href) navigate(item.href.replace(/^#/, ''));
     else if (item.create) dispatch('create', item.create);
     else if (item.action) dispatch('action', item.action);
   }
@@ -109,16 +144,16 @@
 
 {#if open}
   <div class="overlay" role="presentation" on:click|self={close}>
-    <div class="palette" role="dialog" aria-modal="true" aria-label="Befehlspalette" tabindex="-1" on:keydown={onKeydown}>
+    <div class="palette" role="dialog" aria-modal="true" aria-label={notesOnly ? 'Notiz öffnen' : 'Befehlspalette'} tabindex="-1" on:keydown={onKeydown}>
       <div class="search-row">
-        <Icon name="search" />
+        <Icon name={notesOnly ? 'notes' : 'search'} />
         <input
           bind:this={inputEl}
           bind:value={query}
           class="search-input"
           type="text"
-          placeholder="Suchen oder Befehl…"
-          aria-label="Suchen oder Befehl"
+          placeholder={notesOnly ? 'Notiz öffnen…' : 'Suchen oder Befehl…'}
+          aria-label={notesOnly ? 'Notiz öffnen' : 'Suchen oder Befehl'}
           aria-controls="palette-list"
           aria-activedescendant={items[activeIndex] ? `palette-item-${activeIndex}` : undefined}
           autocomplete="off"
@@ -128,7 +163,7 @@
 
       <div class="results" id="palette-list" role="listbox" aria-label="Ergebnisse">
         {#if items.length === 0}
-          <p class="none">Nichts gefunden.</p>
+          <p class="none">{notesOnly ? 'Noch keine Notizen.' : 'Nichts gefunden.'}</p>
         {:else}
           {#each items as item, i (item.id)}
             {#if i === 0 || items[i - 1].group !== item.group}
@@ -155,7 +190,7 @@
       <footer class="palette-foot">
         <span><kbd>↑</kbd><kbd>↓</kbd> wählen</span>
         <span><kbd>↵</kbd> öffnen</span>
-        <span class="muted">{q ? `${totalResults(results)} Treffer` : ''}</span>
+        <span class="muted">{q ? `${notesOnly ? results.notes.length : totalResults(results)} Treffer` : notesOnly ? 'zuletzt bearbeitet' : ''}</span>
       </footer>
     </div>
   </div>

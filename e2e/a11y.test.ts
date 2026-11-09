@@ -240,7 +240,8 @@ test.describe('Study Hub v2.1 — accessibility', () => {
     });
 
     await page.goto(`${BASE_URL}/#/notes/note-2`);
-    const summarize = page.getByRole('button', { name: 'Zusammenfassen' });
+    // The notes split view also has a list-level summarise action.
+    const summarize = page.locator('.detail-pane').getByRole('button', { name: 'Zusammenfassen' });
     await summarize.focus();
     await page.keyboard.press('Enter');
 
