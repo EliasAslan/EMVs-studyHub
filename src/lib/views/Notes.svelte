@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { appState } from '../stores/app.js';
-  import { navigate, replacePath, route } from '../router.js';
+  import { navigate, notePath, replacePath, route } from '../router.js';
   import { persistedStore } from '../stores/viewPrefs.js';
   import { extractTags } from '../data/markdown.js';
   import NoteListRow from '../components/NoteListRow.svelte';
@@ -118,7 +118,7 @@
             />
           {/if}
           <button class="btn btn-primary" type="button" on:click={openCreate}>
-            <Icon name="plus" size={16} /> Notiz
+            <Icon name="plus" size={16} /> Neue Notiz
           </button>
         </div>
       </header>
@@ -206,14 +206,18 @@
             {/each}
           </div>
         {:else}
-          <EmptyState
-            title="Keine Notizen gefunden"
-            text={hasFilters ? 'Filter zurücksetzen oder neue Notiz erfassen.' : 'Text, Foto oder beides — in Sekunden erfasst.'}
-            actionLabel="Notiz erfassen"
-            action={openCreate}
-            secondaryLabel={hasFilters ? 'Filter zurücksetzen' : ''}
-            secondary={resetFilters}
-          />
+          <div class="list-empty">
+            <EmptyState
+              title="Keine Notizen gefunden"
+              text={hasFilters ? 'Filter zurücksetzen oder neue Notiz erfassen.' : 'Text, Foto oder beides — in Sekunden erfasst.'}
+              actionLabel="Neue Notiz"
+              action={openCreate}
+              secondaryLabel={hasFilters ? 'Filter zurücksetzen' : ''}
+              secondary={resetFilters}
+            >
+              <svelte:fragment slot="icon"><Icon name="notes" size={20} /></svelte:fragment>
+            </EmptyState>
+          </div>
         {/if}
 
         {#if allNotes.length}
@@ -230,13 +234,29 @@
       {:else}
         <div class="detail-empty">
           <span class="detail-icon"><Icon name="notes" size={22} /></span>
-          <h2>Wähle eine Notiz</h2>
-          <p class="muted">Oder beginne eine neue — tippen genügt, gespeichert wird von selbst.</p>
-          <button class="btn btn-primary" type="button" on:click={openCreate}>
-            <Icon name="plus" size={16} /> Neue Notiz
-          </button>
-          {#if notes.length}
-            <p class="detail-hint">Zuletzt: {notes.slice(0, 3).map((n) => n.title || 'Ohne Titel').join(' · ')}</p>
+          {#if !allNotes.length}
+            <h2>Schreibe deine erste Notiz</h2>
+            <p class="muted">Tippen genügt — gespeichert wird von selbst. [[Links]] verbinden Notizen, Aufgaben und Prüfungen.</p>
+            <button class="btn btn-primary" type="button" on:click={openCreate}>
+              <Icon name="plus" size={16} /> Neue Notiz
+            </button>
+            <p class="detail-hint">Tastatur: <kbd>N</kbd> für eine neue Notiz.</p>
+          {:else}
+            <h2>Wähle eine Notiz</h2>
+            <p class="muted">Oder beginne eine neue — tippen genügt, gespeichert wird von selbst.</p>
+            <button class="btn btn-primary" type="button" on:click={openCreate}>
+              <Icon name="plus" size={16} /> Neue Notiz
+            </button>
+            {#if notes.length}
+              <div class="quick-open" aria-label="Zuletzt bearbeitet">
+                <span class="quick-open-label">Zuletzt bearbeitet</span>
+                {#each notes.slice(0, 3) as note (note.id)}
+                  <button class="chip" type="button" on:click={() => navigate(notePath(note.id))}>
+                    {note.title || 'Ohne Titel'}
+                  </button>
+                {/each}
+              </div>
+            {/if}
           {/if}
         </div>
       {/if}
@@ -258,7 +278,7 @@
     grid-template-columns: minmax(280px, 330px) minmax(0, 1fr);
     gap: var(--space-5);
     max-width: 1120px;
-    align-items: start;
+    align-items: stretch;
   }
   .list-pane {
     display: flex;
@@ -365,8 +385,16 @@
     color: var(--ink-3);
   }
   .list-scroll {
+    display: flex;
+    flex-direction: column;
     min-height: 0;
     overflow-y: auto;
+  }
+  .list-empty {
+    display: grid;
+    place-items: center;
+    flex: 1;
+    min-height: 220px;
   }
   .list-pane.wide {
     height: calc(100vh - var(--space-6));
@@ -390,12 +418,16 @@
     margin-top: var(--space-3);
   }
   .detail-pane {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
   }
   .detail-empty {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    justify-content: center;
+    flex: 1;
     gap: var(--space-2);
     padding: var(--space-6) var(--space-5);
     border: 1px dashed var(--rule-strong);
@@ -420,11 +452,38 @@
     color: var(--accent-strong);
   }
   .detail-hint {
-    margin-top: var(--space-2);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--rule);
     font-size: var(--text-xs);
     color: var(--ink-3);
+  }
+  .detail-hint kbd {
+    padding: 1px 5px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 4px;
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .quick-open {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--rule);
+  }
+  .quick-open-label {
+    font-size: var(--text-xs);
+    color: var(--ink-3);
+  }
+  .quick-open .chip {
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--text-xs);
+  }
+  .quick-open .chip:hover {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
   }
   @media (min-width: 640px) {
     .page:not(.wide) .filter-grid {
