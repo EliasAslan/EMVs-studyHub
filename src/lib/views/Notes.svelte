@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { appState } from '../stores/app.js';
-  import { navigate, notePath, replacePath, route } from '../router.js';
+  import { navigate, replacePath, route } from '../router.js';
   import { persistedStore } from '../stores/viewPrefs.js';
   import { extractTags } from '../data/markdown.js';
   import NoteListRow from '../components/NoteListRow.svelte';
@@ -229,37 +229,10 @@
 
   {#if wide || isDetail}
     <div class="detail-pane">
-      {#if activeId}
-        <NoteDetail noteId={activeId} />
-      {:else}
-        <div class="detail-empty">
-          <span class="detail-icon"><Icon name="notes" size={22} /></span>
-          {#if !allNotes.length}
-            <h2>Schreibe deine erste Notiz</h2>
-            <p class="muted">Tippen genügt — gespeichert wird von selbst. [[Links]] verbinden Notizen, Aufgaben und Prüfungen.</p>
-            <button class="btn btn-primary" type="button" on:click={openCreate}>
-              <Icon name="plus" size={16} /> Neue Notiz
-            </button>
-            <p class="detail-hint">Tastatur: <kbd>N</kbd> für eine neue Notiz.</p>
-          {:else}
-            <h2>Wähle eine Notiz</h2>
-            <p class="muted">Oder beginne eine neue — tippen genügt, gespeichert wird von selbst.</p>
-            <button class="btn btn-primary" type="button" on:click={openCreate}>
-              <Icon name="plus" size={16} /> Neue Notiz
-            </button>
-            {#if notes.length}
-              <div class="quick-open" aria-label="Zuletzt bearbeitet">
-                <span class="quick-open-label">Zuletzt bearbeitet</span>
-                {#each notes.slice(0, 3) as note (note.id)}
-                  <button class="chip" type="button" on:click={() => navigate(notePath(note.id))}>
-                    {note.title || 'Ohne Titel'}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          {/if}
-        </div>
-      {/if}
+      <!-- No selection: the pane IS the writing surface. NoteDetail's "new"
+           draft path creates the note on first keystroke and swaps in its
+           real URL, so the list shows it immediately. -->
+      <NoteDetail noteId={activeId || 'new'} />
     </div>
   {/if}
 </div>
@@ -294,8 +267,8 @@
   }
   .page-head {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: stretch;
     gap: var(--space-3);
   }
   .head-titles {
@@ -304,6 +277,7 @@
   .head-actions {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: var(--space-2);
     flex: none;
   }
@@ -418,72 +392,7 @@
     margin-top: var(--space-3);
   }
   .detail-pane {
-    display: flex;
-    flex-direction: column;
     min-width: 0;
-  }
-  .detail-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    flex: 1;
-    gap: var(--space-2);
-    padding: var(--space-6) var(--space-5);
-    border: 1px dashed var(--rule-strong);
-    border-radius: var(--radius-3);
-    color: var(--ink-2);
-  }
-  .detail-empty h2 {
-    font-size: var(--text-xl);
-    color: var(--ink);
-  }
-  .detail-empty p {
-    max-width: 42ch;
-    font-size: var(--text-sm);
-  }
-  .detail-icon {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-2);
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-  }
-  .detail-hint {
-    font-size: var(--text-xs);
-    color: var(--ink-3);
-  }
-  .detail-hint kbd {
-    padding: 1px 5px;
-    border: 1px solid var(--rule-strong);
-    border-radius: 4px;
-    background: var(--surface-2);
-    font-family: var(--font-mono);
-    font-size: 10px;
-  }
-  .quick-open {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--rule);
-  }
-  .quick-open-label {
-    font-size: var(--text-xs);
-    color: var(--ink-3);
-  }
-  .quick-open .chip {
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--text-xs);
-  }
-  .quick-open .chip:hover {
-    background: var(--accent-soft);
-    color: var(--accent-strong);
   }
   @media (min-width: 640px) {
     .page:not(.wide) .filter-grid {

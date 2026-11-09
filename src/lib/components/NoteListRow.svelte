@@ -38,11 +38,13 @@
   .row {
     display: flex;
     flex-direction: column;
+    align-self: stretch;
     gap: 2px;
     padding: var(--space-2) var(--space-3);
     border: 1px solid transparent;
     border-radius: var(--radius-2);
     color: var(--ink);
+    text-align: left;
     text-decoration: none;
     transition: background var(--motion), border-color var(--motion);
   }
