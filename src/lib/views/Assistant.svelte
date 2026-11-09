@@ -60,6 +60,7 @@
     if ($aiReady) {
       refreshConnection();
       focusComposer();
+      tick().then(autoGrow);
     }
   });
 
@@ -68,6 +69,13 @@
     if (window.matchMedia?.('(pointer: fine)').matches) {
       tick().then(() => textarea?.focus());
     }
+  }
+
+  /** Composer grows with content, capped at 180px (then scrolls). */
+  function autoGrow() {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
   }
 
   function fold(value) {
@@ -83,19 +91,31 @@
     switch (lastRoute?.name) {
       case 'exams':
         return [
-          '@prüfungen Welche Prüfung braucht als Nächstes Vorbereitung?',
-          '@hub Was ist diese Woche wichtig?',
+          { label: 'Welche Prüfung braucht als Nächstes Vorbereitung?', value: '@prüfungen Welche Prüfung braucht als Nächstes Vorbereitung?' },
+          { label: 'Was ist diese Woche wichtig?', value: '@hub Was ist diese Woche wichtig?' },
         ];
       case 'homework':
-        return ['@hausaufgaben Was ist zuerst dran?', '@heute Was steht heute an?'];
+        return [
+          { label: 'Was ist zuerst dran?', value: '@hausaufgaben Was ist zuerst dran?' },
+          { label: 'Was steht heute an?', value: '@heute Was steht heute an?' },
+        ];
       case 'notes':
       case 'note':
-        return ['@notizen Welche Notiz sollte ich wiederholen?', '@seite Fasse diese Seite zusammen.'];
+        return [
+          { label: 'Welche Notiz sollte ich wiederholen?', value: '@notizen Welche Notiz sollte ich wiederholen?' },
+          { label: 'Fasse diese Seite zusammen.', value: '@seite Fasse diese Seite zusammen.' },
+        ];
       case 'module':
       case 'modules':
-        return ['@seite Was ist in diesem Modul offen?', '@module Welche Module brauchen Aufmerksamkeit?'];
+        return [
+          { label: 'Was ist in diesem Modul offen?', value: '@seite Was ist in diesem Modul offen?' },
+          { label: 'Welche Module brauchen Aufmerksamkeit?', value: '@module Welche Module brauchen Aufmerksamkeit?' },
+        ];
       default:
-        return ['@heute Was steht heute an?', '@hub Was ist diese Woche wichtig?'];
+        return [
+          { label: 'Was steht heute an?', value: '@heute Was steht heute an?' },
+          { label: 'Was ist diese Woche wichtig?', value: '@hub Was ist diese Woche wichtig?' },
+        ];
     }
   }
 
@@ -226,6 +246,7 @@
     mentionOpen = false;
     errorText = '';
     lastRequest = request;
+    tick().then(autoGrow);
     runRequest(request);
   }
 
@@ -302,6 +323,7 @@
     lastRequest = null;
     appliedRef = null;
     showContext = false;
+    tick().then(autoGrow);
   }
 </script>
 
@@ -349,16 +371,17 @@
         <div class="empty">
           <p>Frag zu deinen Daten. Tippe <kbd>@</kbd> für eine Seite, ein Modul oder eine Notiz.</p>
           <div class="suggestions">
-            {#each suggestions as suggestion (suggestion)}
+            {#each suggestions as suggestion (suggestion.value)}
               <button
                 class="chip"
                 type="button"
                 on:click={() => {
-                  input = suggestion;
+                  input = suggestion.value;
                   textarea?.focus();
+                  tick().then(autoGrow);
                 }}
               >
-                {suggestion}
+                {suggestion.label}
               </button>
             {/each}
           </div>
@@ -426,7 +449,8 @@
           aria-label="Frage an den Assistenten"
           aria-autocomplete="list"
           aria-controls={mentionOpen ? 'mention-list' : undefined}
-          on:input={updateMention}
+          on:input={(e) => { updateMention(); autoGrow(); }}
+          on:click={autoGrow}
           on:keydown={onKeydown}
         ></textarea>
 
@@ -638,6 +662,8 @@
   }
   .composer-input {
     min-height: 56px;
+    max-height: 180px;
+    overflow-y: auto;
     resize: vertical;
     border: 0;
     background: transparent;
@@ -704,7 +730,7 @@
       bottom: 0;
     }
   }
-  @media (any-pointer: coarse) {
+  @media (pointer: coarse) {
     .quiet,
     .mention-item {
       min-height: 48px;

@@ -13,6 +13,8 @@
     deleteLink,
     updateModule,
     deleteModule,
+    snapshotModule,
+    restoreModuleSnapshot,
     updateHomework,
     toggleHomework,
     deleteHomework,
@@ -50,6 +52,8 @@
     { id: 'links', label: 'Links' },
     { id: 'files', label: 'Dateien' },
   ];
+
+  const accents = ['#4f46e5', '#0f766e', '#b45309', '#be123c', '#7c3aed', '#0369a1', '#4d7c0f', '#9a3412'];
 
   let tab = 'overview';
   let topicName = '';
@@ -117,8 +121,12 @@
     if (!entry) return;
     if (entry.kind === 'note') navigate(notePath(entry.id));
     else if (entry.kind === 'module') navigate(modulePath(entry.id));
-    else if (entry.kind === 'homework') navigate('/homework');
+    else if (entry.kind === 'topic') {
+      if (entry.moduleId) navigate(modulePath(entry.moduleId));
+      else navigate('/modules');
+    } else if (entry.kind === 'homework') navigate('/homework');
     else if (entry.kind === 'exam') navigate('/exams');
+    else if (entry.kind === 'link') navigate('/links');
   }
 
   function setTab(id) {
@@ -225,8 +233,11 @@
   }
 
   function removeExam(exam) {
+    const snapshot = { ...exam };
     deleteExam(exam.id);
-    toast('Prüfung gelöscht');
+    toast('Prüfung gelöscht', {
+      action: { label: 'Rückgängig', fn: () => restoreEntity('exams', snapshot) },
+    });
   }
 
   function openLinkCreate() {
@@ -259,6 +270,14 @@
     toast('Link gespeichert');
   }
 
+  function removeLink(link) {
+    const snapshot = { ...link };
+    deleteLink(link.id);
+    toast('Link gelöscht', {
+      action: { label: 'Rückgängig', fn: () => restoreEntity('links', snapshot) },
+    });
+  }
+
   function openModuleEdit() {
     editCode = mod.code || '';
     editTitle = mod.title || '';
@@ -274,9 +293,19 @@
 
   function doDeleteModule() {
     const id = mod.id;
+    const snapshot = snapshotModule(id);
     deleteModule(id);
     deleteOpen = false;
     navigate('/modules');
+    toast('Modul gelöscht', {
+      action: {
+        label: 'Rückgängig',
+        fn: () => {
+          restoreModuleSnapshot(snapshot);
+          toast('Wiederhergestellt');
+        },
+      },
+    });
   }
 
   function gradeLabel(grade) {
@@ -385,9 +414,9 @@
                   {:else}
                     {@const entry = resolveLink($appState, segment.target)}
                     {#if entry}
-                      <button class="wiki" type="button" on:click={() => openOverviewLink(segment.target)}>{segment.target}</button>
+                      <button class="wiki" type="button" on:click={() => openOverviewLink(segment.target)}>{segment.label || segment.target}</button>
                     {:else}
-                      <span class="wiki unresolved" title="Kein Ziel gefunden">{segment.target}</span>
+                      <span class="wiki unresolved" title="Kein Ziel gefunden">{segment.label || segment.target}</span>
                     {/if}
                   {/if}
                 {/each}
@@ -406,11 +435,10 @@
         <section class="card pad" aria-labelledby="topics-title">
           <div class="section-title">
             <h2 id="topics-title">Themen</h2>
-            <span class="hint">Filter</span>
           </div>
           <div class="topics">
             {#each topics as topic (topic.id)}
-              <span class="chip is-active">
+              <span class="chip">
                 {topic.name}
                 <button class="chip-x" type="button" aria-label={`${topic.name} entfernen`} on:click={() => deleteTopic(topic.id)}>✕</button>
               </span>
@@ -552,7 +580,7 @@
               <LinkRow {link} showModule={false}>
                 <svelte:fragment slot="actions">
                   <button class="icon-btn sm" type="button" aria-label={`${link.label} bearbeiten`} on:click={() => openLinkEdit(link)}><Icon name="edit" size={14} /></button>
-                  <button class="icon-btn sm" type="button" aria-label={`${link.label} löschen`} on:click={() => deleteLink(link.id)}><Icon name="trash" size={14} /></button>
+                  <button class="icon-btn sm" type="button" aria-label={`${link.label} löschen`} on:click={() => removeLink(link)}><Icon name="trash" size={14} /></button>
                 </svelte:fragment>
               </LinkRow>
             {/each}
@@ -690,7 +718,22 @@
   <div class="stack">
     <label class="field"><span>Kürzel</span><input class="input" bind:value={editCode} /></label>
     <label class="field"><span>Titel</span><input class="input" bind:value={editTitle} data-autofocus /></label>
-    <label class="field"><span>Farbe</span><input class="input color" type="color" bind:value={editAccent} /></label>
+    <label class="field">
+      <span>Farbe</span>
+      <div class="swatches">
+        {#each accents as color}
+          <button
+            class="swatch"
+            class:active={editAccent === color}
+            type="button"
+            style:--swatch={color}
+            aria-label={`Farbe ${color}`}
+            aria-pressed={editAccent === color}
+            on:click={() => (editAccent = color)}
+          ></button>
+        {/each}
+      </div>
+    </label>
   </div>
   <svelte:fragment slot="footer">
     <button class="btn btn-ghost" type="button" on:click={() => (editModuleOpen = false)}>Abbrechen</button>
@@ -699,7 +742,7 @@
 </Modal>
 
 <Modal open={deleteOpen} title="Modul löschen" on:close={() => (deleteOpen = false)}>
-  <p>«{mod?.title || mod?.code}» und alle zugehörigen Inhalte werden entfernt.</p>
+  <p>«{mod?.title || mod?.code}» und alle zugehörigen Inhalte werden entfernt. Hochgeladene Dateien werden endgültig gelöscht.</p>
   <svelte:fragment slot="footer">
     <button class="btn btn-ghost" type="button" on:click={() => (deleteOpen = false)}>Abbrechen</button>
     <button class="btn btn-danger" type="button" on:click={doDeleteModule}>Löschen</button>
@@ -966,9 +1009,23 @@
   .small {
     font-size: var(--text-xs);
   }
-  .color {
-    padding: 4px;
-    height: 44px;
+  .swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    min-height: 40px;
+    align-items: center;
+  }
+  .swatch {
+    width: 24px;
+    height: 24px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    background: var(--swatch);
+  }
+  .swatch.active {
+    outline: 2px solid var(--swatch);
+    outline-offset: 2px;
   }
   @media (min-width: 720px) {
     .inline-add {

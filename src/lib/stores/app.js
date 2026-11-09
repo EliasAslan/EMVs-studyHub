@@ -295,6 +295,37 @@ export function restoreEntity(collection, entity) {
   return commit((s) => store.restoreEntity(s, collection, entity));
 }
 
+/**
+ * Capture a module plus every child record before deleting it, so a cascade
+ * delete can be undone. Attachment files are not included (they are removed
+ * from the device by `deleteModule`).
+ */
+export function snapshotModule(id) {
+  const state = get(appState);
+  const mod = (state.modules || []).find((m) => m.id === id);
+  if (!mod) return null;
+  const collections = ['topics', 'notes', 'homework', 'exams', 'links', 'lessons'];
+  return {
+    module: { ...mod },
+    children: Object.fromEntries(
+      collections.map((coll) => [
+        coll,
+        (state[coll] || []).filter((entity) => entity.moduleId === id).map((entity) => ({ ...entity })),
+      ]),
+    ),
+  };
+}
+
+/** Restore a snapshot taken by `snapshotModule` (undo a module delete). */
+export function restoreModuleSnapshot(snapshot) {
+  if (!snapshot?.module) return null;
+  const restored = restoreEntity('modules', snapshot.module);
+  for (const [coll, entities] of Object.entries(snapshot.children || {})) {
+    for (const entity of entities) restoreEntity(coll, entity);
+  }
+  return restored;
+}
+
 /* ------------------------------------------------------------------ */
 /* Exams                                                               */
 /* ------------------------------------------------------------------ */
@@ -407,6 +438,9 @@ export function applyTheme(theme) {
         ? 'dark'
         : 'light';
   document.documentElement.dataset.theme = resolved;
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) =>
+    meta.setAttribute('content', resolved === 'dark' ? '#0e0f12' : '#f5f5f7'),
+  );
 }
 
 export function exportBackup() {

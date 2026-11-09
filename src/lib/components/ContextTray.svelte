@@ -101,7 +101,7 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  @media (any-pointer: coarse) {
+  @media (pointer: coarse) {
     .toggle {
       min-height: 48px;
     }

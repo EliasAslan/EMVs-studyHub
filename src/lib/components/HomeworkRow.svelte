@@ -117,7 +117,7 @@
     border-radius: var(--radius-1);
     background: transparent;
     color: var(--ink-3);
-    opacity: 0;
+    opacity: 0.45;
   }
   .hw-row:hover .icon,
   .icon:focus-visible {
@@ -127,7 +127,7 @@
     color: var(--danger);
     background: var(--danger-soft);
   }
-  @media (any-pointer: coarse) {
+  @media (pointer: coarse) {
     .icon {
       opacity: 1;
     }

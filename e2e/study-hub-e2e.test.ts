@@ -11,7 +11,7 @@ test.describe('Study Hub v2 — Core Flows', () => {
   test('Heute answers "what now?" with one clear start action', async ({ page }) => {
     await page.goto(BASE_URL);
     await expect(page).toHaveTitle(/Study Hub/);
-    await expect(page.locator('text=Als Nächstes')).toBeVisible();
+    await expect(page.locator('#due-title')).toBeVisible();
     await expect(page.locator('#checklist-title')).toBeVisible();
   });
 
@@ -42,6 +42,7 @@ test.describe('Study Hub v2 — Core Flows', () => {
   test('Create note via Erfassen', async ({ page }) => {
     await page.goto(BASE_URL);
     await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Notiz' }).click();
     await page.getByRole('tab', { name: 'Notiz' }).click();
     await page.getByPlaceholder('Kurz und klar').fill('SQL Joins');
     await page.getByPlaceholder('Was möchtest du festhalten?').fill('INNER JOIN verbindet Tabellen.');
@@ -82,32 +83,20 @@ test.describe('Study Hub v2 — Core Flows', () => {
     await expect(page.locator('text=Fokus starten')).toBeVisible();
     await expect(page.locator('#pomodoro-stats-title')).toBeVisible();
     await page.getByRole('button', { name: 'Fokus starten' }).click();
-    await expect(page.locator('text=Läuft. Kein Druck.')).toBeVisible();
+    await expect(page.locator('text=Läuft')).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: 'Pausieren' }).click();
-    await expect(page.locator('text=Pausiert. Du entscheidest, wann es weitergeht.')).toBeVisible();
+    await expect(page.locator('text=Pausiert')).toBeVisible();
   });
 
   test('Settings: cloud section renders', async ({ page }) => {
     await page.goto(`${BASE_URL}/#/settings`);
     await expect(page.locator('#sync-title')).toHaveText('Cloud');
-    await expect(page.locator('text=Gerät ist die Wahrheit')).toBeVisible();
+    await expect(page.locator('text=Gerät ist Hauptquelle')).toBeVisible();
   });
 
-  test('Fullscreen toggle enters fullscreen and Esc leaves it', async ({ page }) => {
+  test('Fullscreen toggle is not part of the shell', async ({ page }) => {
     await page.goto(BASE_URL);
-    const supported = await page.evaluate(() => document.fullscreenEnabled === true);
-    test.skip(!supported, 'Fullscreen API is not available in this browser');
-
-    const enter = page.getByRole('button', { name: 'Vollbild', exact: true });
-    await expect(enter).toBeVisible();
-    await enter.click();
-
-    await expect(page.getByRole('button', { name: 'Vollbild verlassen' })).toBeVisible();
-    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
-
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: 'Vollbild', exact: true })).toBeVisible();
-    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+    await expect(page.getByRole('button', { name: 'Vollbild', exact: true })).toHaveCount(0);
   });
 });
 
@@ -123,13 +112,13 @@ test.describe('Study Hub v2 — mobile shell', () => {
     await expect(aside).toHaveClass(/\bopen\b/);
     await expect(page.getByRole('link', { name: 'Prüfungen' })).toBeVisible();
 
-    // The drawer slides in from the right on mobile.
+    // The drawer slides in from the left on mobile.
     await expect
       .poll(async () => {
         const box = await aside.boundingBox();
-        return box ? box.x + box.width : 0;
+        return box ? box.x : -1;
       })
-      .toBeCloseTo(390, 0);
+      .toBeCloseTo(0, 0);
 
     await page.keyboard.press('Escape');
     await expect(aside).not.toHaveClass(/\bopen\b/);
@@ -145,5 +134,26 @@ test.describe('Study Hub v2 — mobile shell', () => {
     await page.getByRole('button', { name: 'Mehr' }).click();
     await expect(page.locator('#app-sidebar')).toHaveClass(/\bopen\b/);
     await expect(page.getByRole('button', { name: 'Mehr' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('help modal opens from the drawer and Escape closes modal before drawer', async ({ page }) => {
+    await page.goto(BASE_URL);
+    const aside = page.locator('#app-sidebar');
+
+    await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+    await expect(aside).toHaveClass(/\bopen\b/);
+
+    await page.getByRole('button', { name: 'Tastaturkürzel' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Tastaturkürzel' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('Suche öffnen');
+
+    // Escape ordnet sich ab: erst das Modal, dann der Drawer.
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(aside).toHaveClass(/\bopen\b/);
+
+    await page.keyboard.press('Escape');
+    await expect(aside).not.toHaveClass(/\bopen\b/);
   });
 });

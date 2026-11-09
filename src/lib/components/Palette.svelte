@@ -15,6 +15,7 @@
   let query = '';
   let activeIndex = 0;
   let inputEl;
+  let paletteEl;
   let wasOpen = false;
 
   const navigation = [
@@ -132,6 +133,21 @@
     } else if (event.key === 'Enter') {
       event.preventDefault();
       run(items[activeIndex]);
+    } else if (event.key === 'Tab' && paletteEl) {
+      const focusables = [...paletteEl.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href]')].filter(
+        (el) => el.getClientRects().length > 0,
+      );
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === inputEl)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   }
 
@@ -144,7 +160,7 @@
 
 {#if open}
   <div class="overlay" role="presentation" on:click|self={close}>
-    <div class="palette" role="dialog" aria-modal="true" aria-label={notesOnly ? 'Notiz öffnen' : 'Befehlspalette'} tabindex="-1" on:keydown={onKeydown}>
+    <div class="palette" bind:this={paletteEl} role="dialog" aria-modal="true" aria-label={notesOnly ? 'Notiz öffnen' : 'Befehlspalette'} tabindex="-1" on:keydown={onKeydown}>
       <div class="search-row">
         <Icon name={notesOnly ? 'notes' : 'search'} />
         <input
@@ -190,6 +206,7 @@
       <footer class="palette-foot">
         <span><kbd>↑</kbd><kbd>↓</kbd> wählen</span>
         <span><kbd>↵</kbd> öffnen</span>
+        <span><kbd>?</kbd> Hilfe</span>
         <span class="muted">{q ? `${notesOnly ? results.notes.length : totalResults(results)} Treffer` : notesOnly ? 'zuletzt bearbeitet' : ''}</span>
       </footer>
     </div>
@@ -202,10 +219,17 @@
     inset: 0;
     z-index: 130;
     display: flex;
+    align-items: flex-end;
     justify-content: center;
-    padding: min(14vh, 120px) var(--space-4) var(--space-4);
-    background: rgb(20 22 28 / 0.4);
+    padding: var(--space-4);
+    background: var(--overlay);
     backdrop-filter: blur(4px);
+  }
+  @media (min-width: 640px) {
+    .overlay {
+      align-items: flex-start;
+      padding-top: min(14vh, 120px);
+    }
   }
   .palette {
     width: min(620px, 100%);
@@ -225,6 +249,9 @@
     padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--rule);
     color: var(--ink-3);
+  }
+  .search-row:focus-within {
+    box-shadow: inset 0 -2px 0 var(--accent);
   }
   .search-input {
     flex: 1;

@@ -1,5 +1,13 @@
 <script>
-  import { appState, modulesByProgram, createModule, updateModule, deleteModule } from '../stores/app.js';
+  import {
+    appState,
+    modulesByProgram,
+    createModule,
+    updateModule,
+    deleteModule,
+    snapshotModule,
+    restoreModuleSnapshot,
+  } from '../stores/app.js';
   import { navigate, modulePath } from '../router.js';
   import { toast } from '../stores/toast.js';
   import Modal from '../components/Modal.svelte';
@@ -57,9 +65,19 @@
 
   function doDelete() {
     if (!confirmDelete) return;
-    deleteModule(confirmDelete.id);
+    const mod = confirmDelete;
+    const snapshot = snapshotModule(mod.id);
+    deleteModule(mod.id);
     confirmDelete = null;
-    toast('Modul gelöscht');
+    toast('Modul gelöscht', {
+      action: {
+        label: 'Rückgängig',
+        fn: () => {
+          restoreModuleSnapshot(snapshot);
+          toast('Wiederhergestellt');
+        },
+      },
+    });
   }
 
   function counts(mod) {
@@ -103,11 +121,13 @@
                 <a class="module-link" href="#{modulePath(mod.id)}">
                   <span class="mod-code mono">{mod.code || '—'}</span>
                   <h3>{mod.title || 'Ohne Titel'}</h3>
-                  <span class="stats">
-                    <span>{c.homework} offen</span>
-                    <span>{c.notes} Notizen</span>
-                    <span>{c.exams} Prüfungen</span>
-                  </span>
+                  {#if c.homework || c.notes || c.exams}
+                    <span class="stats">
+                      {#if c.homework}<span>{c.homework} offen</span>{/if}
+                      {#if c.notes}<span>{c.notes} {c.notes === 1 ? 'Notiz' : 'Notizen'}</span>{/if}
+                      {#if c.exams}<span>{c.exams} {c.exams === 1 ? 'Prüfung' : 'Prüfungen'}</span>{/if}
+                    </span>
+                  {/if}
                 </a>
                 <div class="card-actions">
                   <AiButton kind="module" id={mod.id} label="KI fragen" iconOnly />
@@ -173,7 +193,10 @@
 </Modal>
 
 <Modal open={!!confirmDelete} title="Modul löschen" on:close={() => (confirmDelete = null)}>
-  <p>«{confirmDelete?.title || confirmDelete?.code}» und alle zugehörigen Notizen, Hausaufgaben, Prüfungen, Links und Dateien werden entfernt.</p>
+  <p>
+    «{confirmDelete?.title || confirmDelete?.code}» und alle zugehörigen Notizen, Hausaufgaben, Prüfungen und Links werden entfernt.
+    Hochgeladene Dateien werden endgültig gelöscht und lassen sich nicht wiederherstellen.
+  </p>
   <svelte:fragment slot="footer">
     <button class="btn btn-ghost" type="button" on:click={() => (confirmDelete = null)}>Abbrechen</button>
     <button class="btn btn-danger" type="button" on:click={doDelete}>Löschen</button>
@@ -271,7 +294,7 @@
     flex-direction: column;
     gap: 2px;
     padding: var(--space-2);
-    opacity: 0;
+    opacity: 0.5;
   }
   .module-card:hover .card-actions,
   .card-actions:focus-within {
@@ -314,7 +337,7 @@
     outline: 2px solid var(--swatch);
     outline-offset: 2px;
   }
-  @media (any-pointer: coarse) {
+  @media (pointer: coarse) {
     .card-actions {
       opacity: 1;
     }

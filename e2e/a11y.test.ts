@@ -241,6 +241,8 @@ test.describe('Study Hub v2.1 — accessibility', () => {
 
     await page.goto(`${BASE_URL}/#/notes/note-2`);
     // The notes split view also has a list-level summarise action.
+    // In the detail pane "Zusammenfassen" sits in the overflow menu.
+    await page.locator('.detail-pane').getByLabel('Weitere KI-Aktionen').click();
     const summarize = page.locator('.detail-pane').getByRole('button', { name: 'Zusammenfassen' });
     await summarize.focus();
     await page.keyboard.press('Enter');

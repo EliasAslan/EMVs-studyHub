@@ -58,6 +58,10 @@ export function linkIndex(state) {
   }
   for (const h of state.homework || []) add(h.title, { kind: 'homework', id: h.id, label: h.title });
   for (const e of state.exams || []) add(e.title, { kind: 'exam', id: e.id, label: e.title });
+  for (const l of state.links || []) add(l.label, { kind: 'link', id: l.id, label: l.label });
+  for (const t of state.topics || []) {
+    add(t.name, { kind: 'topic', id: t.id, label: t.name, moduleId: t.moduleId || null });
+  }
   return index;
 }
 

@@ -47,13 +47,25 @@
   let reminderDismissed = false;
   let reminderDismissedAtChangeCount = 0;
 
-  // Email reminders state
+  // Email reminders state (persisted via updateSettings)
   let remindersEmail = $appState.settings.email || '';
   let remindersOptIn = $appState.settings.emailReminders || false;
-  let remindersDay = 5; // Friday per plan; WEEKDAYS.index from 1=Montag to 7Sonntag
-  let remindersContent = 'todo'; // todo, summary, none
+  let remindersDay = Number($appState.settings.remindersDay) || 5; // Friday per plan; WEEKDAYS.index from 1=Montag to 7Sonntag
+  let remindersContent = ['todo', 'summary', 'none'].includes($appState.settings.remindersContent)
+    ? $appState.settings.remindersContent
+    : 'todo'; // todo, summary, none
   let remindersBusy = false;
   let remindersError = '';
+  let remindersMessage = '';
+
+  function saveReminders() {
+    updateSettings({
+      email: remindersEmail.trim(),
+      emailReminders: remindersOptIn,
+      remindersDay: Number(remindersDay) || 5,
+      remindersContent,
+    });
+  }
 
   // Local AI settings (device only).
   let aiBase = $aiSettings.baseUrl;
@@ -68,12 +80,12 @@
 
   $: signedIn = !!$cloud.session;
   $: syncStateLabel = $cloud.syncing
-    ? 'läuft'
+    ? 'Synchronisiert…'
     : $cloud.lastError
       ? 'Fehler'
       : signedIn
-        ? 'bereit'
-        : 'aus';
+        ? 'Verbunden · bereit'
+        : 'Nicht verbunden';
   $: settings = $appState.settings;
   $: programs = $appState.programs || [];
   $: modules = $appState.modules || [];
@@ -83,7 +95,6 @@
     lessons: lessons.filter((l) => l.dayOfWeek === day.value),
   }));
   $: lastExport = settings.lastExportAt ? formatDate(dateKey(new Date(settings.lastExportAt)), 'long') : 'nie';
-  $: remindersOptIn = settings.emailReminders || false;
   $: ai = $aiSettings;
   $: aiModelOptions = [...new Set([aiModel, ...aiModels].filter(Boolean))];
   $: aiIsLocal = isLoopbackUrl(normalizeBaseUrl(aiBase));
@@ -330,7 +341,15 @@
     </div>
   </header>
 
-  <section class="card section" aria-labelledby="programs-title">
+  <nav class="subnav" aria-label="Einstellungsbereiche">
+    <a href="#settings-programs" on:click|preventDefault={() => document.getElementById('settings-programs')?.scrollIntoView({ block: 'start' })}>Programme</a>
+    <a href="#settings-theme" on:click|preventDefault={() => document.getElementById('settings-theme')?.scrollIntoView({ block: 'start' })}>Darstellung</a>
+    <a href="#settings-ai" on:click|preventDefault={() => document.getElementById('settings-ai')?.scrollIntoView({ block: 'start' })}>KI</a>
+    <a href="#settings-schedule" on:click|preventDefault={() => document.getElementById('settings-schedule')?.scrollIntoView({ block: 'start' })}>Stundenplan</a>
+    <a href="#settings-data" on:click|preventDefault={() => document.getElementById('settings-data')?.scrollIntoView({ block: 'start' })}>Daten</a>
+  </nav>
+
+  <section class="card section" id="settings-programs" aria-labelledby="programs-title">
     <div class="section-title">
       <h2 id="programs-title">Programme</h2>
       <span class="hint">EMVs und BM</span>
@@ -351,7 +370,7 @@
     </div>
   </section>
 
-  <section class="card section" aria-labelledby="theme-title">
+  <section class="card section" id="settings-theme" aria-labelledby="theme-title">
     <div class="section-title">
       <h2 id="theme-title">Darstellung</h2>
     </div>
@@ -370,7 +389,7 @@
     </div>
   </section>
 
-  <section class="card section" aria-labelledby="ai-title">
+  <section class="card section" id="settings-ai" aria-labelledby="ai-title">
     <div class="section-title">
       <h2 id="ai-title">Lokale KI</h2>
       <span class="hint">optional</span>
@@ -426,7 +445,7 @@
     {/if}
   </section>
 
-  <section class="card section" aria-labelledby="schedule-title">
+  <section class="card section" id="settings-schedule" aria-labelledby="schedule-title">
     <div class="section-title">
       <h2 id="schedule-title">Stundenplan</h2>
       <span class="hint">Nächste Lektion auf Heute</span>
@@ -493,12 +512,12 @@
         {#if lessonEditing}
           <button class="btn btn-ghost" type="button" on:click={resetLessonForm}>Abbrechen</button>
         {/if}
-        <button class="btn btn-primary" type="submit">{lessonEditing ? 'Speichern' : 'Hinzufügen'}</button>
+        <button class="btn btn-primary" type="submit">{lessonEditing ? 'Speichern' : 'Erfassen'}</button>
       </div>
     </form>
   </section>
 
-  <section class="card section" aria-labelledby="backup-title">
+  <section class="card section" id="settings-data" aria-labelledby="backup-title">
     <div class="section-title">
       <h2 id="backup-title">Backup</h2>
       <span class="hint">Zuletzt: {lastExport}</span>
@@ -548,11 +567,11 @@
       <div>
         <label class="field">
           <span>E-Mail</span>
-          <input class="input" type="email" bind:value={remindersEmail} placeholder="name@beispiel.ch" />
+          <input class="input" type="email" bind:value={remindersEmail} placeholder="name@beispiel.ch" on:change={saveReminders} />
         </label>
         <label class="field">
           <span>Tag</span>
-          <select class="select" bind:value={remindersDay}>
+          <select class="select" bind:value={remindersDay} on:change={saveReminders}>
             {#each WEEKDAYS as day (day.value)}
               <option value={day.value}>{day.label}</option>
             {/each}
@@ -560,14 +579,14 @@
         </label>
         <label class="field">
           <span>Inhalt</span>
-          <select class="select" bind:value={remindersContent}>
+          <select class="select" bind:value={remindersContent} on:change={saveReminders}>
             <option value="todo">Als To-Do-Liste (Hausaufgaben + Prüfungen fällig morgen)</option>
             <option value="summary">Als Zusammenfassung</option>
             <option value="none">Kein Inhalt</option>
           </select>
         </label>
         <label class="pref-row">
-          <input type="checkbox" bind:checked={remindersOptIn} />
+          <input type="checkbox" bind:checked={remindersOptIn} on:change={saveReminders} />
           <span>Erinnerungen aktivieren</span>
         </label>
       </div>
@@ -588,7 +607,7 @@
     {#if !$cloud.configured}
       <p class="muted small">Cloud ist nicht konfiguriert.</p>
     {:else if !signedIn}
-      <p class="muted small">Gerät ist die Wahrheit. Anmelden schaltet den stillen Sync frei.</p>
+      <p class="muted small">Gerät ist Hauptquelle. Anmelden aktiviert Auto-Sync.</p>
       <form class="auth-form" on:submit|preventDefault={doSignIn}>
         <label class="field">
           <span>E-Mail</span>
@@ -685,6 +704,31 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
+  .subnav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    gap: var(--space-1);
+    overflow-x: auto;
+    padding: var(--space-2);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-2);
+    background: var(--surface);
+  }
+  .subnav a {
+    flex: none;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-1);
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .subnav a:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
   .eyebrow {
     font-size: 0.8125rem;
     font-weight: 500;
@@ -700,6 +744,7 @@
     flex-direction: column;
     gap: var(--space-3);
     padding: var(--space-4);
+    scroll-margin-top: 110px;
   }
   .section.danger {
     border-color: var(--danger);
@@ -1000,6 +1045,14 @@
     width: 18px;
     height: 18px;
     accent-color: var(--accent);
+  }
+  @media (max-width: 899px) {
+    .schedule {
+      grid-template-columns: 1fr;
+    }
+    .day-block {
+      min-height: 0;
+    }
   }
   @media (min-width: 700px) {
     .form-grid {

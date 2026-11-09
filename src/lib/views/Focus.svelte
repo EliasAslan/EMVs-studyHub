@@ -35,6 +35,8 @@
 
   onMount(() => {
     prefs = getPomodoroPrefs();
+    const saved = Number(prefs.workMinutes);
+    if (Number.isFinite(saved) && saved >= 1 && saved <= 480) minutes = Math.round(saved);
     const unsubscribe = subscribePomodoro((detail) => {
       state = detail.state;
       prefs = detail.prefs;
@@ -54,12 +56,13 @@
   $: progress = state ? progressPct(state, now) : 0;
   $: label = state ? phaseLabel(state) : 'Bereit';
   $: round = state ? roundLabel(state) : '';
-  $: notification = typeof window !== 'undefined' && 'Notification' in window ? notificationStatus() : 'unsupported';
+  $: notification = prefs && typeof window !== 'undefined' && 'Notification' in window ? notificationStatus() : 'unsupported';
 
   const RADIUS = 108;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   function start() {
+    updatePomodoroPrefs({ workMinutes: minutes });
     const result = startPomodoro({ minutes });
     if (!result.ok) toast('Es läuft bereits eine Runde.');
   }
@@ -82,6 +85,7 @@
   function setMinutes(value) {
     minutes = value;
     custom = '';
+    updatePomodoroPrefs({ workMinutes: value });
   }
 
   function applyCustom() {
@@ -92,6 +96,7 @@
     }
     minutes = Math.round(value);
     custom = '';
+    updatePomodoroPrefs({ workMinutes: minutes });
   }
 
   async function askNotifications() {
@@ -104,9 +109,7 @@
 
 <div class="focus-page">
   <header class="focus-head">
-    <p class="eyebrow">Fokus</p>
-    <h1>Eine Runde. Eine Pause.</h1>
-    <p class="lede">Du startest selbst. Danach entscheidest du, wie es weitergeht.</p>
+    <h1>Fokus</h1>
   </header>
 
   <section class="timer-card" class:is-break={state && !isWork} aria-label="Fokus-Timer">
@@ -166,7 +169,7 @@
       <button class="btn btn-primary start" type="button" on:click={start}>
         <Icon name="focus" size={18} /> Fokus starten
       </button>
-      <p class="hint">{minutes} Minuten. Nur du und die Zeit.</p>
+      <p class="hint">Bereit</p>
     {:else if isWork && !workDone}
       <div class="actions">
         <button class="btn btn-primary" type="button" on:click={toggle}>
@@ -174,7 +177,7 @@
         </button>
         <button class="btn btn-ghost" type="button" on:click={stop}>Beenden</button>
       </div>
-      <p class="hint">{paused ? 'Pausiert. Du entscheidest, wann es weitergeht.' : 'Läuft. Kein Druck.'}</p>
+      <p class="hint">{paused ? 'Pausiert' : 'Läuft'}</p>
     {:else if workDone}
       <div class="actions">
         <button class="btn btn-primary" type="button" on:click={() => chooseBreak(recommended)}>
@@ -191,7 +194,7 @@
           Lang · {POMODORO_DEFAULTS.longBreakMinutes} Min
         </button>
       </div>
-      <p class="hint">Fokus beendet. Pause oder direkt weiter.</p>
+      <p class="hint">Fokus beendet</p>
     {:else if breakDone}
       <div class="actions">
         <button class="btn btn-primary" type="button" on:click={next}>Nächste Runde</button>
@@ -210,13 +213,17 @@
         <button class="btn" type="button" on:click={() => skipBreak()}>Pause beenden</button>
         <button class="btn btn-ghost" type="button" on:click={stop}>Beenden</button>
       </div>
-      <p class="hint">Die nächste Runde startest du selbst.</p>
+      <p class="hint">{paused ? 'Pause · Pausiert' : 'Pause · Läuft'}</p>
     {/if}
   </section>
 
+  {#if prefs.showStatistics !== false}
+    <PomodoroStats />
+  {/if}
+
   <section class="prefs card" aria-labelledby="prefs-title">
     <div class="prefs-head">
-      <h2 id="prefs-title">Ruhig bleiben</h2>
+      <h2 id="prefs-title">Timer</h2>
     </div>
     <label class="pref-row check-row">
       <input
@@ -247,10 +254,6 @@
       <span>Verlauf anzeigen</span>
     </label>
   </section>
-
-  {#if prefs.showStatistics !== false}
-    <PomodoroStats />
-  {/if}
 </div>
 
 <style>
@@ -267,21 +270,11 @@
     flex-direction: column;
     gap: var(--space-2);
   }
-  .eyebrow {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: -0.005em;
-    color: var(--ink-2);
-  }
   h1 {
     font-family: var(--font-read);
     font-size: clamp(1.8rem, 4vw, 2.4rem);
     font-weight: 600;
     letter-spacing: -0.02em;
-  }
-  .lede {
-    color: var(--ink-2);
-    font-size: var(--text-sm);
   }
   .timer-card {
     display: flex;
@@ -318,7 +311,7 @@
   }
   .ring-wrap {
     position: relative;
-    width: min(240px, 68vw);
+    width: min(260px, 68vw);
     aspect-ratio: 1;
   }
   .ring {
@@ -426,7 +419,17 @@
   .pref-label {
     flex: 1;
   }
-  @media (any-pointer: coarse) {
+  @media (min-width: 700px) {
+    .ring-wrap {
+      width: 300px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ring-progress {
+      transition: none;
+    }
+  }
+  @media (pointer: coarse) {
     .custom-input {
       min-height: 48px;
     }

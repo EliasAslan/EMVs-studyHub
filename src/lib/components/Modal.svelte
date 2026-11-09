@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import Icon from './Icon.svelte';
   export let open = false;
   export let title = '';
   export let wide = false;
@@ -12,6 +13,27 @@
     if (event.key === 'Escape') {
       event.stopPropagation();
       close();
+      return;
+    }
+    if (event.key !== 'Tab' || !dialog) return;
+    const focusables = [
+      ...dialog.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ].filter((el) => el.getClientRects().length > 0);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (!dialog.contains(active)) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
     }
   }
 
@@ -47,8 +69,8 @@
       {#if title}
         <header class="modal-head">
           <h2>{title}</h2>
-          <button class="btn btn-ghost btn-sm" type="button" on:click={close} aria-label="Schliessen">
-            <span aria-hidden="true">✕</span>
+          <button class="btn btn-ghost btn-sm" type="button" on:click={close} aria-label="Dialog schliessen">
+            <Icon name="x" size={16} />
           </button>
         </header>
       {/if}
@@ -73,7 +95,7 @@
     align-items: flex-end;
     justify-content: center;
     padding: var(--space-4);
-    background: rgb(20 22 28 / 0.35);
+    background: var(--overlay);
     backdrop-filter: blur(3px);
   }
   .modal {

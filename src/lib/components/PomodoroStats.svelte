@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { subscribePomodoro } from '../services/pomodoroEngine.js';
+  import Modal from './Modal.svelte';
   import {
     loadPomodoroHistoryState,
     getTodaySessions,
@@ -11,6 +12,7 @@
 
   let history = { sessions: [] };
   let visibleCount = 5;
+  let confirmClear = false;
 
   onMount(() => {
     refresh();
@@ -53,8 +55,12 @@
 
   function clearAll() {
     if (!sessions.length) return;
-    if (!window.confirm('Den Pomodoro-Verlauf wirklich löschen?')) return;
+    confirmClear = true;
+  }
+
+  function doClear() {
     clearPomodoroHistory();
+    confirmClear = false;
     refresh();
   }
 </script>
@@ -106,6 +112,14 @@
     <p class="empty">Noch keine abgeschlossene Runde. Der Verlauf füllt sich, sobald eine Fokuszeit endet.</p>
   {/if}
 </section>
+
+<Modal open={confirmClear} title="Verlauf löschen" on:close={() => (confirmClear = false)}>
+  <p>Den Pomodoro-Verlauf wirklich löschen? Das lässt sich nicht rückgängig machen.</p>
+  <svelte:fragment slot="footer">
+    <button class="btn btn-ghost" type="button" on:click={() => (confirmClear = false)}>Abbrechen</button>
+    <button class="btn btn-danger" type="button" on:click={doClear}>Löschen</button>
+  </svelte:fragment>
+</Modal>
 
 <style>
   .stats {

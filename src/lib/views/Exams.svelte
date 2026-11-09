@@ -1,5 +1,5 @@
 <script>
-  import { appState, createExam, updateExam, deleteExam } from '../stores/app.js';
+  import { appState, createExam, updateExam, deleteExam, restoreEntity } from '../stores/app.js';
   import { todayKey, formatDate, relativeDayLabel } from '../data/dates.js';
   import { toast } from '../stores/toast.js';
   import Modal from '../components/Modal.svelte';
@@ -55,13 +55,31 @@
   }
 
   function remove(exam) {
+    const snapshot = { ...exam };
     deleteExam(exam.id);
-    toast('Prüfung gelöscht');
+    toast('Prüfung gelöscht', {
+      action: {
+        label: 'Rückgängig',
+        fn: () => {
+          restoreEntity('exams', snapshot);
+          toast('Wiederhergestellt');
+        },
+      },
+    });
   }
 
   function gradeLabel(grade) {
     if (typeof grade !== 'number') return '';
     return Number.isInteger(grade) ? String(grade) : grade.toFixed(1);
+  }
+
+  /** 6-segment fill: 1-5 full, 6th segment half when the grade has a .5 */
+  function gradeState(grade, index) {
+    if (typeof grade !== 'number') return '';
+    const full = Math.floor(grade);
+    if (index <= full) return 'on';
+    if (index === full + 1 && grade % 1 >= 0.5) return 'half';
+    return '';
   }
 </script>
 
@@ -123,11 +141,22 @@
             <button class="exam-main" type="button" on:click={() => openEdit(exam)}>
               <span class="title">{exam.title}</span>
               <span class="meta">
+                <span class="past-badge">Vorbei</span>
                 <span>{exam.date ? formatDate(exam.date, 'short') : 'ohne Datum'}</span>
                 {#if exam.gradeNote}<span class="note">{exam.gradeNote}</span>{/if}
               </span>
             </button>
-            {#if typeof exam.grade === 'number'}<span class="grade mono">{gradeLabel(exam.grade)}</span>{/if}
+            {#if typeof exam.grade === 'number'}
+              <span class="grade-block" title={`Note ${gradeLabel(exam.grade)} von 6`}>
+                <span class="grade mono">{gradeLabel(exam.grade)}</span>
+                <span class="grade-scale" aria-hidden="true">
+                  {#each [1, 2, 3, 4, 5, 6] as i (i)}
+                    <span class="grade-seg {gradeState(exam.grade, i)}"></span>
+                  {/each}
+                </span>
+                <span class="sr-only">Note {gradeLabel(exam.grade)} von 6</span>
+              </span>
+            {/if}
             <button class="icon" type="button" aria-label={`${exam.title} löschen`} on:click={() => remove(exam)}><Icon name="trash" size={15} /></button>
           </div>
         {/each}
@@ -206,8 +235,23 @@
   .exam-row:hover {
     background: var(--surface-2);
   }
-  .exam-row.past {
-    opacity: 0.85;
+  .exam-row.past .date-block {
+    background: var(--surface-2);
+    color: var(--ink-3);
+  }
+  .exam-row.past .title {
+    color: var(--ink-2);
+  }
+  .exam-row.past .month {
+    color: var(--ink-3);
+  }
+  .past-badge {
+    padding: 1px var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: 10px;
+    font-weight: 650;
   }
   .date-block {
     display: flex;
@@ -266,6 +310,32 @@
     color: var(--ok);
     font-weight: 700;
   }
+  .grade-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    flex: none;
+  }
+  .grade-scale {
+    display: flex;
+    gap: 3px;
+  }
+  .grade-seg {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--rule-strong);
+  }
+  .grade-seg.on {
+    background: var(--ok);
+    border-color: var(--ok);
+  }
+  .grade-seg.half {
+    background: linear-gradient(90deg, var(--ok) 50%, var(--surface-2) 50%);
+    border-color: var(--ok);
+  }
   .icon {
     display: grid;
     place-items: center;
@@ -275,7 +345,7 @@
     border-radius: var(--radius-1);
     background: transparent;
     color: var(--ink-3);
-    opacity: 0;
+    opacity: 0.45;
   }
   .exam-row:hover .icon,
   .icon:focus-visible {
@@ -290,7 +360,7 @@
     grid-template-columns: 1fr 1fr;
     gap: var(--space-3);
   }
-  @media (any-pointer: coarse) {
+  @media (pointer: coarse) {
     .icon {
       opacity: 1;
     }

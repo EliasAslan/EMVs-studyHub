@@ -16,7 +16,6 @@
     mistake: 'Fehler',
     summary: 'Zusammenfassung',
     question: 'Frage',
-    idea: 'Idee',
   };
 
   function typeLabel(type) {

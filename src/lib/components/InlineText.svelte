@@ -12,7 +12,7 @@
   $: tokens = parseInline(text);
 </script>
 
-{#each tokens as tok, i (i)}{#if tok.type === 'text'}{tok.text}{:else if tok.type === 'link'}{#if resolveEntry && resolveEntry(tok.target)}<button class="wiki" type="button" on:click={() => onLink(tok.target)}>{tok.label}</button>{:else}<button class="wiki unresolved" type="button" title="Notiz erstellen" on:click={() => onCreate(tok.target)}>{tok.label}</button>{/if}{:else if tok.type === 'bold'}<strong>{tok.text}</strong>{:else if tok.type === 'italic'}<em>{tok.text}</em>{:else if tok.type === 'code'}<code>{tok.text}</code>{:else if tok.type === 'tag'}<button class="tag" type="button" on:click={() => onTag(tok.tag)}>#{tok.tag}</button>{/if}{/each}
+{#each tokens as tok, i (i)}{#if tok.type === 'text'}{tok.text}{:else if tok.type === 'link'}{#if resolveEntry && resolveEntry(tok.target)}<button class="wiki" type="button" on:click={() => onLink(tok.target)}>{tok.label}</button>{:else}<button class="wiki unresolved" type="button" title={`Notiz «${tok.target}» erstellen`} on:click={() => onCreate(tok.target)}><span class="wiki-plus" aria-hidden="true">+</span>{tok.label}</button>{/if}{:else if tok.type === 'bold'}<strong>{tok.text}</strong>{:else if tok.type === 'italic'}<em>{tok.text}</em>{:else if tok.type === 'code'}<code>{tok.text}</code>{:else if tok.type === 'tag'}<button class="tag" type="button" on:click={() => onTag(tok.tag)}>#{tok.tag}</button>{/if}{/each}
 
 <style>
   .wiki {
@@ -34,6 +34,10 @@
   }
   .wiki.unresolved:hover {
     color: var(--accent-strong);
+  }
+  .wiki-plus {
+    margin-right: 3px;
+    font-weight: 700;
   }
   .tag {
     border: 0;

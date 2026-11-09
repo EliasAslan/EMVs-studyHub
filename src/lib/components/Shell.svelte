@@ -7,24 +7,61 @@
   import TabBar from './TabBar.svelte';
   import Palette from './Palette.svelte';
   import QuickCapture from './QuickCapture.svelte';
+  import Modal from './Modal.svelte';
   import Toast from './Toast.svelte';
   import Icon from './Icon.svelte';
-  import FullscreenToggle from './FullscreenToggle.svelte';
   import { toast } from '../stores/toast.js';
   import { paletteOpen, openPalette, togglePalette, closePalette, rememberRoute } from '../stores/ui.js';
   import { downloadBackup } from '../services/backup.js';
 
   let captureOpen = false;
   let captureMode = 'note';
+  let captureMenuOpen = false;
+  let fabMenu;
+  let fabButton;
   let switcherOpen = false;
+  let helpOpen = false;
   let drawerOpen = false;
   let menuButton = null;
   let pendingG = false;
   let pendingTimer = null;
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '');
+
   export function openCapture(mode = 'note') {
+    captureMenuOpen = false;
     captureMode = mode;
     captureOpen = true;
+  }
+
+  function toggleCaptureMenu() {
+    captureMenuOpen = !captureMenuOpen;
+  }
+
+  function closeCaptureMenu() {
+    captureMenuOpen = false;
+    fabButton?.focus();
+  }
+
+  $: if (captureMenuOpen) {
+    queueMicrotask(() => fabMenu?.querySelector('.fab-item')?.focus());
+  }
+
+  function trapMenuFocus(event) {
+    const items = [...(fabMenu?.querySelectorAll('.fab-item') || [])].filter(
+      (el) => el.getClientRects().length > 0,
+    );
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !fabMenu.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   function openDrawer() {
@@ -126,6 +163,17 @@
         return;
       }
 
+      if (event.key === 'Escape' && captureMenuOpen) {
+        event.preventDefault();
+        closeCaptureMenu();
+        return;
+      }
+
+      if (captureMenuOpen && event.key === 'Tab') {
+        trapMenuFocus(event);
+        return;
+      }
+
       if (event.key === 'Escape' && drawerOpen) {
         event.preventDefault();
         closeDrawer({ restoreFocus: true });
@@ -138,8 +186,13 @@
       }
 
       if (editable) return;
-      if ($paletteOpen || switcherOpen || captureOpen || drawerOpen) return;
+      if ($paletteOpen || switcherOpen || captureOpen || drawerOpen || captureMenuOpen) return;
 
+      if (event.key === '?') {
+        event.preventDefault();
+        helpOpen = true;
+        return;
+      }
       if (event.key === '/') {
         event.preventDefault();
         openPalette();
@@ -178,9 +231,13 @@
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') flush();
     };
+    const onHelpShortcut = () => {
+      helpOpen = true;
+    };
     window.addEventListener('keydown', onKey);
     window.addEventListener('pagehide', onHide);
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('studyhub:shortcuts', onHelpShortcut);
 
     return () => {
       stopRouter();
@@ -189,6 +246,7 @@
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pagehide', onHide);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('studyhub:shortcuts', onHelpShortcut);
       document.body.style.overflow = '';
     };
   });
@@ -217,12 +275,14 @@
     class:open={drawerOpen}
     type="button"
     tabindex="-1"
-    aria-label="Navigation schließen"
+    aria-label="Navigation schliessen"
     on:click={() => closeDrawer({ restoreFocus: true })}
   ></button>
-  <Sidebar open={drawerOpen} onClose={() => closeDrawer({ restoreFocus: true })} />
+  <div inert={captureMenuOpen}>
+    <Sidebar open={drawerOpen} onClose={() => closeDrawer({ restoreFocus: true })} />
+  </div>
 
-  <div class="main-wrap">
+  <div class="main-wrap" inert={drawerOpen || captureMenuOpen}>
     <header class="mobile-head">
       <button
         class="icon-btn"
@@ -242,26 +302,77 @@
       <button class="icon-btn" type="button" on:click={openPalette} aria-label="Suchen">
         <Icon name="search" />
       </button>
-      <FullscreenToggle />
     </header>
-
-    <div class="fullscreen-corner"><FullscreenToggle /></div>
 
     <main id="main" tabindex="-1">
       <slot />
     </main>
   </div>
 
-  <button class="fab" type="button" on:click={() => openCapture('note')} aria-label="Erfassen">
-    <Icon name="plus" size={22} />
+  {#if captureMenuOpen}
+    <button class="fab-scrim" type="button" tabindex="-1" aria-label="Erfassen schliessen" on:click={closeCaptureMenu}></button>
+    <div class="fab-menu" bind:this={fabMenu} role="menu" aria-label="Was möchtest du erfassen?">
+      <p class="fab-menu-title">Neu erfassen</p>
+      <button class="fab-item" type="button" role="menuitem" on:click={() => openCapture('note')}>
+        <Icon name="notes" size={18} /><span>Notiz</span>
+      </button>
+      <button class="fab-item" type="button" role="menuitem" on:click={() => openCapture('photo')}>
+        <Icon name="photo" size={18} /><span>Foto</span>
+      </button>
+      <button class="fab-item" type="button" role="menuitem" on:click={() => openCapture('homework')}>
+        <Icon name="homework" size={18} /><span>Hausaufgabe</span>
+      </button>
+      <button class="fab-item" type="button" role="menuitem" on:click={() => openCapture('exam')}>
+        <Icon name="exams" size={18} /><span>Prüfung</span>
+      </button>
+      <button class="fab-item" type="button" role="menuitem" on:click={() => openCapture('module')}>
+        <Icon name="modules" size={18} /><span>Modul</span>
+      </button>
+      <button class="fab-item" type="button" role="menuitem" on:click={() => openCapture('link')}>
+        <Icon name="links" size={18} /><span>Link</span>
+      </button>
+    </div>
+  {/if}
+
+  <button
+    class="fab"
+    type="button"
+    bind:this={fabButton}
+    on:click={toggleCaptureMenu}
+    aria-label={captureMenuOpen ? 'Erfassen schliessen' : 'Erfassen'}
+    aria-haspopup="menu"
+    aria-expanded={captureMenuOpen}
+  >
+    <Icon name={captureMenuOpen ? 'x' : 'plus'} size={22} />
   </button>
 
-  <TabBar onMore={toggleDrawer} expanded={drawerOpen} />
+  <div inert={drawerOpen || captureMenuOpen}>
+    <TabBar onMore={toggleDrawer} expanded={drawerOpen} />
+  </div>
 </div>
 
 <Palette open={$paletteOpen} on:close={closePalette} on:create={onPaletteCreate} on:action={onPaletteAction} />
 <Palette open={switcherOpen} mode="notes" on:close={() => (switcherOpen = false)} />
 <QuickCapture open={captureOpen} initialMode={captureMode} on:close={() => (captureOpen = false)} />
+
+<Modal open={helpOpen} title="Tastaturkürzel" on:close={() => (helpOpen = false)}>
+  <div class="shortcut-list">
+    <div class="shortcut-row"><span><kbd>/</kbd> oder <kbd>{isMac ? '⌘K' : 'Ctrl K'}</kbd></span><span>Suche öffnen</span></div>
+    <div class="shortcut-row"><span><kbd>{isMac ? '⌘O' : 'Ctrl O'}</kbd></span><span>Notiz öffnen</span></div>
+    <div class="shortcut-row"><span><kbd>N</kbd></span><span>Neue Notiz</span></div>
+    <div class="shortcut-row"><span><kbd>H</kbd></span><span>Neue Hausaufgabe</span></div>
+    <div class="shortcut-row"><span><kbd>G</kbd> dann <kbd>H</kbd></span><span>Zu Hausaufgaben</span></div>
+    <div class="shortcut-row"><span><kbd>G</kbd> dann <kbd>N</kbd></span><span>Zu Notizen</span></div>
+    <div class="shortcut-row"><span><kbd>G</kbd> dann <kbd>P</kbd></span><span>Zu Prüfungen</span></div>
+    <div class="shortcut-row"><span><kbd>G</kbd> dann <kbd>K</kbd></span><span>Zu Kalender</span></div>
+    <div class="shortcut-row"><span><kbd>G</kbd> dann <kbd>M</kbd></span><span>Zu Modulen</span></div>
+    <div class="shortcut-row"><span><kbd>?</kbd></span><span>Diese Hilfe</span></div>
+    <div class="shortcut-row"><span><kbd>Esc</kbd></span><span>Schliessen</span></div>
+  </div>
+  <svelte:fragment slot="footer">
+    <button class="btn btn-primary" type="button" on:click={() => (helpOpen = false)}>Schliessen</button>
+  </svelte:fragment>
+</Modal>
 
 <Toast />
 
@@ -310,7 +421,7 @@
     height: 100%;
     padding: 0;
     border: 0;
-    background: rgb(15 23 42 / 38%);
+    background: var(--overlay);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -362,8 +473,78 @@
   .fab:active {
     transform: scale(0.97);
   }
-  .fullscreen-corner {
-    display: none;
+  .fab-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: var(--overlay);
+    backdrop-filter: blur(2px);
+  }
+  .fab-menu {
+    position: fixed;
+    right: var(--space-4);
+    bottom: calc(var(--tabbar-h) + 82px + env(safe-area-inset-bottom, 0px));
+    z-index: 65;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: min(240px, calc(100vw - 32px));
+    padding: var(--space-2);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    box-shadow: var(--shadow-3);
+  }
+  .fab-menu-title {
+    padding: var(--space-1) var(--space-3) var(--space-2);
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  .fab-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 42px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-2);
+    background: transparent;
+    color: var(--ink);
+    font-size: var(--text-sm);
+    text-align: left;
+  }
+  .fab-item:hover {
+    background: var(--surface-2);
+  }
+  .fab-item :global(svg) {
+    color: var(--ink-3);
+  }
+  .shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .shortcut-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+  }
+  .shortcut-row kbd {
+    padding: 1px 5px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 10px;
   }
   @media (min-width: 900px) {
     .scrim {
@@ -387,12 +568,9 @@
       bottom: var(--space-6);
       right: var(--space-6);
     }
-    .fullscreen-corner {
-      display: block;
-      position: fixed;
-      top: var(--space-2);
-      right: var(--space-2);
-      z-index: 20;
+    .fab-menu {
+      bottom: calc(var(--space-6) + 66px);
+      right: var(--space-6);
     }
   }
 </style>

@@ -54,6 +54,19 @@
     return TYPE_LABELS[value] || value;
   }
 
+  /** Everything a wiki link can point at, with its label and icon. */
+  const KIND_META = {
+    note: { label: 'Notiz', icon: 'notes' },
+    module: { label: 'Modul', icon: 'modules' },
+    homework: { label: 'Hausaufgabe', icon: 'homework' },
+    exam: { label: 'Prüfung', icon: 'exams' },
+    link: { label: 'Link', icon: 'links' },
+    topic: { label: 'Thema', icon: 'modules' },
+  };
+  function kindMeta(value) {
+    return KIND_META[value] || { label: 'Neu', icon: 'plus' };
+  }
+
   /**
    * Optional starting points. Only offered while the body is empty and
    * only inserted on an explicit click — never on create, never twice.
@@ -266,8 +279,12 @@
     if (!entry) return;
     if (entry.kind === 'note') navigate(notePath(entry.id));
     else if (entry.kind === 'module') navigate(modulePath(entry.id));
-    else if (entry.kind === 'homework') navigate('/homework');
+    else if (entry.kind === 'topic') {
+      if (entry.moduleId) navigate(modulePath(entry.moduleId));
+      else navigate('/modules');
+    } else if (entry.kind === 'homework') navigate('/homework');
     else if (entry.kind === 'exam') navigate('/exams');
+    else if (entry.kind === 'link') navigate('/links');
   }
 
   function openLink(target) {
@@ -361,23 +378,42 @@
       return 1;
     };
 
+    // Keep a readable mix of kinds: notes first, then the other collections.
     const noteItems = (notes || [])
       .filter((n) => n.title && norm(n.title) !== currentTitle && matches(n.title))
       .sort((a, b) => rank(a.title) - rank(b.title) || (b.updatedAt || 0) - (a.updatedAt || 0))
-      .slice(0, 6);
-    for (const n of noteItems) push('note', n.title, n.title, 'Notiz');
+      .slice(0, q ? 6 : 4);
+    for (const n of noteItems) push('note', n.title, n.title, kindMeta('note').label);
 
     const moduleItems = (modules || [])
       .filter((m) => (m.title || m.code) && (matches(m.title) || matches(m.code)))
       .sort((a, b) => rank(a.title || a.code) - rank(b.title || b.code))
-      .slice(0, 4);
-    for (const m of moduleItems) push('module', m.title || m.code, m.title || m.code, 'Modul');
+      .slice(0, 3);
+    for (const m of moduleItems) push('module', m.title || m.code, m.title || m.code, kindMeta('module').label);
+
+    const homeworkItems = ($appState.homework || [])
+      .filter((h) => h.title && matches(h.title))
+      .sort((a, b) => rank(a.title) - rank(b.title))
+      .slice(0, 2);
+    for (const h of homeworkItems) push('homework', h.title, h.title, kindMeta('homework').label);
 
     const examItems = ($appState.exams || [])
       .filter((e) => e.title && matches(e.title))
       .sort((a, b) => rank(a.title) - rank(b.title))
-      .slice(0, 3);
-    for (const e of examItems) push('exam', e.title, e.title, 'Prüfung');
+      .slice(0, 2);
+    for (const e of examItems) push('exam', e.title, e.title, kindMeta('exam').label);
+
+    const linkItems = ($appState.links || [])
+      .filter((l) => l.label && matches(l.label))
+      .sort((a, b) => rank(a.label) - rank(b.label))
+      .slice(0, 2);
+    for (const l of linkItems) push('link', l.label, l.label, kindMeta('link').label);
+
+    const topicItems = ($appState.topics || [])
+      .filter((t) => t.name && matches(t.name))
+      .sort((a, b) => rank(a.name) - rank(b.name))
+      .slice(0, 2);
+    for (const t of topicItems) push('topic', t.name, t.name, kindMeta('topic').label);
 
     const query = String(rawQuery || '').trim();
     const exact = items.some((i) => norm(i.label) === norm(query));
@@ -492,7 +528,7 @@
   /* ---------------------------------------------------------------- */
 
   function isNarrow() {
-    return typeof window !== 'undefined' && window.matchMedia('(max-width: 1099px)').matches;
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 1199px)').matches;
   }
 
   function onKeydown(event) {
@@ -558,12 +594,17 @@
   });
 </script>
 
+<!-- Note shortcuts (Ctrl/Cmd+E toggle, Ctrl/Cmd+S save, Esc) live on the
+     window: the page div is a plain container, and a keydown handler on it
+     would need an ARIA role (a11y_no_static_element_interactions). -->
+<svelte:window on:keydown={onKeydown} />
+
 {#if !note && !isNewRoute}
   <div class="page">
     <EmptyState title="Notiz nicht gefunden" text="Vielleicht wurde sie gelöscht." actionLabel="Zu den Notizen" action={() => navigate('/notes')} />
   </div>
 {:else}
-  <div class="page" on:keydown={onKeydown}>
+  <div class="page">
     <nav class="crumbs" aria-label="Brotkrümelnavigation">
       <a href="#/notes">Notizen</a>
       {#if note?.moduleId}
@@ -587,14 +628,47 @@
       <div class="head-actions">
         {#if note}
           <AiButton label="KI fragen" kind="note" id={note.id} />
-          <AiButton label="Zusammenfassen" kind="note" id={note.id} prompt="Fasse diese Notiz in 5 Punkten zusammen." />
+          <details class="more-actions">
+            <summary class="icon-btn" aria-label="Weitere KI-Aktionen" title="Weitere KI-Aktionen">
+              <Icon name="more" size={16} />
+            </summary>
+            <div class="more-menu">
+              <AiButton label="Zusammenfassen" kind="note" id={note.id} prompt="Fasse diese Notiz in 5 Punkten zusammen." />
+            </div>
+          </details>
         {/if}
         <div class="segmented" role="group" aria-label="Ansicht">
           <button class="seg" class:active={mode === 'edit'} type="button" aria-pressed={mode === 'edit'} on:click={() => (mode = 'edit')}>Schreiben</button>
-          <button class="seg" class:active={mode === 'read'} type="button" aria-pressed={mode === 'read'} on:click={() => { commitTitle(); save(true); mode = 'read'; }}>Lesen</button>
+          <button class="seg" class:active={mode === 'read'} type="button" aria-pressed={mode === 'read'} on:click={() => (mode = 'read')}>Lesen</button>
         </div>
         <button class="icon-btn" type="button" aria-label="Notiz löschen" on:click={remove}><Icon name="trash" size={16} /></button>
       </div>
+    </div>
+
+    <div class="meta-grid">
+      <label class="field">
+        <span>Typ</span>
+        <select class="select" bind:value={type} on:change={() => scheduleSave()}>
+          <option value="note">Notiz</option>
+          <option value="mistake">Fehler</option>
+          <option value="question">Frage</option>
+          <option value="summary">Zusammenfassung</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Modul</span>
+        <select class="select" bind:value={moduleId} on:change={onModuleChange}>
+          <option value="">Kein Modul</option>
+          {#each modules as m (m.id)}<option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>{/each}
+        </select>
+      </label>
+      <label class="field">
+        <span>Thema</span>
+        <select class="select" bind:value={topicId} on:change={() => scheduleSave()}>
+          <option value="">Kein Thema</option>
+          {#each topics as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
+        </select>
+      </label>
     </div>
 
     {#if mode === 'edit'}
@@ -646,7 +720,7 @@
                 on:mouseenter={() => (suggestActive = i)}
                 on:click={() => insertSuggestion(item)}
               >
-                <Icon name={item.kind === 'note' ? 'notes' : item.kind === 'module' ? 'modules' : item.kind === 'exam' ? 'exams' : 'plus'} size={15} />
+                <Icon name={kindMeta(item.kind).icon} size={15} />
                 <span class="suggest-label">{item.label}</span>
                 <span class="suggest-sub">{item.sub}</span>
               </button>
@@ -673,32 +747,6 @@
       </div>
     {/if}
 
-    <div class="meta-grid">
-      <label class="field">
-        <span>Typ</span>
-        <select class="select" bind:value={type} on:change={() => scheduleSave()}>
-          <option value="note">Notiz</option>
-          <option value="mistake">Fehler</option>
-          <option value="question">Frage</option>
-          <option value="summary">Zusammenfassung</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Modul</span>
-        <select class="select" bind:value={moduleId} on:change={onModuleChange}>
-          <option value="">Kein Modul</option>
-          {#each modules as m (m.id)}<option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>{/each}
-        </select>
-      </label>
-      <label class="field">
-        <span>Thema</span>
-        <select class="select" bind:value={topicId} on:change={() => scheduleSave()}>
-          <option value="">Kein Thema</option>
-          {#each topics as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
-        </select>
-      </label>
-    </div>
-
     {#if note && hasConnections}
       <section class="connections" aria-label="Verbindungen">
         <div class="section-title"><h2>Verbindungen</h2></div>
@@ -708,8 +756,24 @@
             <p class="conn-label">Verlinkt zu</p>
             <div class="chips">
               {#each outgoing as item (item.target)}
-                <button class:unresolved={!item.entry} class="chip conn-chip" type="button" on:click={() => openConnection(item)} title={item.entry ? '' : 'Notiz erstellen'}>
+                <button
+                  class:unresolved={!item.entry}
+                  class="chip conn-chip"
+                  type="button"
+                  on:click={() => openConnection(item)}
+                  title={item.entry ? `${kindMeta(item.entry.kind).label}: ${item.entry.label}` : 'Notiz erstellen'}
+                >
+                  {#if !item.entry}
+                    <Icon name="plus" size={13} />
+                  {:else if item.entry.kind !== 'note'}
+                    <Icon name={kindMeta(item.entry.kind).icon} size={13} />
+                  {/if}
                   <span>{item.label || item.target}</span>
+                  {#if !item.entry}
+                    <span class="kind">erstellen</span>
+                  {:else if item.entry.kind !== 'note'}
+                    <span class="kind">{kindMeta(item.entry.kind).label}</span>
+                  {/if}
                   {#if item.count > 1}<span class="count">{item.count}</span>{/if}
                 </button>
               {/each}
@@ -849,8 +913,11 @@
     font-weight: 600;
     letter-spacing: -0.02em;
   }
-  .title-input:focus {
-    outline: none;
+  .title-input:focus-visible,
+  .body-input:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 3px;
+    border-radius: var(--radius-1);
   }
   .templates {
     border-top: 1px solid var(--rule);
@@ -913,8 +980,10 @@
     line-height: 1.7;
     resize: vertical;
   }
-  .body-input:focus {
-    outline: none;
+  .body-input:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 3px;
+    border-radius: var(--radius-1);
   }
   .suggest {
     position: absolute;
@@ -1019,6 +1088,38 @@
     border-color: var(--rule-strong);
     background: transparent;
     color: var(--ink-2);
+  }
+  .conn-chip.unresolved:hover {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+  .more-actions {
+    position: relative;
+  }
+  .more-actions summary {
+    cursor: pointer;
+    list-style: none;
+  }
+  .more-actions summary::-webkit-details-marker {
+    display: none;
+  }
+  .more-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 30;
+    padding: var(--space-1);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-2);
+    background: var(--surface);
+    box-shadow: var(--shadow-2);
+  }
+  .more-menu :global(.ai-btn) {
+    white-space: nowrap;
+  }
+  .conn-chip .kind {
+    font-size: 10px;
+    color: var(--ink-3);
   }
   .conn-chip .count {
     font-family: var(--font-mono);

@@ -11,7 +11,7 @@
     teams: 'notes',
     onenote: 'file',
     website: 'links',
-    youtube: 'focus',
+    youtube: 'youtube',
     custom: 'links',
   };
 

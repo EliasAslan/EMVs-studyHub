@@ -22,10 +22,15 @@
   // Older saved filters predate the tag field.
   $: if (!('tag' in $filters)) filters.update((f) => ({ ...f, tag: 'all' }));
 
-  let wide = typeof window !== 'undefined' && window.matchMedia('(min-width: 1100px)').matches;
+  // Split view is a large-monitor affordance only. Everything below this
+  // uses the single-column focused writing layout (list OR detail).
+  const WIDE_QUERY = '(min-width: 1200px)';
+
+  let wide = typeof window !== 'undefined' && window.matchMedia(WIDE_QUERY).matches;
+  let filtersOpen = false;
 
   onMount(() => {
-    const mq = window.matchMedia('(min-width: 1100px)');
+    const mq = window.matchMedia(WIDE_QUERY);
     const update = () => (wide = mq.matches);
     update();
     mq.addEventListener('change', update);
@@ -71,6 +76,12 @@
     $filters.type !== 'all' ||
     $filters.tag !== 'all';
 
+  $: activeFilterCount =
+    ($filters.moduleId !== 'all' ? 1 : 0) +
+    ($filters.topicId !== 'all' ? 1 : 0) +
+    ($filters.type !== 'all' ? 1 : 0) +
+    ($filters.tag !== 'all' ? 1 : 0);
+
   function setFilter(patch) {
     filters.update((f) => ({ ...f, ...patch }));
   }
@@ -113,49 +124,71 @@
       </header>
 
       <div class="filters">
-        <input
-          class="input search"
-          type="search"
-          placeholder="Notizen durchsuchen"
-          aria-label="Notizen durchsuchen"
-          value={$filters.query}
-          on:input={(e) => setFilter({ query: e.target.value })}
-        />
-        <select
-          class="select"
-          value={$filters.moduleId}
-          aria-label="Modul filtern"
-          on:change={(e) => setFilter({ moduleId: e.target.value, topicId: 'all' })}
-        >
-          <option value="all">Alle Module</option>
-          {#each modules as m (m.id)}<option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>{/each}
-        </select>
-        <select
-          class="select"
-          value={$filters.topicId}
-          aria-label="Thema filtern"
-          on:change={(e) => setFilter({ topicId: e.target.value })}
-        >
-          <option value="all">Alle Themen</option>
-          {#each topics as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
-        </select>
-        <select
-          class="select"
-          value={$filters.type}
-          aria-label="Typ filtern"
-          on:change={(e) => setFilter({ type: e.target.value })}
-        >
-          <option value="all">Alle Typen</option>
-          <option value="note">Notiz</option>
-          <option value="mistake">Fehler</option>
-          <option value="question">Frage</option>
-          <option value="summary">Zusammenfassung</option>
-        </select>
+        <div class="filter-bar">
+          <input
+            class="input search"
+            type="search"
+            placeholder="Notizen durchsuchen"
+            aria-label="Notizen durchsuchen"
+            value={$filters.query}
+            on:input={(e) => setFilter({ query: e.target.value })}
+          />
+          <button
+            class="chip filter-toggle"
+            type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="notes-filter-grid"
+            on:click={() => (filtersOpen = !filtersOpen)}
+          >
+            Filter
+            {#if activeFilterCount}<span class="filter-count">{activeFilterCount}</span>{/if}
+            <Icon name={filtersOpen ? 'chevronDown' : 'chevronRight'} size={13} />
+          </button>
+        </div>
+        {#if filtersOpen}
+          <div class="filter-grid" id="notes-filter-grid">
+            <select
+              class="select"
+              value={$filters.moduleId}
+              aria-label="Modul filtern"
+              on:change={(e) => setFilter({ moduleId: e.target.value, topicId: 'all' })}
+            >
+              <option value="all">Alle Module</option>
+              {#each modules as m (m.id)}<option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>{/each}
+            </select>
+            <select
+              class="select"
+              value={$filters.topicId}
+              aria-label="Thema filtern"
+              on:change={(e) => setFilter({ topicId: e.target.value })}
+            >
+              <option value="all">Alle Themen</option>
+              {#each topics as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
+            </select>
+            <select
+              class="select"
+              value={$filters.type}
+              aria-label="Typ filtern"
+              on:change={(e) => setFilter({ type: e.target.value })}
+            >
+              <option value="all">Alle Typen</option>
+              <option value="note">Notiz</option>
+              <option value="mistake">Fehler</option>
+              <option value="question">Frage</option>
+              <option value="summary">Zusammenfassung</option>
+            </select>
+            {#if activeFilterCount}
+              <button class="btn btn-ghost btn-sm reset" type="button" on:click={resetFilters}>
+                Filter zurücksetzen ({activeFilterCount})
+              </button>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       {#if tagCounts.length}
         <div class="tags" aria-label="Nach Tag filtern">
-          <button class="chip" class:is-active={$filters.tag === 'all'} type="button" aria-pressed={$filters.tag === 'all'} on:click={() => setTag('all')}>alle</button>
+          <button class="chip" class:is-active={$filters.tag === 'all'} type="button" aria-pressed={$filters.tag === 'all'} on:click={() => setTag('all')}>Alle</button>
           {#each tagCounts as [tag, count] (tag)}
             <button class="chip" class:is-active={$filters.tag === tag} type="button" aria-pressed={$filters.tag === tag} on:click={() => setTag(tag)}>
               #{tag}<span class="tag-count">{count}</span>
@@ -236,7 +269,7 @@
   .list-pane.wide {
     position: sticky;
     top: var(--space-4);
-    max-height: calc(100vh - var(--space-6));
+    height: calc(100vh - var(--space-6));
     overflow: hidden;
   }
   .page-head {
@@ -272,11 +305,45 @@
     flex-direction: column;
     gap: var(--space-2);
   }
-  .filters .select {
+  .filter-bar {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .filter-bar .search {
+    flex: 1;
+  }
+  .filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    min-height: 40px;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--text-xs);
+  }
+  .filter-count {
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .filter-grid {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-2);
+    background: var(--surface);
+  }
+  .filter-grid .select {
     width: 100%;
   }
-  .search {
-    width: 100%;
+  .filter-grid .reset {
+    justify-self: start;
+    color: var(--accent-strong);
   }
   .tags {
     display: flex;
@@ -294,7 +361,6 @@
   }
   .tag-count {
     margin-left: 5px;
-    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--ink-3);
   }
@@ -302,8 +368,12 @@
     min-height: 0;
     overflow-y: auto;
   }
+  .list-pane.wide {
+    height: calc(100vh - var(--space-6));
+  }
   .list-pane.wide .list-scroll {
-    max-height: calc(100vh - 420px);
+    flex: 1;
+    min-height: 0;
     padding-right: 2px;
   }
   .count {
@@ -357,16 +427,12 @@
     color: var(--ink-3);
   }
   @media (min-width: 640px) {
-    .page:not(.wide) .filters {
-      flex-direction: row;
-      flex-wrap: wrap;
+    .page:not(.wide) .filter-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: center;
     }
-    .page:not(.wide) .filters .select {
-      width: auto;
-      min-width: 140px;
-    }
-    .page:not(.wide) .search {
-      flex: 1 1 220px;
+    .page:not(.wide) .filter-grid .reset {
+      grid-column: 1 / -1;
     }
   }
 </style>

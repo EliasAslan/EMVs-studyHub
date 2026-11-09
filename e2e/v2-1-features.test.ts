@@ -82,6 +82,7 @@ test.describe('Study Hub v2.1 — local AI', () => {
 
     await page.goto(BASE_URL);
     await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Notiz' }).click();
     await page.getByRole('tab', { name: 'Notiz' }).click();
     await page.getByPlaceholder('Kurz und klar').fill('AI Notiz');
     await page.getByPlaceholder('Was möchtest du festhalten?').fill('Ein kurzer Text.');
@@ -90,8 +91,10 @@ test.describe('Study Hub v2.1 — local AI', () => {
 
     // Both panes are visible on wide screens; the detail pane owns these actions.
     const detail = page.locator('.detail-pane');
-    await expect(detail.getByRole('button', { name: 'Zusammenfassen' })).toBeVisible();
     await expect(detail.getByRole('button', { name: 'KI fragen' })).toBeVisible();
+    // "Zusammenfassen" lives in the overflow menu since the one-primary + overflow change.
+    await detail.getByLabel('Weitere KI-Aktionen').click();
+    await expect(detail.getByRole('button', { name: 'Zusammenfassen' })).toBeVisible();
   });
 });
 
@@ -116,15 +119,11 @@ test.describe('Study Hub v2.1 — quick actions', () => {
     await expect(page.getByRole('button', { name: 'Zusammenfassen' })).toHaveCount(0);
   });
 
-  test('Today quick action opens the assistant with Heute context', async ({ page }) => {
+  test('Today has no AI quick action (contextual only)', async ({ page }) => {
     await enableAi(page);
     await page.goto(`${BASE_URL}/#/`);
 
-    await page.getByRole('button', { name: 'KI fragen' }).click();
-    await expect(page).toHaveURL(/#\/assistant\?/);
-    await expect(page.getByText('Ollama verbunden')).toBeVisible();
-    await expect(page.getByLabel('Frage an den Assistenten')).toHaveValue('Was steht heute an?');
-    await expect(page.locator('.tray .chip').filter({ hasText: 'Heute' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'KI fragen' })).toHaveCount(0);
   });
 
   test('Homework quick action opens the assistant with Hausaufgaben context', async ({ page }) => {
@@ -178,6 +177,7 @@ test.describe('Study Hub v2.1 — recurring homework', () => {
 
     await page.getByLabel('Titel der Hausaufgabe').fill('Wöchentlich Test');
     await page.getByLabel('Fällig am').fill('2026-11-10');
+    await page.getByRole('button', { name: 'Wiederholen' }).click();
     await page.getByLabel('Wiederholen').selectOption('weekly');
     await page.locator('form.add').getByRole('button', { name: 'Erfassen' }).click();
 

@@ -59,7 +59,7 @@
     border: 0;
     background: transparent;
     color: var(--ink-3);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     text-decoration: none;
   }

@@ -11,7 +11,6 @@
     mistake: 'Fehler',
     summary: 'Zusammenfassung',
     question: 'Frage',
-    idea: 'Idee',
   };
 
   $: label = TYPE_LABELS[note.type] || (note.type ? note.type.charAt(0).toUpperCase() + note.type.slice(1) : 'Notiz');

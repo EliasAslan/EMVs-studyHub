@@ -26,9 +26,8 @@
 
   $: modules = $appState.modules || [];
   $: links = ($appState.links || [])
-    .filter((l) => $filters.moduleId === 'all' || l.moduleId === $filters.moduleId)
+    .filter((l) => $filters.moduleId === 'all' || ($filters.moduleId === '' ? !l.moduleId : l.moduleId === $filters.moduleId))
     .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt || 0) - (b.createdAt || 0));
-  $: globalCount = ($appState.links || []).filter((l) => !l.moduleId).length;
 
   function setFilter(value) {
     filters.update((f) => ({ ...f, moduleId: value }));
@@ -115,7 +114,7 @@
         <option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>
       {/each}
     </select>
-    <span class="count">{links.length} {links.length === 1 ? 'Link' : 'Links'}{globalCount ? ` · ${globalCount} global` : ''}</span>
+    <span class="count">{links.length} {links.length === 1 ? 'Link' : 'Links'}</span>
   </div>
 
   {#if links.length}

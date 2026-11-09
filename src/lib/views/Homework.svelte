@@ -9,7 +9,7 @@
     deleteHomework,
     restoreEntity,
   } from '../stores/app.js';
-  import { todayKey } from '../data/dates.js';
+  import { todayKey, addDays, parseDateKey } from '../data/dates.js';
   import {
     RECURRENCE_OPTIONS,
     recurrenceFromValue,
@@ -30,9 +30,10 @@
   });
 
   let title = '';
-  let dueDate = todayKey();
+  let dueDate = defaultDueDate();
   let moduleId = '';
   let recurrence = 'none';
+  let recurrenceOpen = false;
   let editing = null;
   let editTitle = '';
   let editDue = '';
@@ -51,6 +52,25 @@
     ($filters.programId === 'all' || visibleModules.some((m) => m.id === hw.moduleId));
   $: open = $openHomework.filter(matchesFilter);
   $: done = $doneHomework.filter(matchesFilter);
+  $: activeFilterCount =
+    ($filters.programId !== 'all' ? 1 : 0) + ($filters.moduleId !== 'all' ? 1 : 0);
+
+  /** Tomorrow, or the next weekday when tomorrow is a weekend. */
+  function defaultDueDate() {
+    let next = addDays(todayKey(), 1);
+    const weekday = parseDateKey(next)?.getDay();
+    if (weekday === 6) next = addDays(next, 2);
+    else if (weekday === 0) next = addDays(next, 1);
+    return next;
+  }
+
+  function toggleNoDueDate(event) {
+    dueDate = event.target.checked ? '' : defaultDueDate();
+  }
+
+  function resetFilters() {
+    filters.update((f) => ({ ...f, programId: 'all', moduleId: 'all' }));
+  }
 
   function setFilter(patch) {
     filters.update((f) => ({ ...f, ...patch }));
@@ -60,13 +80,14 @@
     if (!title.trim()) return;
     createHomework({
       title,
-      dueDate: dueDate || todayKey(),
+      dueDate: dueDate || null,
       moduleId: moduleId || null,
       recurrence: recurrenceFromValue(recurrence),
     });
     title = '';
-    dueDate = todayKey();
+    dueDate = defaultDueDate();
     recurrence = 'none';
+    recurrenceOpen = false;
     toast('Hausaufgabe erfasst');
   }
 
@@ -124,22 +145,58 @@
   </header>
 
   <form class="add card" on:submit|preventDefault={add}>
-    <input class="input title-input" bind:value={title} placeholder="Neue Hausaufgabe" aria-label="Titel der Hausaufgabe" />
-    <input class="input date-input" type="date" bind:value={dueDate} aria-label="Fällig am" />
-    <select class="select module-input" bind:value={moduleId} aria-label="Modul">
-      <option value="">Kein Modul</option>
-      {#each modules as m (m.id)}
-        <option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>
-      {/each}
-    </select>
-    <select class="select recur-input" bind:value={recurrence} aria-label="Wiederholen">
-      {#each RECURRENCE_OPTIONS as option (option.value)}
-        <option value={option.value}>{option.label}</option>
-      {/each}
-    </select>
-    <button class="btn btn-primary" type="submit" disabled={!title.trim()}>
-      <Icon name="plus" size={16} /> Erfassen
-    </button>
+    <div class="add-grid">
+      <label class="field">
+        <span class="field-label">Titel</span>
+        <input class="input title-input" bind:value={title} placeholder="z. B. Auftrag 4 lösen" aria-label="Titel der Hausaufgabe" />
+      </label>
+      <label class="field">
+        <span class="field-label">Fällig</span>
+        <input class="input date-input" type="date" bind:value={dueDate} aria-label="Fällig am" />
+      </label>
+      <label class="field">
+        <span class="field-label">Modul</span>
+        <select class="select module-input" bind:value={moduleId} aria-label="Modul">
+          <option value="">Kein Modul</option>
+          {#each modules as m (m.id)}
+            <option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>
+          {/each}
+        </select>
+      </label>
+    </div>
+    <div class="add-foot">
+      <label class="check-row">
+        <input type="checkbox" checked={!dueDate} on:change={toggleNoDueDate} />
+        Ohne Datum
+      </label>
+      <button
+        class="disclosure"
+        type="button"
+        aria-expanded={recurrenceOpen}
+        aria-controls="homework-recurrence"
+        on:click={() => (recurrenceOpen = !recurrenceOpen)}
+      >
+        <Icon name="repeat" size={15} />
+        Wiederholen
+        <Icon name={recurrenceOpen ? 'chevronDown' : 'chevronRight'} size={13} />
+      </button>
+      <button class="btn btn-primary" type="submit" disabled={!title.trim()}>
+        <Icon name="plus" size={16} /> Erfassen
+      </button>
+    </div>
+    {#if recurrenceOpen}
+      <div class="recurrence-row" id="homework-recurrence">
+        <label class="field">
+          <span class="field-label">Wiederholen</span>
+          <select class="select recur-input" bind:value={recurrence} aria-label="Wiederholen">
+            {#each RECURRENCE_OPTIONS as option (option.value)}
+              <option value={option.value}>{option.label}</option>
+            {/each}
+          </select>
+        </label>
+        <p class="hint">Beim Erledigen wird automatisch die nächste Runde angelegt.</p>
+      </div>
+    {/if}
   </form>
 
   <div class="filters">
@@ -166,8 +223,14 @@
       {/each}
     </select>
     <button class="chip" type="button" aria-pressed={$filters.showDone} on:click={() => setFilter({ showDone: !$filters.showDone })}>
-      Erledigte {$filters.showDone ? 'ausblenden' : 'anzeigen'}
+      Erledigte anzeigen
+      {#if done.length}<span class="chip-count">{done.length}</span>{/if}
     </button>
+    {#if activeFilterCount}
+      <button class="chip reset" type="button" on:click={resetFilters}>
+        Filter zurücksetzen ({activeFilterCount})
+      </button>
+    {/if}
   </div>
 
   {#if open.length}
@@ -272,10 +335,83 @@
     flex: none;
   }
   .add {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+  .add-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+  .field-label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .add-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .add-foot .btn-primary {
+    margin-left: auto;
+  }
+  .disclosure {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-1);
+    background: transparent;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+  }
+  .disclosure:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .disclosure[aria-expanded='true'] {
+    color: var(--accent-strong);
+  }
+  .recurrence-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--rule);
+  }
+  .recurrence-row .field {
+    width: min(220px, 100%);
+  }
+  .hint {
+    flex: 1;
+    min-width: 180px;
+    padding-bottom: 8px;
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+  }
+  .chip-count {
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .chip[aria-pressed='true'] .chip-count {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .chip.reset {
+    color: var(--accent-strong);
   }
   .filters {
     display: flex;
@@ -312,9 +448,9 @@
     font-size: var(--text-sm);
   }
   @media (min-width: 720px) {
-    .add {
-      grid-template-columns: minmax(180px, 1fr) 150px 180px 150px auto;
-      align-items: center;
+    .add-grid {
+      grid-template-columns: minmax(180px, 1fr) 160px 200px;
+      align-items: end;
     }
   }
 </style>

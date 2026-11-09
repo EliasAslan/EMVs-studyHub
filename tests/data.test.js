@@ -251,6 +251,41 @@ describe('wiki links', () => {
     expect(linkIndex(state).size).toBeGreaterThan(0);
   });
 
+  it('resolves homework, exams, links and topics too', () => {
+    const s = baseState({
+      notes: [
+        {
+          id: 'n1',
+          title: 'Plan',
+          body: '[[Aufgabe 3]] [[Prüfung M294]] [[Moodle]] [[Normalisierung]] [[M294|DB]]',
+        },
+      ],
+      homework: [{ id: 'h1', title: 'Aufgabe 3' }],
+      exams: [{ id: 'e1', title: 'Prüfung M294' }],
+      links: [{ id: 'l1', label: 'Moodle' }],
+      topics: [{ id: 't1', name: 'Normalisierung', moduleId: 'm1' }],
+    });
+
+    expect(resolveLink(s, 'aufgabe 3')).toEqual({ kind: 'homework', id: 'h1', label: 'Aufgabe 3' });
+    expect(resolveLink(s, 'Prüfung M294')).toEqual({ kind: 'exam', id: 'e1', label: 'Prüfung M294' });
+    expect(resolveLink(s, 'Moodle')).toEqual({ kind: 'link', id: 'l1', label: 'Moodle' });
+    expect(resolveLink(s, 'Normalisierung')).toEqual({
+      kind: 'topic',
+      id: 't1',
+      label: 'Normalisierung',
+      moduleId: 'm1',
+    });
+    expect(resolveLink(s, 'M294')).toMatchObject({ kind: 'module', id: 'm1' });
+
+    expect(outgoingLinks(s, 'n1').map((o) => o.entry?.kind)).toEqual([
+      'homework',
+      'exam',
+      'link',
+      'topic',
+      'module',
+    ]);
+  });
+
   it('parses aliases and resolves by target only', () => {
     const links = parseWikiLinks('A [[SQL Basics|Grundlagen]] B');
     expect(links).toHaveLength(1);

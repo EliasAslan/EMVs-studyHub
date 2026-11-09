@@ -23,6 +23,8 @@ export function defaultSettings() {
     navCollapsed: false,
     email: '',
     emailReminders: false,
+    remindersDay: 5,
+    remindersContent: 'todo',
     lastExportAt: null,
     changeCount: 0,
     currentProgramId: 'program-emvs',

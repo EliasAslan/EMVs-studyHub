@@ -8,11 +8,11 @@
 </script>
 
 <div class="empty">
-  <div class="empty-icon" aria-hidden="true">
-    <slot name="icon">
-      <span>·</span>
-    </slot>
-  </div>
+  {#if $$slots.icon}
+    <div class="empty-icon" aria-hidden="true">
+      <slot name="icon" />
+    </div>
+  {/if}
   {#if title}<h3>{title}</h3>{/if}
   {#if text}<p class="muted">{text}</p>{/if}
   <div class="row">

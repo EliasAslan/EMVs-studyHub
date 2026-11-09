@@ -1,5 +1,5 @@
 <script>
-  import { appState, createHomework, openHomework } from '../stores/app.js';
+  import { appState, createHomework, createExam, openHomework } from '../stores/app.js';
   import { monthModel } from '../data/calendar.js';
   import { monthRange, formatMonth, formatDate, todayKey, weekdayShort, relativeDayLabel } from '../data/dates.js';
   import { upcomingDeadlines } from '../data/deadlines.js';
@@ -13,6 +13,7 @@
   let selected = todayKey();
 
   let addOpen = false;
+  let addKind = 'homework';
   let addTitle = '';
   let addModule = '';
   let addDate = selected;
@@ -37,18 +38,30 @@
     selected = todayKey();
   }
 
-  function openAdd() {
+  function openAdd(kind = 'homework') {
+    addKind = kind;
     addTitle = '';
     addModule = '';
     addDate = selected;
     addOpen = true;
   }
 
-  function addHomework() {
+  function addEntry() {
     if (!addTitle.trim()) return;
-    createHomework({ title: addTitle, dueDate: addDate || selected, moduleId: addModule || null });
+    const payload = {
+      title: addTitle,
+      date: addDate || selected,
+      dueDate: addDate || selected,
+      moduleId: addModule || null,
+    };
+    if (addKind === 'exam') {
+      createExam(payload);
+      toast('Prüfung erfasst');
+    } else {
+      createHomework(payload);
+      toast('Hausaufgabe erfasst');
+    }
     addOpen = false;
-    toast('Hausaufgabe erfasst');
   }
 
   function isInMonth(key) {
@@ -62,7 +75,7 @@
       <p class="eyebrow">Zeit</p>
       <h1>Kalender</h1>
     </div>
-    <button class="btn btn-primary" type="button" on:click={openAdd}><Icon name="plus" size={16} /> Hausaufgabe</button>
+    <button class="btn btn-primary" type="button" on:click={() => openAdd()}><Icon name="plus" size={16} /> Eintrag</button>
   </header>
 
   <div class="calendar card">
@@ -96,8 +109,8 @@
             </span>
             <span class="num mono" aria-hidden="true">{Number(day.key.slice(8, 10))}</span>
             <span class="marks" aria-hidden="true">
-              {#if day.homework.length}<span class="mark hw" title={`${day.homework.length} Hausaufgaben`}>{day.homework.length}</span>{/if}
-              {#if day.exams.length}<span class="mark exam" title={`${day.exams.length} Prüfungen`}>{day.exams.length}</span>{/if}
+              {#if day.homework.length}<span class="mark hw" title={`${day.homework.length} Hausaufgaben`}><span class="mark-letter">H</span>{day.homework.length}</span>{/if}
+              {#if day.exams.length}<span class="mark exam" title={`${day.exams.length} Prüfungen`}><span class="mark-letter">P</span>{day.exams.length}</span>{/if}
             </span>
           </button>
         {/each}
@@ -130,7 +143,10 @@
     {:else}
       <div class="empty-day">
         <p class="muted">Nichts an diesem Tag.</p>
-        <button class="btn btn-sm" type="button" on:click={openAdd}>Hausaufgabe für diesen Tag</button>
+        <div class="empty-actions">
+          <button class="btn btn-sm" type="button" on:click={() => openAdd('homework')}>Hausaufgabe</button>
+          <button class="btn btn-sm" type="button" on:click={() => openAdd('exam')}>Prüfung</button>
+        </div>
       </div>
     {/if}
   </section>
@@ -156,10 +172,14 @@
   </section>
 </div>
 
-<Modal open={addOpen} title="Hausaufgabe" on:close={() => (addOpen = false)}>
+<Modal open={addOpen} title={addKind === 'exam' ? 'Neue Prüfung' : 'Neue Hausaufgabe'} on:close={() => (addOpen = false)}>
   <div class="stack">
+    <div class="segmented" role="group" aria-label="Art des Eintrags">
+      <button class="seg" class:active={addKind === 'homework'} type="button" aria-pressed={addKind === 'homework'} on:click={() => (addKind = 'homework')}>Hausaufgabe</button>
+      <button class="seg" class:active={addKind === 'exam'} type="button" aria-pressed={addKind === 'exam'} on:click={() => (addKind = 'exam')}>Prüfung</button>
+    </div>
     <label class="field"><span>Titel</span><input class="input" bind:value={addTitle} data-autofocus placeholder="Was ist zu tun?" /></label>
-    <label class="field"><span>Fällig</span><input class="input" type="date" bind:value={addDate} /></label>
+    <label class="field"><span>{addKind === 'exam' ? 'Datum' : 'Fällig'}</span><input class="input" type="date" bind:value={addDate} /></label>
     <label class="field">
       <span>Modul</span>
       <select class="select" bind:value={addModule}>
@@ -170,7 +190,7 @@
   </div>
   <svelte:fragment slot="footer">
     <button class="btn btn-ghost" type="button" on:click={() => (addOpen = false)}>Abbrechen</button>
-    <button class="btn btn-primary" type="button" on:click={addHomework} disabled={!addTitle.trim()}>Erfassen</button>
+    <button class="btn btn-primary" type="button" on:click={addEntry} disabled={!addTitle.trim()}>{addKind === 'exam' ? 'Prüfung erfassen' : 'Hausaufgabe erfassen'}</button>
   </svelte:fragment>
 </Modal>
 
@@ -368,6 +388,40 @@
   }
   .small {
     font-size: var(--text-xs);
+  }
+  .mark-letter {
+    font-size: 8px;
+    line-height: 1;
+    opacity: 0.85;
+  }
+  .empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .segmented {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-2);
+    background: var(--surface-2);
+  }
+  .seg {
+    flex: 1;
+    min-height: 36px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-1);
+    background: transparent;
+    color: var(--ink-3);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .seg.active {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-1);
   }
   @media (min-width: 700px) {
     .day {

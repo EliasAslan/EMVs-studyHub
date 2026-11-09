@@ -123,8 +123,8 @@
         class="collapse"
         type="button"
         on:click={() => onClose?.()}
-        aria-label="Navigation schließen"
-        title="Schließen"
+        aria-label="Navigation schliessen"
+        title="Schliessen"
       >
         <Icon name="x" size={18} />
       </button>
@@ -256,6 +256,14 @@
   </nav>
 
   <div class="foot" use:closeDrawerOnNavigation>
+    <button
+      class="nav-link help-btn"
+      type="button"
+      on:click={() => window.dispatchEvent(new CustomEvent('studyhub:shortcuts'))}
+    >
+      <Icon name="help" />
+      {#if !compact}<span>Tastaturkürzel</span>{/if}
+    </button>
     <a class="nav-link" class:active={$route.name === 'links'} href="#/links" aria-current={$route.name === 'links' ? 'page' : undefined} title={compact ? 'Links' : undefined}>
       <Icon name="links" />
       {#if !compact}<span>Links</span>{/if}
@@ -272,6 +280,14 @@
 </aside>
 
 <style>
+  .help-btn {
+    border: 0;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+  }
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
@@ -290,11 +306,15 @@
     transition:
       transform var(--motion),
       width var(--motion),
-      visibility var(--motion);
+      visibility 0s linear var(--motion);
   }
   .sidebar.open {
     transform: translateX(0);
     visibility: visible;
+    transition:
+      transform var(--motion),
+      width var(--motion),
+      visibility 0s;
   }
   .sidebar.collapsed {
     width: var(--sidebar-w-collapsed);
@@ -513,7 +533,7 @@
   }
   .rail-code {
     font-family: var(--font-mono);
-    font-size: 0.6rem;
+    font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.01em;
     color: var(--ink-2);
@@ -607,20 +627,11 @@
     }
   }
   @media (max-width: 899px) {
-    .sidebar {
-      inset: 0 0 0 auto;
-      transform: translateX(100%);
-      border-right: none;
-      border-left: 1px solid var(--rule);
-    }
-    .sidebar.open {
-      transform: translateX(0);
-    }
     .rail-toggle {
       display: none;
     }
   }
-  @media (any-pointer: coarse) {
+  @media (pointer: coarse) {
     .nav-link {
       min-height: 44px;
     }

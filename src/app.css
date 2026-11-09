@@ -4,7 +4,7 @@
 
 :root {
   --accent: #4f46e5;
-  --accent-strong: #4338ca;
+  --accent-strong: #3730a3;
   --accent-soft: #eef1ff;
   --accent-ink: #ffffff;
 
@@ -12,22 +12,24 @@
   --surface: #ffffff;
   --surface-2: #f0f0f3;
   --ink: #1d1d1f;
-  --ink-2: #63636a;
-  --ink-3: #69696f;
+  --ink-2: #4b4b53;
+  --ink-3: #5f5f67;
   --rule: #e6e6e9;
   --rule-strong: #d3d3d8;
 
   --tint-today: #f7f7f9;
-  --tint-homework: #edf1fa;
-  --tint-exams: #fbf3e5;
-  --tint-notes: #edf4ee;
+  --tint-homework: #e7eefc;
+  --tint-exams: #fcefd7;
+  --tint-notes: #e5f2e9;
 
-  --ok: #2f6f4e;
-  --ok-soft: #e8f3ec;
-  --warn: #8a5a12;
-  --warn-soft: #fbf1dd;
-  --danger: #b3261e;
-  --danger-soft: #fbeae9;
+  --ok: #256846;
+  --ok-soft: #e3f1e8;
+  --warn: #7a4c0a;
+  --warn-soft: #fbf0d8;
+  --danger: #a41f18;
+  --danger-soft: #fbe7e5;
+
+  --overlay: rgb(17 18 22 / 45%);
 
   --radius-1: 6px;
   --radius-2: 9px;
@@ -67,31 +69,33 @@
 }
 
 [data-theme="dark"] {
-  --accent: #a5b4fc;
-  --accent-strong: #c7d2fe;
-  --accent-soft: #262a45;
-  --accent-ink: #14182b;
+  --accent: #9aa8ff;
+  --accent-strong: #c3ccff;
+  --accent-soft: #232a4d;
+  --accent-ink: #101225;
 
-  --bg: #101012;
-  --surface: #1a1a1d;
-  --surface-2: #242427;
-  --ink: #f5f5f7;
-  --ink-2: #a1a1a6;
-  --ink-3: #9a9aa2;
-  --rule: #2c2c30;
-  --rule-strong: #3a3a3f;
+  --bg: #0e0f12;
+  --surface: #17181c;
+  --surface-2: #202127;
+  --ink: #f2f2f5;
+  --ink-2: #b9b9c2;
+  --ink-3: #a2a2ac;
+  --rule: #2b2c33;
+  --rule-strong: #3a3b44;
 
-  --tint-today: #17171a;
-  --tint-homework: #171d2a;
-  --tint-exams: #241f16;
-  --tint-notes: #17221a;
+  --tint-today: #15161a;
+  --tint-homework: #151b2b;
+  --tint-exams: #241e13;
+  --tint-notes: #142019;
 
   --ok: #8fd3ad;
-  --ok-soft: #1c2f24;
-  --warn: #e5c07b;
-  --warn-soft: #332a18;
+  --ok-soft: #16281e;
+  --warn: #f0c674;
+  --warn-soft: #322713;
   --danger: #f2a6a0;
-  --danger-soft: #3a2020;
+  --danger-soft: #3a1e1d;
+
+  --overlay: rgb(0 0 0 / 55%);
 
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow-2: 0 6px 24px rgb(0 0 0 / 0.35);
@@ -151,7 +155,8 @@ a {
 }
 
 a:hover {
-  color: var(--accent);
+  color: var(--ink);
+  text-decoration-thickness: 2px;
 }
 
 button,
@@ -180,9 +185,10 @@ ol {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
   border-radius: var(--radius-1);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
 ::selection {
@@ -333,6 +339,7 @@ ol {
   border-radius: var(--radius-2);
   background: var(--surface);
   color: var(--ink);
+  font-size: 16px;
   transition: border-color var(--motion), box-shadow var(--motion);
 }
 
@@ -454,7 +461,7 @@ ol {
   flex: 1;
 }
 
-@media (any-pointer: coarse) {
+@media (pointer: coarse) {
   .btn,
   .input,
   .select,
