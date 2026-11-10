@@ -11,6 +11,10 @@
     resetAll,
   } from '../stores/app.js';
   import { downloadBackup } from '../services/backup.js';
+  import {
+    downloadWidgetSnapshotJson,
+    downloadWidgetSnapshotText,
+  } from '../services/widgetSnapshot.js';
   import { formatDate, dateKey, WEEKDAYS } from '../data/dates.js';
   import { sortedLessons, lessonLabel as lessonTitle } from '../data/schedule.js';
   import { toast } from '../stores/toast.js';
@@ -28,6 +32,7 @@
   let programName = '';
   let programCode = '';
   let busy = false;
+  let widgetBusy = false;
 
   let lessonEditing = null;
   let lessonDay = 1;
@@ -112,6 +117,30 @@
       toast(e.message || 'Export fehlgeschlagen');
     } finally {
       busy = false;
+    }
+  }
+
+  async function downloadWidgetJson() {
+    widgetBusy = true;
+    try {
+      downloadWidgetSnapshotJson();
+      toast('Widget-Snapshot gespeichert (JSON)');
+    } catch (e) {
+      toast(e.message || 'Widget-Export fehlgeschlagen');
+    } finally {
+      widgetBusy = false;
+    }
+  }
+
+  async function downloadWidgetText() {
+    widgetBusy = true;
+    try {
+      downloadWidgetSnapshotText();
+      toast('Widget-Snapshot gespeichert (TXT)');
+    } catch (e) {
+      toast(e.message || 'Widget-Export fehlgeschlagen');
+    } finally {
+      widgetBusy = false;
     }
   }
 
@@ -550,6 +579,28 @@
         </button>
       </div>
     {/if}
+  </section>
+
+  <section class="card section" id="settings-desktop-widgets" aria-labelledby="desktop-widgets-title">
+    <div class="section-title">
+      <h2 id="desktop-widgets-title">Desktop-Widget</h2>
+      <span class="hint">Rainmeter · Windows Desktop</span>
+    </div>
+    <p class="muted small">
+      Snapshot für Desktop-Widgets. Keine Notiztexte, Noten, E-Mails oder IDs. Der Inhalt ist rein lesbar.
+    </p>
+    <div class="button-row">
+      <button class="btn btn-primary" type="button" on:click={downloadWidgetJson} disabled={widgetBusy}>
+        <Icon name="file" size={15} /> JSON herunterladen
+      </button>
+      <button class="btn" type="button" on:click={downloadWidgetText} disabled={widgetBusy}>
+        <Icon name="file" size={15} /> TXT für Rainmeter
+      </button>
+    </div>
+    <p class="muted small">
+      JSON ist für zukünftige Widgets vorgesehen. Die TXT-Datei ist im einfachen
+      key=value-Format und lässt sich mit Rainmeter WebParser einlesen.
+    </p>
   </section>
 
   <section class="card section" aria-labelledby="email-title">
