@@ -36,10 +36,13 @@ No `.rmskin` package is used yet — the skin source lives in this repository at
 Edit `desktop\StudyHub\StudyHub.ini`, section `[Variables]` and set:
 
 ```ini
-SnapshotFile=C:\Users\<you>\Downloads\study-hub-widget-2026-11-10.txt
+SnapshotFile=C:\Users\<you>\Downloads\study-hub-widget.txt
 ```
 
 - The path must be fully qualified (absolute) — WebParser uses the `file://` protocol.
+- Study Hub exports snapshots as `study-hub-widget-YYYY-MM-DD.txt` into your Downloads
+  folder; point `SnapshotFile` at the file you exported, for example
+  `C:\Users\<you>\Downloads\study-hub-widget-2026-11-10.txt`.
 - After a new export, point `SnapshotFile` at the new file (or copy the new file over the old
   one and refresh).
 

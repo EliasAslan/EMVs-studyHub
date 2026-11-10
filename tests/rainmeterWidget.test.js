@@ -9,6 +9,23 @@ function extract(text, regex) {
   return m ? m.slice(1) : [];
 }
 
+function iniSections() {
+  const map = {};
+  let current = '';
+  for (const rawLine of SKIN.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const sec = /^\[([^\]]+)\]$/.exec(line);
+    if (sec) {
+      current = sec[1];
+      map[current] = {};
+      continue;
+    }
+    const kv = /^([^=]+)=(.*)$/.exec(line);
+    if (kv && current) map[current][kv[1].trim()] = kv[2].trim();
+  }
+  return map;
+}
+
 const NOW = new Date(2026, 10, 10, 8, 15, 0);
 
 function snapshotText(state) {
@@ -30,6 +47,27 @@ describe('Study Hub Rainmeter widget skin', () => {
   it('refreshes on right click and opens Study Hub on left click', () => {
     expect(SKIN).toContain('RightMouseUpAction=[!Refresh]');
     expect(SKIN).toContain('LeftMouseUpAction=');
+  });
+
+  it('references only existing WebParser parent measures from child measures', () => {
+    const sections = iniSections();
+    const webParser = Object.entries(sections).filter(([, opts]) => opts.Measure === 'WebParser');
+    const parents = new Set(webParser.filter(([, opts]) => opts.RegExp).map(([name]) => name));
+    for (const [name, opts] of webParser) {
+      if (!opts.URL) continue; // parent measures carry the RegExp and no URL
+      const ref = /^\[Measure([^\]]+)\]$/.exec(opts.URL);
+      if (!ref) continue; // file://…#SnapshotFile# variable URL -> no parent needed
+      expect(sections, `WebParser child [${name}] must reference an existing section`).toHaveProperty(
+        `Measure${ref[1]}`,
+      );
+      expect(sections[`Measure${ref[1]}`]).toMatchObject({ Measure: 'WebParser', RegExp: expect.any(String) });
+      expect(parents).toContain(`Measure${ref[1]}`);
+    }
+  });
+
+  it('does not hardcode a personal Windows path', () => {
+    expect(SKIN).not.toContain('C:\\Users\\e3953');
+    expect(SKIN).toContain('SnapshotFile=C:\\Users\\<you>\\Downloads\\study-hub-widget.txt');
   });
 
   it('captures the Start Here title, incl. umlauts and special characters', () => {
