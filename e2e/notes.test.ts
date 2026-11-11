@@ -113,6 +113,7 @@ test.describe('Study Hub — notes', () => {
     await seedLinks(page);
     await page.goto(`${BASE_URL}/#/notes/n1`);
 
+    await page.locator('.detail-pane').getByRole('button', { name: 'Schreiben' }).click();
     await page.getByLabel('Notiztext').fill('Neue Links: [[');
     const suggest = page.locator('.detail-pane .suggest');
     await expect(suggest).toBeVisible();
@@ -127,9 +128,9 @@ test.describe('Study Hub — notes', () => {
     await expect(suggest).toContainText('Thema');
   });
 
-  test('uses focused writing below 1200px and the split view from 1200px', async ({ page }) => {
+  test('uses focused writing below 1920px and the split view only on huge screens', async ({ page }) => {
     await seedLinks(page);
-    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`${BASE_URL}/#/notes`);
 
     await expect(page.locator('.list-pane')).toBeVisible();
@@ -140,7 +141,7 @@ test.describe('Study Hub — notes', () => {
     await expect(page.locator('.detail-pane')).toBeVisible();
     await expect(page.locator('.list-pane')).toHaveCount(0);
 
-    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.setViewportSize({ width: 2000, height: 1100 });
     await expect(page.locator('.list-pane')).toBeVisible();
     await expect(page.locator('.detail-pane')).toBeVisible();
   });

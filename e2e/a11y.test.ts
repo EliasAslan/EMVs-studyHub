@@ -165,6 +165,7 @@ test.describe('Study Hub v2.1 — accessibility', () => {
   test('Notizdetail has no serious or critical WCAG 2.1 A/AA violations', async ({ page }) => {
     await seed(page);
     await page.goto(`${BASE_URL}/#/notes/note-2`);
+    await page.locator('.detail-pane').getByRole('button', { name: 'Schreiben' }).click();
     await expect(page.getByLabel('Notiztext')).toBeVisible();
     await page.waitForTimeout(250);
     await expectAccessible(page, 'Notizdetail');
@@ -218,6 +219,7 @@ test.describe('Study Hub v2.1 — accessibility', () => {
       route.fulfill({ json: { models: [{ name: 'qwen3:8b' }] } }),
     );
     await page.goto(`${BASE_URL}/#/notes/note-2`);
+    await page.locator('.detail-pane').getByRole('button', { name: 'Schreiben' }).click();
     await expect(page.getByLabel('Notiztext')).toBeVisible();
     await page.waitForTimeout(250);
     await expectAccessible(page, 'Notizdetail (KI an)');

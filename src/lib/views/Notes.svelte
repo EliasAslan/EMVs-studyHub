@@ -24,7 +24,7 @@
 
   // Split view is a large-monitor affordance only. Everything below this
   // uses the single-column focused writing layout (list OR detail).
-  const WIDE_QUERY = '(min-width: 1200px)';
+  const WIDE_QUERY = '(min-width: 1920px)';
 
   let wide = typeof window !== 'undefined' && window.matchMedia(WIDE_QUERY).matches;
   let filtersOpen = false;

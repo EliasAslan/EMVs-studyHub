@@ -139,9 +139,10 @@
     titleDirty = false;
     savedAt = n.updatedAt || null;
     suggestOpen = false;
-    // A brand-new/empty note should be ready to type in, even when the
-    // previous note was being read.
-    if (!String(n.body || '').trim()) mode = 'edit';
+    // An existing note opens in reading mode so you can read it first;
+    // empty/draft notes stay ready to type in.
+    if (String(n.body || '').trim()) mode = 'read';
+    else mode = 'edit';
   }
 
   function resetDraft() {
