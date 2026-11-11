@@ -4,6 +4,7 @@ import {
   buildSnapshot,
   snapshotToJson,
   snapshotToText,
+  widgetSnapshotFilename,
 } from '../src/lib/data/widgetSnapshot.js';
 
 const NOW = new Date(2026, 10, 7, 10, 0, 0); // 7 Nov 2026
@@ -163,5 +164,12 @@ describe('snapshotToText', () => {
     expect(snapshotToText(null)).toBe('');
     expect(snapshotToText(undefined)).toBe('');
     expect(snapshotToText('')).toBe('');
+  });
+});
+
+describe('widgetSnapshotFilename', () => {
+  it('formats a date-based snapshot file name', () => {
+    expect(widgetSnapshotFilename('txt', new Date(2026, 10, 7))).toBe('study-hub-widget-2026-11-07.txt');
+    expect(widgetSnapshotFilename('json', new Date(2026, 0, 5))).toBe('study-hub-widget-2026-01-05.json');
   });
 });

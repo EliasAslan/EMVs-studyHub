@@ -72,6 +72,10 @@ describe('store persistence', () => {
     expect(adapter.raw(store.STORAGE_KEY)).toBeNull();
     expect(adapter.raw(store.TIMER_KEY)).toBeNull();
   });
+
+  it('defaults the desktop widget auto-save switch to off', () => {
+    expect(defaultState().settings.widgetAutoSave).toBe(false);
+  });
 });
 
 describe('entities and cascades', () => {

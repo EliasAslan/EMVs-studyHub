@@ -491,6 +491,21 @@ export const modulesByProgram = derived(appState, ($s) => {
 });
 export const backupReminder = derived(appState, ($s) => store.needsBackupReminder($s));
 
+/**
+ * Change fingerprint for the slices that feed the desktop widget snapshot
+ * (homework + exams). Auto-save uses it to decide when the snapshot file on
+ * disk is stale and has to be rewritten. Pure and DOM-free.
+ */
+export const widgetSnapshotSignature = derived(appState, ($s) => {
+  const homework = ($s.homework || [])
+    .map((h) => `${h.id}|${h.done ? 1 : 0}|${h.dueDate ?? ''}|${h.title ?? ''}|${h.updatedAt ?? 0}`)
+    .join('|');
+  const exams = ($s.exams || [])
+    .map((e) => `${e.id}|${e.date}|${e.title ?? ''}|${e.updatedAt ?? 0}`)
+    .join('|');
+  return `${homework}::${exams}`;
+});
+
 export function moduleById(state, id) {
   return (state.modules || []).find((m) => m.id === id) || null;
 }

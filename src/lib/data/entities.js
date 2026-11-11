@@ -27,6 +27,7 @@ export function defaultSettings() {
     remindersContent: 'todo',
     lastExportAt: null,
     changeCount: 0,
+    widgetAutoSave: false,
     currentProgramId: 'program-emvs',
     updatedAt: 0,
   };

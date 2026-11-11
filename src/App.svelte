@@ -1,7 +1,15 @@
 <script>
   import { route, navigate } from './lib/router.js';
+  import { appState, widgetSnapshotSignature } from './lib/stores/app.js';
+  import { startWidgetAutoSave, scheduleWidgetAutoSave, stopWidgetAutoSave } from './lib/services/widgetSnapshot.js';
   import Shell from './lib/components/Shell.svelte';
   import EmptyState from './lib/components/EmptyState.svelte';
+
+  // Automatic widget snapshot saving (M2): re-save when the snapshot-relevant
+  // slices of the state change, or once a day so day-shifted deadlines refresh.
+  $: if ($appState.settings?.widgetAutoSave) startWidgetAutoSave();
+  $: if ($appState.settings?.widgetAutoSave) scheduleWidgetAutoSave($widgetSnapshotSignature);
+  $: if (!$appState.settings?.widgetAutoSave) stopWidgetAutoSave();
 
   // One chunk per route keeps the first load small; the browser caches each
   // chunk after its first visit.

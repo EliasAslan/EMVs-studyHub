@@ -4,8 +4,10 @@ One small Rainmeter skin that shows the Study Hub desktop widget snapshot on the
 desktop.
 
 The skin reads the **TXT snapshot** that Study Hub can export from **Einstellungen →
-Desktop-Widget → „TXT für Rainmeter“** (`study-hub-widget-YYYY-MM-DD.txt`). Exporting is
-manual only — the skin never writes files and the Study Hub app itself is not modified.
+Desktop-Widget → „TXT für Rainmeter“** (`study-hub-widget-YYYY-MM-DD.txt`). Since milestone
+**M2** Study Hub can also **save this snapshot automatically** (see
+[Einstellungen → Desktop-Widget → „Snapshot automatisch speichern“](../../src/lib/views/Settings.svelte));
+the Study Hub app itself is not modified and the skin never writes files.
 
 ## What the widget shows
 
@@ -30,6 +32,22 @@ small auto-sized text block (roughly 300 × 150 px).
 
 No `.rmskin` package is used yet — the skin source lives in this repository at
 `desktop/StudyHub/StudyHub.ini` and is copied directly.
+
+## Automatic snapshot saving (M2)
+
+When **„Snapshot automatisch speichern“** is enabled in the Study Hub settings
+(**Einstellungen → Desktop-Widget**), Study Hub writes the snapshot TXT file itself instead of
+waiting for a manual export:
+
+- The file is written via the browser File System Access API into a location the user picks once
+  per browser session (falling back to a download in browsers without the API).
+- The save runs shortly after the app starts and whenever a snapshot-relevant change happens
+  (homework added / done / re-dated, new exams).
+- A daily re-save keeps day-shifted deadlines (`daysUntil`) fresh.
+
+The widget picks the new file up automatically: the WebParser measures refresh about every
+30 seconds (`UpdateRate=30`), so a rewritten snapshot file shows up on the next refresh. A forced
+refresh is still available via right click on the widget.
 
 ## Configure the snapshot file
 

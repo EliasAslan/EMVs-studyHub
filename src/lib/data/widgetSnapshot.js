@@ -131,6 +131,12 @@ export function buildSnapshot(state = {}, now = new Date()) {
   };
 }
 
+/** Date-based snapshot file name, e.g. `study-hub-widget-2026-11-10.txt`. */
+export function widgetSnapshotFilename(suffix = 'json', now = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `study-hub-widget-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.${suffix}`;
+}
+
 export function snapshotToJson(snapshot) {
   return JSON.stringify(snapshot, null, 2);
 }

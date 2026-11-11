@@ -33,6 +33,7 @@
   let programCode = '';
   let busy = false;
   let widgetBusy = false;
+  let widgetAutoSave = $appState.settings.widgetAutoSave || false;
 
   let lessonEditing = null;
   let lessonDay = 1;
@@ -142,6 +143,10 @@
     } finally {
       widgetBusy = false;
     }
+  }
+
+  function saveWidgetAutoSave() {
+    updateSettings({ widgetAutoSave });
   }
 
   async function onImport(event) {
@@ -600,6 +605,16 @@
     <p class="muted small">
       JSON ist für zukünftige Widgets vorgesehen. Die TXT-Datei ist im einfachen
       key=value-Format und lässt sich mit Rainmeter WebParser einlesen.
+    </p>
+    <label class="pref-row">
+      <input type="checkbox" bind:checked={widgetAutoSave} on:change={saveWidgetAutoSave} />
+      <span>Snapshot automatisch speichern</span>
+    </label>
+    <p class="muted small">
+      Aktiviere das Widget-Snapshot für automatische Updates: Study Hub schreibt
+      dann bei Änderungen an Hausaufgaben und Prüfungen die TXT-Datei in deinen
+      ausgewählten Speicherort. Die Desktop-Widgets (Rainmeter) lesen die Datei beim
+      nächsten Refresh.
     </p>
   </section>
 
