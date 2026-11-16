@@ -1,4 +1,5 @@
 <script>
+  import { onMount, tick } from 'svelte';
   import {
     appState,
     updateSettings,
@@ -16,7 +17,13 @@
     downloadWidgetSnapshotText,
   } from '../services/widgetSnapshot.js';
   import { formatDate, dateKey, WEEKDAYS } from '../data/dates.js';
-  import { sortedLessons, lessonLabel as lessonTitle } from '../data/schedule.js';
+  import {
+    sortedLessons,
+    lessonLabel as lessonTitle,
+    lessonConflicts,
+    lessonDuration,
+    isLessonNow,
+  } from '../data/schedule.js';
   import { toast } from '../stores/toast.js';
   import { cloud, signIn, signUp, signOut, runSync, loadCloud } from '../stores/cloud.js';
   import { sendDeadlineReminders } from '../services/sendDeadlineReminders.js';
@@ -42,6 +49,9 @@
   let lessonModule = '';
   let lessonLabel = '';
   let lessonRoom = '';
+  let formEl;
+  let formTouched = false;
+  let now = new Date();
 
   let authEmail = '';
   let authPassword = '';
@@ -100,6 +110,18 @@
     ...day,
     lessons: lessons.filter((l) => l.dayOfWeek === day.value),
   }));
+  $: lessonsByDay = new Map(lessonGroups.map((group) => [group.value, group.lessons]));
+  // Keep the week compact: weekends only appear once they have lessons or are today.
+  $: scheduleDays = lessonGroups.filter(
+    (group) => group.value <= 5 || group.lessons.length > 0 || group.value === todayDow,
+  );
+  $: todayDow = now.getDay() === 0 ? 7 : now.getDay();
+  $: formActive = !!lessonEditing || formTouched;
+  $: formConflicts = lessonConflicts(
+    lessons,
+    { dayOfWeek: Number(lessonDay), start: lessonStart, end: lessonEnd },
+    lessonEditing?.id,
+  );
   $: lastExport = settings.lastExportAt ? formatDate(dateKey(new Date(settings.lastExportAt)), 'long') : 'nie';
   $: ai = $aiSettings;
   $: aiModelOptions = [...new Set([aiModel, ...aiModels].filter(Boolean))];
@@ -107,6 +129,29 @@
   $: if (ai.enabled && !aiProbed) {
     aiProbed = true;
     probeAi();
+  }
+
+  onMount(() => {
+    const timer = setInterval(() => (now = new Date()), 60_000);
+    return () => clearInterval(timer);
+  });
+
+  function moduleFor(lesson) {
+    return modules.find((m) => m.id === lesson.moduleId) || null;
+  }
+
+  function shiftTime(time, minutes) {
+    const [hours, mins] = String(time || '08:00')
+      .split(':')
+      .map(Number);
+    const total = Math.min((hours || 0) * 60 + (mins || 0) + minutes, 23 * 60 + 59);
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+
+  async function revealForm() {
+    await tick();
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    formEl?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
   }
 
   async function doExport() {
@@ -242,6 +287,7 @@
     lessonModule = '';
     lessonLabel = '';
     lessonRoom = '';
+    formTouched = false;
   }
 
   function editLesson(lesson) {
@@ -252,6 +298,18 @@
     lessonModule = lesson.moduleId || '';
     lessonLabel = lesson.label || '';
     lessonRoom = lesson.room || '';
+    formTouched = false;
+    revealForm();
+  }
+
+  function addLessonOn(day) {
+    resetLessonForm();
+    lessonDay = day;
+    const dayLessons = lessonsByDay.get(day) || [];
+    const last = dayLessons[dayLessons.length - 1];
+    lessonStart = last?.end || '08:00';
+    lessonEnd = shiftTime(lessonStart, 60);
+    revealForm();
   }
 
   function saveLesson() {
@@ -278,13 +336,25 @@
       createLesson(payload);
       toast('Lektion erfasst');
     }
+    // Keep the day so the next lesson can be added quickly.
+    const day = payload.dayOfWeek;
     resetLessonForm();
+    lessonDay = day;
   }
 
   function removeLesson(lesson) {
+    const snapshot = { ...lesson };
     deleteLesson(lesson.id);
     if (lessonEditing?.id === lesson.id) resetLessonForm();
-    toast('Lektion gelöscht');
+    toast('Lektion gelöscht', {
+      action: {
+        label: 'Rückgängig',
+        fn: () => {
+          createLesson(snapshot);
+          toast('Lektion wiederhergestellt');
+        },
+      },
+    });
   }
 
   function dayLabel(value) {
@@ -500,20 +570,44 @@
   <section class="card section" id="settings-schedule" aria-labelledby="schedule-title">
     <div class="section-title">
       <h2 id="schedule-title">Stundenplan</h2>
-      <span class="hint">Nächste Lektion auf Heute</span>
+      <span class="hint">{lessons.length} {lessons.length === 1 ? 'Lektion' : 'Lektionen'} pro Woche</span>
     </div>
 
     <div class="schedule">
-      {#each lessonGroups as group (group.value)}
-        <div class="day-block">
-          <p class="day-name">{group.short}</p>
+      {#each scheduleDays as group (group.value)}
+        <div class="day-block" class:today={group.value === todayDow}>
+          <div class="day-head">
+            <p class="day-name">
+              {group.short}
+              {#if group.value === todayDow}<span class="day-badge">Heute</span>{/if}
+            </p>
+            <div class="day-tools">
+              {#if group.lessons.length}<span class="day-count">{group.lessons.length}</span>{/if}
+              <button
+                class="icon add"
+                type="button"
+                aria-label={`Lektion am ${group.label} erfassen`}
+                title="Lektion erfassen"
+                on:click={() => addLessonOn(group.value)}
+              >
+                <Icon name="plus" size={13} />
+              </button>
+            </div>
+          </div>
           {#if group.lessons.length}
             {#each group.lessons as lesson (lesson.id)}
-              <div class="lesson-row">
-                <span class="lesson-time mono">{lesson.start}–{lesson.end}</span>
+              {@const mod = moduleFor(lesson)}
+              <div class="lesson-row" class:editing={lessonEditing?.id === lesson.id}>
                 <button class="lesson-main" type="button" on:click={() => editLesson(lesson)}>
-                  <span>{lesson.label || lessonTitle($appState, lesson)}</span>
-                  {#if lesson.room}<span class="room">{lesson.room}</span>{/if}
+                  <span class="lesson-line">
+                    {#if mod}<span class="mod-dot" style:--dot={mod.accent} aria-hidden="true"></span>{/if}
+                    <span class="lesson-name">{lessonTitle($appState, lesson)}</span>
+                  </span>
+                  <span class="lesson-meta mono">
+                    <span>{lesson.start}–{lesson.end}{#if lessonDuration(lesson)} · {lessonDuration(lesson)} Min{/if}</span>
+                    {#if isLessonNow(lesson, now)}<span class="now-badge">Jetzt</span>{/if}
+                    {#if lesson.room}<span class="lesson-room">{lesson.room}</span>{/if}
+                  </span>
                 </button>
                 <button class="icon" type="button" aria-label={`${lessonTitle($appState, lesson)} löschen`} on:click={() => removeLesson(lesson)}>
                   <Icon name="trash" size={14} />
@@ -521,14 +615,21 @@
               </div>
             {/each}
           {:else}
-            <p class="free">frei</p>
+            <button class="free" type="button" on:click={() => addLessonOn(group.value)}>
+              <Icon name="plus" size={12} /> Lektion erfassen
+            </button>
           {/if}
         </div>
       {/each}
     </div>
 
-    <form class="lesson-form" on:submit|preventDefault={saveLesson}>
-      <p class="form-title">{lessonEditing ? `Lektion · ${dayLabel(lessonEditing.dayOfWeek)}` : 'Neue Lektion'}</p>
+    <form
+      class="lesson-form"
+      bind:this={formEl}
+      on:submit|preventDefault={saveLesson}
+      on:input={() => (formTouched = true)}
+    >
+      <p class="form-title">{lessonEditing ? 'Lektion bearbeiten' : 'Neue Lektion'} · {dayLabel(lessonDay)}</p>
       <div class="form-grid">
         <label class="field">
           <span>Tag</span>
@@ -560,6 +661,12 @@
           <input class="input" bind:value={lessonRoom} placeholder="optional" />
         </label>
       </div>
+      {#if formActive && formConflicts.length}
+        <p class="conflict" role="status">
+          Überschneidet sich mit
+          {formConflicts.map((l) => `${lessonTitle($appState, l)} (${l.start}–${l.end})`).join(', ')}.
+        </p>
+      {/if}
       <div class="form-actions">
         {#if lessonEditing}
           <button class="btn btn-ghost" type="button" on:click={resetLessonForm}>Abbrechen</button>
@@ -946,10 +1053,12 @@
   }
   .schedule {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--space-2);
   }
   .day-block {
+    display: flex;
+    flex-direction: column;
     padding: var(--space-2);
     border: 1px solid var(--rule);
     border-radius: var(--radius-2);
@@ -957,57 +1066,132 @@
     min-height: 84px;
     overflow: hidden;
   }
-  .day-name {
+  .day-block.today {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
+  }
+  .day-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1);
     margin-bottom: var(--space-1);
+  }
+  .day-name {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     font-size: 0.6875rem;
     font-weight: 600;
+    color: var(--ink-3);
+  }
+  .day-block.today .day-name {
+    color: var(--accent-strong);
+  }
+  .day-badge {
+    padding: 1px 5px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .day-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .day-count {
+    font-family: var(--font-mono);
+    font-size: 9px;
     color: var(--ink-3);
   }
   .lesson-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'time icon'
-      'main icon';
     align-items: start;
-    gap: 1px var(--space-1);
+    gap: 1px;
     margin-bottom: var(--space-1);
+    padding: 1px;
+    border-radius: var(--radius-1);
     min-width: 0;
   }
-  .lesson-time {
-    grid-area: time;
-    font-size: 9px;
-    color: var(--ink-3);
-    white-space: nowrap;
+  .lesson-row.editing {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--accent);
   }
   .lesson-main {
-    grid-area: main;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    gap: 2px;
     min-width: 0;
+    padding: 2px 3px;
     border: 0;
+    border-radius: var(--radius-1);
     background: transparent;
     color: var(--ink);
-    font-size: 0.75rem;
     text-align: left;
-    line-height: 1.3;
-    padding: 0;
-  }
-  .lesson-main span {
-    max-width: 100%;
-    overflow-wrap: anywhere;
+    line-height: 1.25;
   }
   .lesson-main:hover {
-    color: var(--accent-strong);
+    background: var(--surface);
   }
-  .room {
-    font-size: 9px;
+  .lesson-line {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .lesson-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 0.78125rem;
+    font-weight: 550;
+  }
+  .lesson-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 5px;
+    max-width: 100%;
+    font-size: 9.5px;
     color: var(--ink-3);
+  }
+  .lesson-room {
+    overflow-wrap: anywhere;
+  }
+  .now-badge {
+    flex: none;
+    padding: 1px 5px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--ok) 16%, transparent);
+    color: var(--ok);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
   }
   .free {
-    font-size: var(--text-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    min-height: 30px;
+    margin-top: 2px;
+    padding: 0 4px;
+    border: 1px dashed var(--rule);
+    border-radius: var(--radius-1);
+    background: transparent;
     color: var(--ink-3);
+    font-size: 9.5px;
+  }
+  .free:hover {
+    border-color: var(--accent);
+    background: var(--surface);
+    color: var(--accent-strong);
   }
   .icon {
     display: grid;
@@ -1019,13 +1203,26 @@
     background: transparent;
     color: var(--ink-3);
   }
+  .icon.add {
+    width: 20px;
+    height: 20px;
+  }
   .lesson-row .icon {
-    grid-area: icon;
     align-self: center;
   }
   .icon:hover {
     background: var(--surface);
     color: var(--danger);
+  }
+  .icon.add:hover {
+    color: var(--accent-strong);
+  }
+  .conflict {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-1);
+    background: var(--warn-soft);
+    color: var(--warn);
+    font-size: var(--text-xs);
   }
   .lesson-form {
     display: flex;

@@ -101,6 +101,25 @@ test.describe('Study Hub v2 — Core Flows', () => {
     await expect(page).toHaveURL(/#\/settings$/);
   });
 
+  test('Schedule: quick-add a lesson on a day and undo its deletion', async ({ page }) => {
+    await page.goto(`${BASE_URL}/#/settings`);
+    const section = page.locator('#settings-schedule');
+
+    await page.getByRole('button', { name: 'Lektion am Montag erfassen' }).click();
+    const form = page.locator('.lesson-form');
+    await form.getByLabel('Bezeichnung').fill('Mathe');
+    await form.getByLabel('Start').fill('08:00');
+    await form.getByLabel('Ende').fill('09:00');
+    await form.getByRole('button', { name: 'Erfassen' }).click();
+    await expect(section).toContainText('Mathe');
+
+    await page.getByRole('button', { name: 'Mathe löschen' }).click();
+    await expect(section).not.toContainText('Mathe');
+
+    await page.getByRole('button', { name: 'Rückgängig' }).click();
+    await expect(section).toContainText('Mathe');
+  });
+
   test('Settings: cloud section renders', async ({ page }) => {
     await page.goto(`${BASE_URL}/#/settings`);
     await expect(page.locator('#sync-title')).toHaveText('Cloud');

@@ -48,6 +48,53 @@ export function lessonLabel(state, lesson) {
   return mod ? mod.title || mod.code : 'Unterricht';
 }
 
+function toMinutes(value) {
+  const [hours, minutes] = String(value || '')
+    .split(':')
+    .map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return hours * 60 + minutes;
+}
+
+/** Lesson length in minutes, or 0 for invalid/empty ranges. */
+export function lessonDuration(lesson) {
+  const start = toMinutes(lesson?.start);
+  const end = toMinutes(lesson?.end);
+  if (start == null || end == null || end <= start) return 0;
+  return end - start;
+}
+
+/** True while the lesson's weekday and time slot contain `now`. */
+export function isLessonNow(lesson, now = new Date()) {
+  if (!lesson) return false;
+  const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+  if (Number(lesson.dayOfWeek) !== dayOfWeek) return false;
+  const start = toMinutes(lesson.start);
+  const end = toMinutes(lesson.end);
+  if (start == null || end == null || end <= start) return false;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return minutes >= start && minutes < end;
+}
+
+/**
+ * Lessons on the same day whose time range overlaps `candidate`.
+ * Touching ranges (09:00–10:00 and 10:00–11:00) do not conflict.
+ */
+export function lessonConflicts(lessons, candidate, ignoreId = null) {
+  const day = Number(candidate?.dayOfWeek);
+  const start = toMinutes(candidate?.start);
+  const end = toMinutes(candidate?.end);
+  if (!Number.isFinite(day) || start == null || end == null || end <= start) return [];
+  return (lessons || []).filter((lesson) => {
+    if (!lesson || lesson.id === ignoreId) return false;
+    if (Number(lesson.dayOfWeek) !== day) return false;
+    const otherStart = toMinutes(lesson.start);
+    const otherEnd = toMinutes(lesson.end);
+    if (otherStart == null || otherEnd == null || otherEnd <= otherStart) return false;
+    return start < otherEnd && end > otherStart;
+  });
+}
+
 export function daysUntilLesson(lesson, now = new Date()) {
   const next = nextLesson({ lessons: [lesson] }, now);
   if (!next) return null;

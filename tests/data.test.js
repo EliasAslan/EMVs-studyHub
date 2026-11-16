@@ -32,7 +32,14 @@ import {
   linkFirstMention,
   norm,
 } from '../src/lib/data/wikiLinks.js';
-import { lessonsForDay, nextLesson, daysUntilLesson } from '../src/lib/data/schedule.js';
+import {
+  lessonsForDay,
+  nextLesson,
+  daysUntilLesson,
+  lessonConflicts,
+  lessonDuration,
+  isLessonNow,
+} from '../src/lib/data/schedule.js';
 
 const NOW = new Date(2026, 10, 4, 10, 30); // Wed 4 Nov 2026, local time
 
@@ -362,5 +369,30 @@ describe('schedule', () => {
     expect(next.date).toBe('2026-11-04');
     expect(lessonsForDay(state, 3).map((l) => l.id)).toEqual(['l2', 'l3']);
     expect(daysUntilLesson(state.lessons[0], NOW)).toBe(5);
+  });
+
+  it('detects overlaps without flagging touching ranges', () => {
+    const lessons = [
+      { id: 'a', dayOfWeek: 3, start: '09:00', end: '10:00' },
+      { id: 'b', dayOfWeek: 3, start: '10:00', end: '11:00' },
+      { id: 'c', dayOfWeek: 4, start: '09:30', end: '11:00' },
+    ];
+
+    expect(lessonConflicts(lessons, { dayOfWeek: 3, start: '09:30', end: '09:45' }).map((l) => l.id)).toEqual(['a']);
+    expect(lessonConflicts(lessons, { dayOfWeek: 3, start: '10:00', end: '10:30' }).map((l) => l.id)).toEqual(['b']);
+    expect(lessonConflicts(lessons, { dayOfWeek: 3, start: '11:00', end: '12:00' })).toEqual([]);
+    expect(lessonConflicts(lessons, { dayOfWeek: 4, start: '09:30', end: '10:00' }).map((l) => l.id)).toEqual(['c']);
+    expect(lessonConflicts(lessons, { dayOfWeek: 3, start: '09:00', end: '10:00' }, 'a')).toEqual([]);
+  });
+
+  it('computes duration and detects the running lesson', () => {
+    expect(lessonDuration({ start: '08:00', end: '09:30' })).toBe(90);
+    expect(lessonDuration({ start: '09:00', end: '08:00' })).toBe(0);
+    expect(lessonDuration({})).toBe(0);
+
+    const wed = { dayOfWeek: 3, start: '10:00', end: '11:00' };
+    expect(isLessonNow(wed, new Date(2026, 10, 4, 10, 30))).toBe(true);
+    expect(isLessonNow(wed, new Date(2026, 10, 4, 11, 0))).toBe(false);
+    expect(isLessonNow(wed, new Date(2026, 10, 5, 10, 30))).toBe(false);
   });
 });
