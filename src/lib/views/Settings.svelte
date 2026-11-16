@@ -149,6 +149,10 @@
     updateSettings({ widgetAutoSave });
   }
 
+  function openShortcuts() {
+    window.dispatchEvent(new CustomEvent('studyhub:shortcuts'));
+  }
+
   async function onImport(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -378,6 +382,7 @@
   <nav class="subnav" aria-label="Einstellungsbereiche">
     <a href="#settings-programs" on:click|preventDefault={() => document.getElementById('settings-programs')?.scrollIntoView({ block: 'start' })}>Programme</a>
     <a href="#settings-theme" on:click|preventDefault={() => document.getElementById('settings-theme')?.scrollIntoView({ block: 'start' })}>Darstellung</a>
+    <a href="#settings-shortcuts" on:click|preventDefault={() => document.getElementById('settings-shortcuts')?.scrollIntoView({ block: 'start' })}>Tastatur</a>
     <a href="#settings-ai" on:click|preventDefault={() => document.getElementById('settings-ai')?.scrollIntoView({ block: 'start' })}>KI</a>
     <a href="#settings-schedule" on:click|preventDefault={() => document.getElementById('settings-schedule')?.scrollIntoView({ block: 'start' })}>Stundenplan</a>
     <a href="#settings-data" on:click|preventDefault={() => document.getElementById('settings-data')?.scrollIntoView({ block: 'start' })}>Daten</a>
@@ -420,6 +425,19 @@
           {option.label}
         </button>
       {/each}
+    </div>
+  </section>
+
+  <section class="card section" id="settings-shortcuts" aria-labelledby="shortcuts-title">
+    <div class="section-title">
+      <h2 id="shortcuts-title">Tastaturkürzel</h2>
+      <span class="hint">Schneller navigieren</span>
+    </div>
+    <p class="muted small">Suche, Erfassen und Seitenwechsel ohne Maus.</p>
+    <div class="button-row">
+      <button class="btn" type="button" on:click={openShortcuts}>
+        <Icon name="help" size={15} /> Kürzel anzeigen
+      </button>
     </div>
   </section>
 

@@ -88,6 +88,19 @@ test.describe('Study Hub v2 — Core Flows', () => {
     await expect(page.locator('text=Pausiert')).toBeVisible();
   });
 
+  test('Collapsing the sidebar footer keeps Settings available', async ({ page }) => {
+    await page.goto(BASE_URL);
+    const sidebar = page.locator('#app-sidebar');
+
+    await sidebar.getByRole('button', { name: 'Untere Navigation einklappen' }).click();
+    await expect(sidebar.getByRole('button', { name: 'Untere Navigation ausklappen' })).toBeVisible();
+
+    const settings = sidebar.getByRole('link', { name: 'Einstellungen' });
+    await expect(settings).toBeVisible();
+    await settings.click();
+    await expect(page).toHaveURL(/#\/settings$/);
+  });
+
   test('Settings: cloud section renders', async ({ page }) => {
     await page.goto(`${BASE_URL}/#/settings`);
     await expect(page.locator('#sync-title')).toHaveText('Cloud');
@@ -136,24 +149,14 @@ test.describe('Study Hub v2 — mobile shell', () => {
     await expect(page.getByRole('button', { name: 'Mehr' })).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('help modal opens from the drawer and Escape closes modal before drawer', async ({ page }) => {
-    await page.goto(BASE_URL);
-    const aside = page.locator('#app-sidebar');
+  test('help modal opens from settings and Escape closes it', async ({ page }) => {
+    await page.goto(`${BASE_URL}/#/settings`);
 
-    await page.getByRole('button', { name: 'Navigation öffnen' }).click();
-    await expect(aside).toHaveClass(/\bopen\b/);
-
-    await page.getByRole('button', { name: 'Tastaturkürzel' }).click();
+    await page.getByRole('button', { name: 'Kürzel anzeigen' }).click();
     const dialog = page.getByRole('dialog', { name: 'Tastaturkürzel' });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('Suche öffnen');
-
-    // Escape ordnet sich ab: erst das Modal, dann der Drawer.
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
-    await expect(aside).toHaveClass(/\bopen\b/);
-
-    await page.keyboard.press('Escape');
-    await expect(aside).not.toHaveClass(/\bopen\b/);
   });
 });

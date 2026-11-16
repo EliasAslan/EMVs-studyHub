@@ -12,6 +12,7 @@
   export let onClose = null;
 
   const modulePrefs = persistedStore('studyhub_sidebar_modules', { collapsed: false });
+  const footPrefs = persistedStore('studyhub_sidebar_foot', { collapsed: false });
 
   let navEl;
   let lastModuleId = null;
@@ -32,6 +33,7 @@
   // The rail only exists on desktop; the mobile drawer always shows full labels.
   $: compact = collapsed && isDesktop;
   $: modulesCollapsed = !!$modulePrefs.collapsed;
+  $: footCollapsed = !!$footPrefs.collapsed;
   $: openCount = $openHomework.length;
   $: currentProgram = programs.find((p) => p.id === currentProgramId) || programs[0] || null;
   $: programModules = modules
@@ -68,6 +70,10 @@
 
   function toggleModules() {
     modulePrefs.update((prefs) => ({ ...prefs, collapsed: !prefs.collapsed }));
+  }
+
+  function toggleFoot() {
+    footPrefs.update((prefs) => ({ ...prefs, collapsed: !prefs.collapsed }));
   }
 
   function selectProgram(programId) {
@@ -255,39 +261,45 @@
     {/if}
   </nav>
 
-  <div class="foot" use:closeDrawerOnNavigation>
+  <div class="foot-wrap" class:collapsed={footCollapsed}>
     <button
-      class="nav-link help-btn"
+      class="foot-toggle"
       type="button"
-      on:click={() => window.dispatchEvent(new CustomEvent('studyhub:shortcuts'))}
+      aria-expanded={!footCollapsed}
+      aria-controls="sidebar-foot"
+      aria-label={footCollapsed ? 'Untere Navigation ausklappen' : 'Untere Navigation einklappen'}
+      title={footCollapsed ? 'Ausklappen' : 'Einklappen'}
+      on:click={toggleFoot}
     >
-      <Icon name="help" />
-      {#if !compact}<span>Tastaturkürzel</span>{/if}
+      <Icon name="chevronDown" size={14} />
     </button>
-    <a class="nav-link" class:active={$route.name === 'links'} href="#/links" aria-current={$route.name === 'links' ? 'page' : undefined} title={compact ? 'Links' : undefined}>
-      <Icon name="links" />
-      {#if !compact}<span>Links</span>{/if}
-    </a>
-    <a class="nav-link" class:active={$route.name === 'focus'} href="#/focus" aria-current={$route.name === 'focus' ? 'page' : undefined} title={compact ? 'Fokus' : undefined}>
-      <Icon name="focus" />
-      {#if !compact}<span>Fokus</span>{/if}
-    </a>
-    <a class="nav-link" class:active={$route.name === 'settings'} href="#/settings" aria-current={$route.name === 'settings' ? 'page' : undefined} title={compact ? 'Einstellungen' : undefined}>
-      <Icon name="settings" />
-      {#if !compact}<span>Einstellungen</span>{/if}
-    </a>
+    <div class="foot-clip" inert={footCollapsed}>
+      <div class="foot" id="sidebar-foot" use:closeDrawerOnNavigation>
+        <a class="nav-link" class:active={$route.name === 'links'} href="#/links" aria-current={$route.name === 'links' ? 'page' : undefined} title={compact ? 'Links' : undefined}>
+          <Icon name="links" />
+          {#if !compact}<span>Links</span>{/if}
+        </a>
+        <a class="nav-link" class:active={$route.name === 'focus'} href="#/focus" aria-current={$route.name === 'focus' ? 'page' : undefined} title={compact ? 'Fokus' : undefined}>
+          <Icon name="focus" />
+          {#if !compact}<span>Fokus</span>{/if}
+        </a>
+      </div>
+    </div>
   </div>
+  <a
+    class="nav-link settings-link"
+    class:active={$route.name === 'settings'}
+    href="#/settings"
+    aria-current={$route.name === 'settings' ? 'page' : undefined}
+    title={compact ? 'Einstellungen' : undefined}
+    use:closeDrawerOnNavigation
+  >
+    <Icon name="settings" />
+    {#if !compact}<span>Einstellungen</span>{/if}
+  </a>
 </aside>
 
 <style>
-  .help-btn {
-    border: 0;
-    background: transparent;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    width: 100%;
-  }
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
@@ -556,13 +568,77 @@
     background: var(--surface);
     color: var(--accent-strong);
   }
+  .foot-wrap {
+    --foot-motion: 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+    display: grid;
+    flex: none;
+    grid-template-rows: 1fr;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule);
+    transition:
+      grid-template-rows var(--foot-motion),
+      padding-top var(--foot-motion),
+      padding-bottom var(--foot-motion);
+  }
+  .foot-wrap.collapsed {
+    grid-template-rows: 0fr;
+    padding-top: 0;
+    padding-bottom: 10px;
+  }
+  .foot-clip {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity var(--foot-motion),
+      transform var(--foot-motion);
+  }
+  .foot-wrap.collapsed .foot-clip {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
   .foot {
     display: flex;
-    flex: none;
     flex-direction: column;
     gap: 1px;
-    padding-top: 8px;
-    border-top: 1px solid var(--rule);
+  }
+  .foot-toggle {
+    position: absolute;
+    top: -11px;
+    left: 50%;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--ink-3);
+    cursor: pointer;
+    transform: translateX(-50%);
+    transition:
+      background var(--motion),
+      color var(--motion),
+      transform var(--motion);
+  }
+  .foot-toggle:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .foot-toggle:active {
+    transform: translateX(-50%) scale(0.9);
+  }
+  .foot-toggle :global(svg) {
+    transform: none;
+    transition: transform var(--foot-motion);
+  }
+  .foot-wrap.collapsed .foot-toggle :global(svg) {
+    transform: rotate(180deg);
   }
   .collapse {
     display: grid;
@@ -641,7 +717,11 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .sidebar {
+    .sidebar,
+    .foot-wrap,
+    .foot-clip,
+    .foot-toggle,
+    .foot-toggle :global(svg) {
       transition: none;
     }
   }
