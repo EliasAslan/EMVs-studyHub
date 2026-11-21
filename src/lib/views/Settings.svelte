@@ -180,13 +180,15 @@
   let aiProbed = false;
 
   $: signedIn = !!$cloud.session;
-  $: syncStateLabel = $cloud.syncing
-    ? 'Synchronisiert…'
-    : $cloud.lastError
-      ? 'Fehler'
-      : signedIn
-        ? 'Verbunden · bereit'
-        : 'Nicht verbunden';
+  $: syncStateLabel = !$cloud.online
+    ? 'Offline · wartet auf Internet'
+    : $cloud.syncing
+      ? 'Synchronisiert…'
+      : $cloud.lastError
+        ? 'Aktion nötig'
+        : signedIn
+          ? $cloud.syncPending ? 'Sync ausstehend' : 'Aktuell'
+          : 'Nicht verbunden';
   $: settings = $appState.settings;
   $: programs = $appState.programs || [];
   $: modules = $appState.modules || [];
@@ -506,7 +508,10 @@
     <a href="#settings-shortcuts" on:click|preventDefault={() => document.getElementById('settings-shortcuts')?.scrollIntoView({ block: 'start' })}>Tastatur</a>
     <a href="#settings-ai" on:click|preventDefault={() => document.getElementById('settings-ai')?.scrollIntoView({ block: 'start' })}>KI</a>
     <a href="#settings-schedule" on:click|preventDefault={() => document.getElementById('settings-schedule')?.scrollIntoView({ block: 'start' })}>Stundenplan</a>
-    <a href="#settings-data" on:click|preventDefault={() => document.getElementById('settings-data')?.scrollIntoView({ block: 'start' })}>Daten</a>
+    <a href="#settings-data" on:click|preventDefault={() => document.getElementById('settings-data')?.scrollIntoView({ block: 'start' })}>Backups</a>
+    <a href="#settings-desktop-widgets" on:click|preventDefault={() => document.getElementById('settings-desktop-widgets')?.scrollIntoView({ block: 'start' })}>Widgets</a>
+    <a href="#settings-email" on:click|preventDefault={() => document.getElementById('settings-email')?.scrollIntoView({ block: 'start' })}>E-Mail</a>
+    <a href="#settings-cloud" on:click|preventDefault={() => document.getElementById('settings-cloud')?.scrollIntoView({ block: 'start' })}>Cloud</a>
   </nav>
 
   <section class="card section" id="settings-programs" aria-labelledby="programs-title">
@@ -794,7 +799,7 @@
     </p>
   </section>
 
-  <section class="card section" aria-labelledby="email-title">
+  <section class="card section" id="settings-email" aria-labelledby="email-title">
     <div class="section-title">
       <h2 id="email-title">Erinnerungen</h2>
       <span class="badge" class:is-on={remindersOptIn} class:is-busy={remindersBusy} class:is-error={!!remindersError}>
@@ -837,7 +842,7 @@
     {/if}
   </section>
 
-  <section class="card section" aria-labelledby="sync-title">
+  <section class="card section" id="settings-cloud" aria-labelledby="sync-title">
     <div class="section-title">
       <h2 id="sync-title">Cloud</h2>
       <span class="sync-badge" class:on={signedIn && !$cloud.lastError} class:busy={$cloud.syncing} class:error={!!$cloud.lastError}>
@@ -847,67 +852,101 @@
     </div>
 
     {#if !$cloud.configured}
-      <p class="muted small">Cloud ist nicht konfiguriert.</p>
+      <div class="setup-notice" role="status">
+        <span class="notice-mark" aria-hidden="true">i</span>
+        <div><strong>Cloud ist noch nicht eingerichtet.</strong><p>Lokale Daten funktionieren weiterhin wie gewohnt.</p></div>
+      </div>
     {:else if !signedIn}
-      <p class="auth-intro">Melde dich an, um deine Daten mit Neon auf mehreren Geräten zu synchronisieren. Study Hub funktioniert auch ohne Konto weiter.</p>
-      <div class="auth-card">
-        <div class="auth-tabs" role="group" aria-label="Kontoaktion">
-          <button class:active={authMode === 'signin'} type="button" aria-pressed={authMode === 'signin'} on:click={() => setAuthMode('signin')}>Anmelden</button>
-          <button class:active={authMode === 'signup'} type="button" aria-pressed={authMode === 'signup'} on:click={() => setAuthMode('signup')}>Konto erstellen</button>
+      <div class="auth-layout">
+        <div class="auth-story">
+          <span class="auth-kicker"><span class="status-pip" aria-hidden="true"></span> STUDY HUB CLOUD</span>
+          <h3>Dein Lernalltag.<br /><em>Immer dabei.</em></h3>
+          <p class="auth-lede">Melde dich an und halte deine Notizen, Hausaufgaben und Planung auf allen Geräten aktuell.</p>
+          <div class="auth-benefits">
+            <div><span class="benefit-icon" aria-hidden="true">↻</span><span><strong>Automatisch aktuell</strong><small>Sync im Hintergrund, sobald Internet da ist.</small></span></div>
+            <div><span class="benefit-icon" aria-hidden="true">⌂</span><span><strong>Offline weiterarbeiten</strong><small>Deine Daten bleiben auf diesem Gerät verfügbar.</small></span></div>
+          </div>
         </div>
-        {#if authMode === 'signup'}
-          <p class="auth-note">Erstelle ein neues Neon-Konto. Frühere Supabase-Konten funktionieren hier nicht; deine Daten auf diesem Gerät bleiben erhalten.</p>
-        {/if}
-        <form class="auth-form" on:submit|preventDefault={authMode === 'signin' ? doSignIn : doSignUp}>
-          <label class="field">
-            <span>E-Mail-Adresse</span>
-            <input class="input" type="email" bind:value={authEmail} autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required />
-          </label>
-          <label class="field">
-            <span>Passwort</span>
-            <div class="password-control">
-              <input class="input" type={showAuthPassword ? 'text' : 'password'} bind:value={authPassword} autocomplete={authMode === 'signin' ? 'current-password' : 'new-password'} minlength={authMode === 'signup' ? 8 : 1} required />
-              <button type="button" class="password-toggle" aria-label={showAuthPassword ? 'Passwort verbergen' : 'Passwort anzeigen'} aria-pressed={showAuthPassword} on:click={() => (showAuthPassword = !showAuthPassword)}>{showAuthPassword ? 'Verbergen' : 'Anzeigen'}</button>
-            </div>
-            {#if authMode === 'signup'}<span class="auth-help">Mindestens 8 Zeichen.</span>{/if}
-          </label>
-          <button class="btn btn-primary auth-submit" type="submit" disabled={authBusy || !authEmail.trim() || !authPassword}>
-            {authBusy ? 'Bitte warten…' : authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
-          </button>
-        </form>
-        {#if authMode === 'signin'}
-          <button class="text-button" type="button" on:click={requestPasswordReset} disabled={authBusy || !authEmail.trim()}>Passwort vergessen?</button>
-        {/if}
+        <div class="auth-card">
+          <div class="auth-card-heading">
+            <h3>{authMode === 'signin' ? 'Willkommen zurück' : 'Konto erstellen'}</h3>
+            <p>{authMode === 'signin' ? 'Melde dich mit deinem Study-Hub-Konto an.' : 'Ein neues Konto ist in wenigen Schritten bereit.'}</p>
+          </div>
+          <div class="auth-tabs" role="group" aria-label="Kontoaktion">
+            <button class:active={authMode === 'signin'} type="button" aria-pressed={authMode === 'signin'} on:click={() => setAuthMode('signin')}>Anmelden</button>
+            <button class:active={authMode === 'signup'} type="button" aria-pressed={authMode === 'signup'} on:click={() => setAuthMode('signup')}>Konto erstellen</button>
+          </div>
+          {#if authMode === 'signup'}
+            <p class="auth-note">Erstelle ein neues Neon-Konto. Frühere Supabase-Konten funktionieren hier nicht; deine Daten auf diesem Gerät bleiben erhalten.</p>
+          {/if}
+          <form class="auth-form" on:submit|preventDefault={authMode === 'signin' ? doSignIn : doSignUp}>
+            <label class="field">
+              <span>E-Mail-Adresse</span>
+              <input class="input" type="email" bind:value={authEmail} autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="du@beispiel.ch" required />
+            </label>
+            <label class="field">
+              <span>Passwort</span>
+              <div class="password-control">
+                <input class="input" type={showAuthPassword ? 'text' : 'password'} bind:value={authPassword} autocomplete={authMode === 'signin' ? 'current-password' : 'new-password'} minlength={authMode === 'signup' ? 8 : 1} placeholder={authMode === 'signup' ? 'Mindestens 8 Zeichen' : 'Dein Passwort'} required />
+                <button type="button" class="password-toggle" aria-label={showAuthPassword ? 'Passwort verbergen' : 'Passwort anzeigen'} aria-pressed={showAuthPassword} on:click={() => (showAuthPassword = !showAuthPassword)}>{showAuthPassword ? 'Verbergen' : 'Anzeigen'}</button>
+              </div>
+              {#if authMode === 'signup'}<span class="auth-help">Mindestens 8 Zeichen.</span>{/if}
+            </label>
+            <button class="btn btn-primary auth-submit" type="submit" disabled={authBusy || !authEmail.trim() || !authPassword}>
+              {authBusy ? 'Bitte warten…' : authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
+            </button>
+          </form>
+          {#if authMode === 'signin'}
+            <button class="text-button" type="button" on:click={requestPasswordReset} disabled={authBusy || !authEmail.trim()}>Passwort vergessen?</button>
+          {/if}
+          <div class="auth-footnote"><span aria-hidden="true">🔒</span> Deine Cloud-Daten sind nur für dein Konto zugänglich.</div>
+        </div>
       </div>
     {:else}
-      <div class="sync-account">
-        <span class="muted small">{$cloud.email}</span>
-        <span class="muted small">Zuletzt: {$cloud.lastSynced}</span>
+      <div class="sync-dashboard">
+        <div class="sync-identity">
+          <span class="account-avatar" aria-hidden="true">{($cloud.email || 'S').slice(0, 1).toUpperCase()}</span>
+          <div class="identity-copy"><strong>{$cloud.email}</strong><span>Dein Study-Hub-Konto</span></div>
+          <span class="sync-badge" class:on={$cloud.online && !$cloud.lastError} class:busy={$cloud.syncing} class:error={!!$cloud.lastError} class:pending={$cloud.syncPending && !$cloud.syncing}>
+            <span class="sync-dot" aria-hidden="true"></span>
+            {syncStateLabel}
+          </span>
+        </div>
+        <div class="sync-details">
+          <div><span class="detail-label">Letzte Synchronisierung</span><strong>{$cloud.lastSynced}</strong></div>
+          <div><span class="detail-label">Verbindung</span><strong>{$cloud.online ? 'Internet verfügbar' : 'Offline'}</strong></div>
+        </div>
+        <div class="sync-actions">
+          <button class="btn btn-primary" type="button" on:click={() => syncNow(true)} disabled={$cloud.syncing || !$cloud.online}>
+            {$cloud.syncing ? 'Synchronisiert…' : 'Jetzt synchronisieren'}
+          </button>
+          <button class="btn" type="button" on:click={() => syncNow(false)} disabled={$cloud.syncing || !$cloud.online}>
+            Cloud-Daten laden
+          </button>
+          <button class="btn btn-ghost" type="button" on:click={doSignOut} disabled={authBusy}>Abmelden</button>
+        </div>
+        <p class="sync-background-note">
+          <span class="background-dot" aria-hidden="true"></span>
+          {#if !$cloud.online}Änderungen bleiben auf diesem Gerät und werden bei Internetverbindung automatisch synchronisiert.
+          {:else if $cloud.syncPending}Änderungen warten auf die nächste Synchronisierung.
+          {:else}Änderungen werden automatisch im Hintergrund synchronisiert.{/if}
+        </p>
       </div>
-      <div class="button-row">
-        <button class="btn btn-primary" type="button" on:click={() => syncNow(true)} disabled={$cloud.syncing}>
-          {$cloud.syncing ? 'Synchronisiert…' : 'Synchronisieren'}
-        </button>
-        <button class="btn" type="button" on:click={() => syncNow(false)} disabled={$cloud.syncing}>
-          Cloud laden
-        </button>
-        <button class="btn btn-ghost" type="button" on:click={doSignOut} disabled={authBusy}>Abmelden</button>
-      </div>
-      {#if $cloud.message}<p class="muted small">{$cloud.message}</p>{/if}
+      {#if $cloud.message}<p class="muted small auth-feedback success" role="status">{$cloud.message}</p>{/if}
       {#if $cloud.lastError}
         <div class="sync-error" role="alert">
           <strong>{$cloud.lastError.title}</strong>
           <span>{$cloud.lastError.action}</span>
           <details>
-            <summary>Details ({$cloud.lastError.code})</summary>
+            <summary>Technische Details ({$cloud.lastError.code})</summary>
             <code>{$cloud.lastError.technical}</code>
           </details>
         </div>
       {/if}
     {/if}
 
-    {#if authMessage}<p class="muted small">{authMessage}</p>{/if}
-    {#if authError}<p class="error small" role="alert">{authError}</p>{/if}
+    {#if authMessage}<p class="auth-feedback success" role="status">{authMessage}</p>{/if}
+    {#if authError}<p class="auth-feedback error" role="alert">{authError}</p>{/if}
   </section>
 
   <section class="card section danger" aria-labelledby="reset-title">
@@ -1549,6 +1588,558 @@
   @media (min-width: 700px) {
     .form-grid {
       grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  /* Settings page polish */
+  .page {
+    width: min(100%, 960px);
+    gap: clamp(14px, 2vw, 20px);
+  }
+  .page-head {
+    padding: 8px 2px 2px;
+  }
+  .page-head .eyebrow {
+    margin-bottom: 4px;
+    color: var(--accent-strong);
+    font-size: 0.7rem;
+    font-weight: 750;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+  .page-head h1 {
+    letter-spacing: -0.045em;
+  }
+  .subnav {
+    gap: 5px;
+    padding: 6px;
+    border-color: color-mix(in srgb, var(--rule-strong) 62%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    box-shadow: var(--shadow-1);
+    backdrop-filter: blur(14px);
+  }
+  .subnav a {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 10px;
+    color: var(--ink-2);
+    letter-spacing: 0.005em;
+    transition: color var(--motion), background var(--motion), transform var(--motion);
+  }
+  .subnav a:hover {
+    transform: translateY(-1px);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+  .section {
+    position: relative;
+    gap: 16px;
+    padding: clamp(17px, 2.8vw, 26px);
+    border-color: color-mix(in srgb, var(--rule) 78%, var(--accent-soft));
+    border-radius: 18px;
+    background: linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--surface) 91%, var(--accent-soft)));
+    box-shadow: var(--shadow-1);
+    transition: border-color var(--motion), box-shadow var(--motion);
+  }
+  .section:hover {
+    border-color: color-mix(in srgb, var(--rule-strong) 72%, var(--accent));
+    box-shadow: var(--shadow-2);
+  }
+  .section-title {
+    align-items: center;
+    margin-bottom: 2px;
+  }
+  .section-title h2 {
+    font-size: 1rem;
+    letter-spacing: -0.02em;
+  }
+  .hint {
+    color: var(--ink-3);
+  }
+  .program-row {
+    min-height: 50px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    transition: background var(--motion), border-color var(--motion);
+  }
+  .program-row:hover {
+    border-color: var(--rule);
+    background: var(--surface);
+  }
+  .program-name {
+    letter-spacing: -0.01em;
+  }
+  .segmented {
+    max-width: 500px;
+    padding: 4px;
+    border-radius: 12px;
+  }
+  .seg {
+    min-height: 42px;
+    border-radius: 9px;
+    transition: background var(--motion), color var(--motion), box-shadow var(--motion);
+  }
+  .check-row,
+  .pref-row {
+    padding: 9px 11px;
+    border: 1px solid var(--rule);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--surface) 80%, transparent);
+  }
+  .ai-grid,
+  .form-grid {
+    gap: 14px;
+  }
+  .input,
+  .select,
+  .textarea {
+    border-radius: 11px;
+    background: var(--surface);
+  }
+  .btn {
+    min-height: 42px;
+    border-radius: 11px;
+    font-weight: 620;
+  }
+  .btn-primary {
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .auth-intro {
+    max-width: 65ch;
+    line-height: 1.65;
+  }
+  .auth-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.04fr) minmax(320px, 0.96fr);
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--rule));
+    border-radius: 20px;
+    background: var(--surface);
+    box-shadow: var(--shadow-2);
+  }
+  .auth-story {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 19px;
+    min-height: 430px;
+    padding: clamp(25px, 4vw, 42px);
+    background:
+      radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 63%),
+      linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 83%, var(--surface)), var(--surface-2));
+  }
+  .auth-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    color: var(--accent-strong);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+  }
+  .status-pip {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 15%, transparent);
+  }
+  .auth-story > h3 {
+    max-width: 12ch;
+    font-size: clamp(2rem, 4vw, 2.7rem);
+    line-height: 1.06;
+    letter-spacing: -0.055em;
+  }
+  .auth-story > h3 em {
+    color: var(--accent-strong);
+    font-style: normal;
+  }
+  .auth-lede {
+    max-width: 40ch;
+    color: var(--ink-2);
+    font-size: var(--text-base);
+    line-height: 1.7;
+  }
+  .auth-benefits {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 3px;
+  }
+  .auth-benefits > div {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+  .benefit-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--rule));
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    color: var(--accent-strong);
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+  .auth-benefits strong,
+  .auth-benefits small {
+    display: block;
+  }
+  .auth-benefits strong {
+    font-size: var(--text-sm);
+    font-weight: 680;
+  }
+  .auth-benefits small {
+    margin-top: 2px;
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+  }
+  .auth-card {
+    justify-content: center;
+    gap: 17px;
+    max-width: none;
+    padding: clamp(22px, 3.4vw, 34px);
+    border: 0;
+    border-left: 1px solid var(--rule);
+    border-radius: 0;
+    background: var(--surface);
+  }
+  .auth-card-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .auth-card-heading h3 {
+    font-size: 1.38rem;
+    letter-spacing: -0.035em;
+  }
+  .auth-card-heading p,
+  .auth-note {
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+    line-height: 1.55;
+  }
+  .auth-note {
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--rule));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface));
+  }
+  .auth-tabs {
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--surface-2);
+  }
+  .auth-tabs button {
+    min-height: 42px;
+    border-radius: 9px;
+    transition: color var(--motion), background var(--motion), box-shadow var(--motion);
+  }
+  .auth-tabs button.active {
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+  }
+  .auth-form {
+    gap: 15px;
+    max-width: none;
+  }
+  .auth-form .field {
+    gap: 7px;
+  }
+  .auth-form .field > span:first-child {
+    color: var(--ink);
+    font-size: var(--text-xs);
+    font-weight: 680;
+  }
+  .auth-form .input {
+    min-height: 47px;
+    border-radius: 11px;
+    background: var(--surface);
+  }
+  .auth-form .input::placeholder {
+    color: var(--ink-3);
+    opacity: 0.72;
+  }
+  .password-toggle {
+    min-height: 34px;
+    right: 6px;
+    border-radius: 8px;
+  }
+  .password-toggle:hover {
+    background: var(--accent-soft);
+  }
+  .auth-help {
+    margin-top: -2px;
+    color: var(--ink-3);
+  }
+  .auth-submit {
+    min-height: 48px;
+    margin-top: 2px;
+    border-radius: 12px;
+    font-size: var(--text-sm);
+  }
+  .text-button {
+    width: fit-content;
+    color: var(--accent-strong);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .text-button:hover {
+    text-decoration: underline;
+  }
+  .auth-footnote {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    color: var(--ink-3);
+    font-size: 0.7rem;
+  }
+  .auth-footnote span {
+    color: var(--ok);
+  }
+  .auth-feedback {
+    max-width: 720px;
+    margin: 0;
+    padding: 11px 13px;
+    border: 1px solid var(--rule);
+    border-radius: 11px;
+    background: var(--surface);
+    font-size: var(--text-sm);
+    line-height: 1.55;
+  }
+  .auth-feedback.success {
+    border-color: color-mix(in srgb, var(--ok) 36%, var(--rule));
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+  .auth-feedback.error {
+    border-color: color-mix(in srgb, var(--danger) 40%, var(--rule));
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+  .setup-notice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 620px;
+    padding: 15px;
+    border: 1px solid var(--rule);
+    border-radius: 13px;
+    background: var(--surface-2);
+  }
+  .setup-notice p {
+    margin-top: 3px;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+  }
+  .notice-mark {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-weight: 800;
+  }
+  .sync-dashboard {
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+  }
+  .sync-identity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 17px 18px;
+  }
+  .account-avatar {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    flex: none;
+    border-radius: 14px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-size: 1rem;
+    font-weight: 750;
+  }
+  .identity-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    flex: 1;
+  }
+  .identity-copy strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--text-sm);
+  }
+  .identity-copy span,
+  .detail-label {
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+  }
+  .sync-badge {
+    flex: none;
+    padding: 7px 10px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-weight: 650;
+  }
+  .sync-badge.on {
+    border-color: color-mix(in srgb, var(--ok) 25%, var(--rule));
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+  .sync-badge.pending {
+    border-color: color-mix(in srgb, var(--warn) 30%, var(--rule));
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  .sync-badge.error {
+    border-color: color-mix(in srgb, var(--danger) 35%, var(--rule));
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+  .sync-details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0 18px 16px 72px;
+  }
+  .sync-details > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .sync-details strong {
+    font-size: var(--text-sm);
+  }
+  .sync-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    padding: 14px 18px;
+    border-top: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+  .sync-background-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 18px;
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+  }
+  .background-dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--ok);
+  }
+  .sync-error {
+    max-width: 820px;
+    padding: 15px;
+    border-radius: 13px;
+    line-height: 1.55;
+  }
+  .sync-error strong {
+    color: var(--danger);
+    font-size: var(--text-sm);
+  }
+  .sync-error > span {
+    color: var(--ink);
+    font-size: var(--text-sm);
+  }
+  .sync-error details {
+    margin-top: 4px;
+  }
+  .section.danger {
+    border-color: color-mix(in srgb, var(--danger) 28%, var(--rule));
+    background: linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--danger-soft) 45%, var(--surface)));
+  }
+  @media (max-width: 760px) {
+    .auth-layout {
+      grid-template-columns: 1fr;
+    }
+    .auth-story {
+      min-height: 0;
+      gap: 13px;
+      padding: 23px;
+    }
+    .auth-story > h3 {
+      max-width: none;
+      font-size: 1.9rem;
+    }
+    .auth-lede {
+      max-width: none;
+    }
+    .auth-benefits {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .auth-benefits > div {
+      align-items: flex-start;
+    }
+    .auth-card {
+      border-top: 1px solid var(--rule);
+      border-left: 0;
+    }
+  }
+  @media (max-width: 560px) {
+    .page-head {
+      align-items: flex-start;
+    }
+    .section {
+      padding: 16px;
+      border-radius: 15px;
+    }
+    .auth-benefits {
+      grid-template-columns: 1fr;
+    }
+    .auth-card {
+      padding: 19px;
+    }
+    .sync-identity {
+      flex-wrap: wrap;
+      padding: 14px;
+    }
+    .sync-badge {
+      margin-left: 54px;
+    }
+    .sync-details {
+      padding: 0 14px 14px;
+    }
+    .sync-actions {
+      padding: 13px 14px;
+    }
+    .sync-background-note {
+      align-items: flex-start;
+      padding: 11px 14px;
+    }
+    .button-row .btn,
+    .sync-actions .btn {
+      flex: 1 1 auto;
     }
   }
 </style>
