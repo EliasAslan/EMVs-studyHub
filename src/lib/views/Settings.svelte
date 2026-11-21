@@ -25,7 +25,7 @@
     isLessonNow,
   } from '../data/schedule.js';
   import { toast } from '../stores/toast.js';
-  import { cloud, signIn, signUp, signOut, runSync, loadCloud } from '../stores/cloud.js';
+  import { cloud, signIn, signUp, signOut, resetPassword, runSync, loadCloud } from '../stores/cloud.js';
   import { sendDeadlineReminders } from '../services/sendDeadlineReminders.js';
   import { aiSettings, saveAiSettings } from '../stores/ai.js';
   import { checkConnection, describeAiError } from '../services/localAI.js';
@@ -56,8 +56,86 @@
   let authEmail = '';
   let authPassword = '';
   let authBusy = false;
+  let authMode = 'signin';
+  let showAuthPassword = false;
   let authMessage = '';
   let authError = '';
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    authError = '';
+    authMessage = '';
+  }
+
+  function explainAuthError(error, fallback) {
+    const raw = String(error?.message || '').toLowerCase();
+    if (/invalid.*(credential|password)|incorrect.*password|user.*not found|invalid email or password/.test(raw)) {
+      return 'E-Mail oder Passwort stimmt nicht. Prüfe deine Angaben oder setze dein Passwort zurück.';
+    }
+    if (/already.*(registered|exists)|user already/.test(raw)) {
+      return 'Für diese E-Mail gibt es schon ein Konto. Melde dich an oder setze dein Passwort zurück.';
+    }
+    if (/password.*(short|length)|at least.*characters/.test(raw)) {
+      return 'Wähle ein Passwort mit mindestens 8 Zeichen.';
+    }
+    if (/email.*(invalid|valid)/.test(raw)) return 'Bitte gib eine gültige E-Mail-Adresse ein.';
+    if (/rate limit|too many requests/.test(raw)) return 'Zu viele Versuche. Bitte warte kurz und versuche es erneut.';
+    if (/failed to fetch|network|offline|timeout/.test(raw)) return 'Keine Verbindung. Prüfe dein Internet und versuche es erneut.';
+    return fallback;
+  }
+
+  async function requestPasswordReset() {
+    authError = '';
+    authMessage = '';
+    const email = authEmail.trim();
+    if (!email) {
+      authError = 'Gib zuerst deine E-Mail-Adresse ein.';
+      return;
+    }
+    authBusy = true;
+    try {
+      await resetPassword(email);
+      authMessage = 'Falls ein Konto zu dieser Adresse gehört, erhältst du eine E-Mail mit dem Link zum Zurücksetzen.';
+    } catch (e) {
+      authError = explainAuthError(e, 'Die E-Mail konnte gerade nicht gesendet werden. Versuche es später erneut.');
+    } finally {
+      authBusy = false;
+    }
+  }
+
+  async function doSignIn() {
+    authError = '';
+    authMessage = '';
+    authBusy = true;
+    try {
+      await signIn(authEmail.trim(), authPassword);
+      authPassword = '';
+      authMessage = 'Angemeldet.';
+    } catch (e) {
+      authError = explainAuthError(e, 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+    } finally {
+      authBusy = false;
+    }
+  }
+
+  async function doSignUp() {
+    authError = '';
+    authMessage = '';
+    if (authPassword.length < 8) {
+      authError = 'Wähle ein Passwort mit mindestens 8 Zeichen.';
+      return;
+    }
+    authBusy = true;
+    try {
+      await signUp(authEmail.trim(), authPassword);
+      authPassword = '';
+      authMessage = $cloud.message || 'Konto erstellt.';
+    } catch (e) {
+      authError = explainAuthError(e, 'Konto konnte nicht erstellt werden. Bitte versuche es erneut.');
+    } finally {
+      authBusy = false;
+    }
+  }
 
   // Backup reminder state
   let reminderDismissed = false;
@@ -361,35 +439,43 @@
     return WEEKDAYS.find((d) => d.value === value)?.label || '';
   }
 
-  async function doSignIn() {
+  function setAuthMode(mode) {
+    authMode = mode;
     authError = '';
     authMessage = '';
-    authBusy = true;
-    try {
-      await signIn(authEmail.trim(), authPassword);
-      authPassword = '';
-      authMessage = 'Angemeldet.';
-    } catch (e) {
-      authError = e?.message || 'Anmeldung fehlgeschlagen.';
-    } finally {
-      authBusy = false;
-    }
   }
 
-  async function doSignUp() {
+  function explainAuthError(error, fallback) {
+    const raw = String(error?.message || '').toLowerCase();
+    if (/invalid.*(credential|password)|incorrect.*password|user.*not found|invalid email or password/.test(raw)) {
+      return 'E-Mail oder Passwort stimmt nicht. Prüfe deine Angaben oder setze dein Passwort zurück.';
+    }
+    if (/already.*(registered|exists)|user already/.test(raw)) {
+      return 'Für diese E-Mail gibt es schon ein Konto. Melde dich an oder setze dein Passwort zurück.';
+    }
+    if (/password.*(short|length)|at least.*characters/.test(raw)) {
+      return 'Wähle ein Passwort mit mindestens 8 Zeichen.';
+    }
+    if (/email.*(invalid|valid)/.test(raw)) return 'Bitte gib eine gültige E-Mail-Adresse ein.';
+    if (/rate limit|too many requests/.test(raw)) return 'Zu viele Versuche. Bitte warte kurz und versuche es erneut.';
+    if (/failed to fetch|network|offline|timeout/.test(raw)) return 'Keine Verbindung. Prüfe dein Internet und versuche es erneut.';
+    return fallback;
+  }
+
+  async function requestPasswordReset() {
     authError = '';
     authMessage = '';
-    if (authPassword.length < 6) {
-      authError = 'Passwort: mindestens 6 Zeichen.';
+    const email = authEmail.trim();
+    if (!email) {
+      authError = 'Gib zuerst deine E-Mail-Adresse ein.';
       return;
     }
     authBusy = true;
     try {
-      await signUp(authEmail.trim(), authPassword);
-      authPassword = '';
-      authMessage = $cloud.message || 'Konto erstellt.';
+      await resetPassword(email);
+      authMessage = 'Falls ein Konto zu dieser Adresse gehört, erhältst du eine E-Mail mit dem Link zum Zurücksetzen.';
     } catch (e) {
-      authError = e?.message || 'Konto konnte nicht erstellt werden.';
+      authError = explainAuthError(e, 'Die E-Mail konnte gerade nicht gesendet werden. Versuche es später erneut.');
     } finally {
       authBusy = false;
     }
@@ -798,25 +884,36 @@
     {#if !$cloud.configured}
       <p class="muted small">Cloud ist nicht konfiguriert.</p>
     {:else if !signedIn}
-      <p class="muted small">Gerät ist Hauptquelle. Anmelden aktiviert Auto-Sync.</p>
-      <form class="auth-form" on:submit|preventDefault={doSignIn}>
-        <label class="field">
-          <span>E-Mail</span>
-          <input class="input" type="email" bind:value={authEmail} autocomplete="email" required />
-        </label>
-        <label class="field">
-          <span>Passwort</span>
-          <input class="input" type="password" bind:value={authPassword} autocomplete="current-password" minlength="6" required />
-        </label>
-        <div class="button-row">
-          <button class="btn btn-primary" type="submit" disabled={authBusy || !authEmail.trim() || !authPassword}>
-            {authBusy ? 'Bitte warten…' : 'Anmelden'}
-          </button>
-          <button class="btn" type="button" on:click={doSignUp} disabled={authBusy || !authEmail.trim() || !authPassword}>
-            Konto erstellen
-          </button>
+      <p class="auth-intro">Melde dich an, um deine Daten mit Neon auf mehreren Geräten zu synchronisieren. Study Hub funktioniert auch ohne Konto weiter.</p>
+      <div class="auth-card">
+        <div class="auth-tabs" role="group" aria-label="Kontoaktion">
+          <button class:active={authMode === 'signin'} type="button" aria-pressed={authMode === 'signin'} on:click={() => setAuthMode('signin')}>Anmelden</button>
+          <button class:active={authMode === 'signup'} type="button" aria-pressed={authMode === 'signup'} on:click={() => setAuthMode('signup')}>Konto erstellen</button>
         </div>
-      </form>
+        {#if authMode === 'signup'}
+          <p class="auth-note">Erstelle ein neues Neon-Konto. Frühere Supabase-Konten funktionieren hier nicht; deine Daten auf diesem Gerät bleiben erhalten.</p>
+        {/if}
+        <form class="auth-form" on:submit|preventDefault={authMode === 'signin' ? doSignIn : doSignUp}>
+          <label class="field">
+            <span>E-Mail-Adresse</span>
+            <input class="input" type="email" bind:value={authEmail} autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required />
+          </label>
+          <label class="field">
+            <span>Passwort</span>
+            <div class="password-control">
+              <input class="input" type={showAuthPassword ? 'text' : 'password'} bind:value={authPassword} autocomplete={authMode === 'signin' ? 'current-password' : 'new-password'} minlength={authMode === 'signup' ? 8 : 1} required />
+              <button type="button" class="password-toggle" aria-label={showAuthPassword ? 'Passwort verbergen' : 'Passwort anzeigen'} aria-pressed={showAuthPassword} on:click={() => (showAuthPassword = !showAuthPassword)}>{showAuthPassword ? 'Verbergen' : 'Anzeigen'}</button>
+            </div>
+            {#if authMode === 'signup'}<span class="auth-help">Mindestens 8 Zeichen.</span>{/if}
+          </label>
+          <button class="btn btn-primary auth-submit" type="submit" disabled={authBusy || !authEmail.trim() || !authPassword}>
+            {authBusy ? 'Bitte warten…' : authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
+          </button>
+        </form>
+        {#if authMode === 'signin'}
+          <button class="text-button" type="button" on:click={requestPasswordReset} disabled={authBusy || !authEmail.trim()}>Passwort vergessen?</button>
+        {/if}
+      </div>
     {:else}
       <div class="sync-account">
         <span class="muted small">{$cloud.email}</span>
@@ -936,6 +1033,155 @@
     gap: var(--space-3);
     padding: var(--space-4);
     scroll-margin-top: 110px;
+  }
+  .auth-intro {
+    max-width: 58ch;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+  }
+  .auth-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-width: 460px;
+    padding: var(--space-4);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-3);
+    background: var(--surface-2);
+  }
+  .auth-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-1);
+    padding: 3px;
+    border-radius: var(--radius-2);
+    background: var(--surface);
+  }
+  .auth-tabs button {
+    min-height: 40px;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-1);
+    background: transparent;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .auth-tabs button.active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+  .auth-note, .auth-help { color: var(--ink-2); font-size: var(--text-xs); }
+  .auth-form { display: flex; flex-direction: column; gap: var(--space-3); }
+  .password-control { position: relative; display: flex; align-items: center; }
+  .password-control .input { padding-right: 88px; }
+  .password-toggle {
+    position: absolute;
+    right: var(--space-2);
+    min-height: 36px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-1);
+    background: transparent;
+    color: var(--accent-strong);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  .auth-submit { width: 100%; }
+  .text-button {
+    align-self: flex-start;
+    padding: var(--space-1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent-strong);
+    font-size: var(--text-sm);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .text-button:disabled { opacity: .5; cursor: not-allowed; }
+  .auth-intro {
+    max-width: 58ch;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+  }
+  .auth-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-width: 460px;
+    padding: var(--space-4);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-3);
+    background: var(--surface-2);
+  }
+  .auth-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-1);
+    padding: 3px;
+    border-radius: var(--radius-2);
+    background: var(--surface);
+  }
+  .auth-tabs button {
+    min-height: 40px;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-1);
+    background: transparent;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .auth-tabs button.active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+  .auth-note, .auth-help {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+  }
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-width: none;
+  }
+  .password-control {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .password-control .input {
+    padding-right: 88px;
+  }
+  .password-toggle {
+    position: absolute;
+    right: var(--space-2);
+    min-height: 36px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-1);
+    background: transparent;
+    color: var(--accent-strong);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  .auth-submit {
+    width: 100%;
+  }
+  .text-button {
+    align-self: flex-start;
+    padding: var(--space-1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent-strong);
+    font-size: var(--text-sm);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .text-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .section.danger {
     border-color: var(--danger);
