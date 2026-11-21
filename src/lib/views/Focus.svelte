@@ -33,6 +33,10 @@
   let tick = 0;
   let now = Date.now();
   let focusMode = false;
+  let edgeNavVisible = false;
+  let edgeTimer = null;
+  let fullscreenActive = false;
+  let pageRoot = null;
 
   onMount(() => {
     prefs = getPomodoroPrefs();
@@ -43,7 +47,22 @@
       prefs = detail.prefs;
       if (detail.reason === 'tick') tick += 1;
     });
-    return unsubscribe;
+    const onFullscreen = () => { fullscreenActive = !!document.fullscreenElement; };
+    const onPointerMove = (event) => {
+      if (!focusMode) return;
+      if (event.clientX <= 18) revealEdgeNav();
+      else if (event.clientX > 220) scheduleEdgeHide();
+    };
+    document.addEventListener('fullscreenchange', onFullscreen);
+    window.addEventListener('pointermove', onPointerMove);
+    return () => {
+      unsubscribe();
+      document.removeEventListener('fullscreenchange', onFullscreen);
+      window.removeEventListener('pointermove', onPointerMove);
+      clearTimeout(edgeTimer);
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      document.body.classList.remove('pomodoro-immersive', 'pomodoro-nav-visible');
+    };
   });
 
   $: running = state?.status === STATUS.running;
@@ -63,6 +82,38 @@
 
   const RADIUS = 108;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+  async function setFocusMode(enabled) {
+    focusMode = enabled;
+    edgeNavVisible = false;
+    document.body.classList.toggle('pomodoro-immersive', enabled);
+    document.body.classList.remove('pomodoro-nav-visible');
+    if (enabled) {
+      try {
+        await document.documentElement.requestFullscreen?.();
+        fullscreenActive = !!document.fullscreenElement;
+      } catch {
+        fullscreenActive = false;
+      }
+    } else if (document.fullscreenElement) {
+      await document.exitFullscreen?.().catch(() => {});
+    }
+  }
+
+  function revealEdgeNav() {
+    if (!focusMode) return;
+    clearTimeout(edgeTimer);
+    edgeNavVisible = true;
+    document.body.classList.add('pomodoro-nav-visible');
+  }
+
+  function scheduleEdgeHide() {
+    clearTimeout(edgeTimer);
+    edgeTimer = setTimeout(() => {
+      edgeNavVisible = false;
+      document.body.classList.remove('pomodoro-nav-visible');
+    }, 700);
+  }
 
   function start() {
     updatePomodoroPrefs({ workMinutes: minutes });
@@ -110,7 +161,11 @@
   }
 </script>
 
-<div class="focus-page" class:focus-mode={focusMode}>
+<div class="focus-page" class:focus-mode={focusMode} class:edge-visible={edgeNavVisible} bind:this={pageRoot}>
+  {#if focusMode}
+    <div class="edge-trigger" aria-hidden="true" on:mouseenter={revealEdgeNav} on:mousemove={revealEdgeNav}></div>
+    <button class="focus-exit" type="button" on:click={() => setFocusMode(false)} on:mouseenter={revealEdgeNav} title="Fokusmodus beenden">Beenden</button>
+  {/if}
   <header class="focus-head">
     <div>
       <p class="eyebrow">STUDY HUB · POMODORO</p>
@@ -118,8 +173,8 @@
       <p class="focus-intro">Arbeite in klaren Intervallen. Pausen und dein Verlauf bleiben automatisch gespeichert.</p>
     </div>
     {#if state}
-      <button class="btn btn-ghost focus-toggle" type="button" aria-pressed={focusMode} on:click={() => (focusMode = !focusMode)} title="Timer im Fokus-Modus anzeigen">
-        <Icon name={focusMode ? 'x' : 'focus'} size={16} /> {focusMode ? 'Ansicht verlassen' : 'Fokus-Modus'}
+      <button class="btn btn-ghost focus-toggle" type="button" aria-pressed={focusMode} on:click={() => setFocusMode(!focusMode)} title="Timer im Vollbild anzeigen">
+        <Icon name={focusMode ? 'x' : 'focus'} size={16} /> {focusMode ? 'Ansicht verlassen' : 'Vollbild'}
       </button>
     {/if}
   </header>
@@ -284,13 +339,38 @@
     max-width: 720px;
     margin: 0 auto;
   }
-  .focus-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-4); text-align:left; }
+   .focus-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-4); text-align:left; }
+   :global(body.pomodoro-immersive .mobile-head), :global(body.pomodoro-immersive .tabbar), :global(body.pomodoro-immersive .fab) { visibility:hidden; }
+  :global(body.pomodoro-immersive #main) { width:100%; max-width:none; height:100dvh; padding:0; }
+  :global(body.pomodoro-immersive .toasts), :global(body.pomodoro-immersive .fab-menu), :global(body.pomodoro-immersive .fab-scrim) { display:none !important; }
+  :global(body.pomodoro-immersive .scrim) { display:none !important; }
+  :global(body.pomodoro-immersive #app-sidebar) { z-index:1004; visibility:visible; transform:translateX(-100%); transition:transform 160ms ease-out; }
+   :global(body.pomodoro-nav-visible #app-sidebar) { transform:translateX(0); }
+
   .eyebrow { margin-bottom:var(--space-1); color:var(--accent-strong); font-size:10px; font-weight:800; letter-spacing:.13em; }
   .focus-intro { margin-top:var(--space-2); max-width:52ch; color:var(--ink-2); font-size:var(--text-sm); }
   .focus-toggle { flex:none; }
-  .focus-mode .focus-head, .focus-mode .prefs { display:none; }
-  .focus-mode { max-width:760px; min-height:calc(100dvh - 120px); justify-content:center; }
-  .focus-mode .timer-card { min-height: min(680px, 76dvh); justify-content:center; }
+  .focus-mode .focus-head, .focus-mode .prefs, .focus-mode :global(.pomodoro-stats) { display:none; }
+  .focus-mode {
+    position:fixed; inset:0; z-index:1000; width:100vw; height:100dvh; max-width:none;
+    margin:0; padding:0; justify-content:center; gap:0; overflow:auto;
+    background:var(--bg); color:var(--ink);
+  }
+  .focus-mode .timer-card {
+    width:min(100vw, 960px); min-height:100dvh; justify-content:center;
+    border:0; border-radius:0; box-shadow:none; background:var(--bg);
+  }
+  .focus-mode .ring-wrap { width:min(48vh, 420px, 74vw); }
+  .focus-mode .clock { font-size:clamp(4rem, 12vw, 8rem); }
+  .focus-mode .timer-context, .focus-mode .actions, .focus-mode .breaks, .focus-mode .duration { z-index:1; }
+  .edge-trigger { position:fixed; inset:0 auto 0 0; z-index:1002; width:18px; }
+  .focus-exit {
+    position:fixed; top:var(--space-4); right:var(--space-4); z-index:1005;
+    padding:var(--space-2) var(--space-3); border:0; background:transparent;
+    color:var(--ink-3); opacity:0; transition:opacity 140ms ease-out; cursor:pointer;
+  }
+  .focus-mode.edge-visible .focus-exit, .focus-mode .focus-exit:focus-visible { opacity:1; }
+
   h1 {
     font-family: var(--font-read);
     font-size: clamp(1.8rem, 4vw, 2.4rem);
