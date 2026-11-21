@@ -1,25 +1,34 @@
 /**
  * Neon Auth + Data API client.
  *
- * Only the public Neon database URL belongs in a browser app. Database access
- * is protected by authenticated JWTs and per-user row-level security.
+ * Both URLs are public endpoints. Auth issues the session JWT; the Data API
+ * attaches it to per-user, row-level secured database queries.
  */
 import { createClient } from '@neon/neon-js/supabase';
 
-export const NEON_DATABASE_URL =
-  import.meta.env.VITE_NEON_DATABASE_URL ||
-  'https://ep-polished-sunset-bdyv6pbx.c-8.us-east-2.aws.neon.tech/neondb';
+export const NEON_AUTH_URL =
+  import.meta.env.VITE_NEON_AUTH_URL ||
+  'https://ep-polished-sunset-bdyv6pbx.neonauth.c-8.us-east-2.aws.neon.tech/neondb/auth';
+
+export const NEON_DATA_API_URL =
+  import.meta.env.VITE_NEON_DATA_API_URL ||
+  'https://ep-polished-sunset-bdyv6pbx.apirest.c-8.us-east-2.aws.neon.tech/neondb/rest/v1';
 
 export function isNeonConfigured() {
-  return NEON_DATABASE_URL.startsWith('https://') && !NEON_DATABASE_URL.includes('PASTE_YOUR_');
+  return NEON_AUTH_URL.startsWith('https://') && NEON_DATA_API_URL.startsWith('https://');
 }
 
 let client = null;
 
 export function getNeonClient() {
   if (!isNeonConfigured()) {
-    throw new Error('Neon ist nicht konfiguriert.');
+    throw new Error('Neon Auth und Data API sind nicht konfiguriert.');
   }
-  if (!client) client = createClient(NEON_DATABASE_URL);
+  if (!client) {
+    client = createClient({
+      auth: { url: NEON_AUTH_URL },
+      dataApi: { url: NEON_DATA_API_URL },
+    });
+  }
   return client;
 }
