@@ -439,42 +439,6 @@
     return WEEKDAYS.find((d) => d.value === value)?.label || '';
   }
 
-  function explainAuthError(error, fallback) {
-    const raw = String(error?.message || '').toLowerCase();
-    if (/invalid.*(credential|password)|incorrect.*password|user.*not found|invalid email or password/.test(raw)) {
-      return 'E-Mail oder Passwort stimmt nicht. Prüfe deine Angaben oder setze dein Passwort zurück.';
-    }
-    if (/already.*(registered|exists)|user already/.test(raw)) {
-      return 'Für diese E-Mail gibt es schon ein Konto. Melde dich an oder setze dein Passwort zurück.';
-    }
-    if (/password.*(short|length)|at least.*characters/.test(raw)) {
-      return 'Wähle ein Passwort mit mindestens 8 Zeichen.';
-    }
-    if (/email.*(invalid|valid)/.test(raw)) return 'Bitte gib eine gültige E-Mail-Adresse ein.';
-    if (/rate limit|too many requests/.test(raw)) return 'Zu viele Versuche. Bitte warte kurz und versuche es erneut.';
-    if (/failed to fetch|network|offline|timeout/.test(raw)) return 'Keine Verbindung. Prüfe dein Internet und versuche es erneut.';
-    return fallback;
-  }
-
-  async function requestPasswordReset() {
-    authError = '';
-    authMessage = '';
-    const email = authEmail.trim();
-    if (!email) {
-      authError = 'Gib zuerst deine E-Mail-Adresse ein.';
-      return;
-    }
-    authBusy = true;
-    try {
-      await resetPassword(email);
-      authMessage = 'Falls ein Konto zu dieser Adresse gehört, erhältst du eine E-Mail mit dem Link zum Zurücksetzen.';
-    } catch (e) {
-      authError = explainAuthError(e, 'Die E-Mail konnte gerade nicht gesendet werden. Versuche es später erneut.');
-    } finally {
-      authBusy = false;
-    }
-  }
-
   async function doSignOut() {
     authError = '';
     authBusy = true;
