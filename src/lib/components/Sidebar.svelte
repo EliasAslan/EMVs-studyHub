@@ -183,11 +183,6 @@
       <Icon name="today" />
       {#if !compact}<span>Heute</span>{/if}
     </a>
-    <a class="nav-link" class:active={$route.name === 'focus'} href="#/focus" aria-current={$route.name === 'focus' ? 'page' : undefined} title={compact ? 'Fokus-Timer' : 'Pomodoro-Timer öffnen'}>
-      <Icon name="focus" />
-      {#if !compact}<span>Fokus-Timer</span>{/if}
-    </a>
-
     {#if !compact}
       <div class="module-head">
         <button
