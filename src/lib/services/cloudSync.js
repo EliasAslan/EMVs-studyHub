@@ -6,7 +6,7 @@
  * Nothing here writes localStorage; the caller applies the merged state.
  */
 
-import { listUserRows, upsertUserRows } from './supabaseData.js';
+import { listUserRows, upsertUserRows } from './neonData.js';
 import {
   UPLOAD_ORDER,
   TABLE_FOR_COLLECTION,
