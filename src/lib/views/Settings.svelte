@@ -68,12 +68,19 @@
   }
 
   function explainAuthError(error, fallback) {
-    const raw = String(error?.message || '').toLowerCase();
+    const message = String(error?.message || error?.error?.message || error?.cause?.message || '').trim();
+    const raw = message.toLowerCase();
     if (/invalid.*(credential|password)|incorrect.*password|user.*not found|invalid email or password/.test(raw)) {
       return 'E-Mail oder Passwort stimmt nicht. Prüfe deine Angaben oder setze dein Passwort zurück.';
     }
     if (/already.*(registered|exists)|user already/.test(raw)) {
       return 'Für diese E-Mail gibt es schon ein Konto. Melde dich an oder setze dein Passwort zurück.';
+    }
+    if (/signup_not_allowed|sign.?up.*(disabled|not allowed)/.test(raw)) {
+      return 'Die Kontoerstellung ist in Neon Auth deaktiviert. Bitte kontaktiere die Administration.';
+    }
+    if (/invalid.*domain|origin.*not.*allowed|trusted.*origin/.test(raw)) {
+      return 'Diese App-Adresse ist in Neon Auth nicht freigegeben. Füge die Website-Adresse zu den erlaubten Neon Auth Domains hinzu.';
     }
     if (/password.*(short|length)|at least.*characters/.test(raw)) {
       return 'Wähle ein Passwort mit mindestens 8 Zeichen.';
@@ -81,7 +88,7 @@
     if (/email.*(invalid|valid)/.test(raw)) return 'Bitte gib eine gültige E-Mail-Adresse ein.';
     if (/rate limit|too many requests/.test(raw)) return 'Zu viele Versuche. Bitte warte kurz und versuche es erneut.';
     if (/failed to fetch|network|offline|timeout/.test(raw)) return 'Keine Verbindung. Prüfe dein Internet und versuche es erneut.';
-    return fallback;
+    return message ? `${fallback} (Neon: ${message})` : fallback;
   }
 
   async function requestPasswordReset() {
