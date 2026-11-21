@@ -4,7 +4,7 @@
  */
 
 import { writable, get } from 'svelte/store';
-import { getSupabaseClient, isSupabaseConfigured } from '../services/supabaseClient.js';
+import { getNeonClient, isNeonConfigured } from '../services/neonClient.js';
 import {
   syncState,
   uploadMergedData,
@@ -21,7 +21,7 @@ import {
 import { normalizeState } from '../data/entities.js';
 import { getState, replaceState, applyTheme, setSyncHandler } from './app.js';
 
-const configured = isSupabaseConfigured();
+const configured = isNeonConfigured();
 
 export const cloud = writable({
   configured,
@@ -33,6 +33,8 @@ export const cloud = writable({
   lastError: null,
   message: '',
   accountUid: getLastSyncedUid(),
+  online: typeof navigator === 'undefined' || navigator.onLine !== false,
+  syncPending: false,
 });
 
 let client = null;
@@ -40,13 +42,34 @@ let started = false;
 let authSubscription = null;
 let syncTimer = null;
 let inFlight = null;
+let syncAfterFlight = false;
+let autoRetryCount = 0;
+
+function isOnline() {
+  return typeof navigator === 'undefined' || navigator.onLine !== false;
+}
+
+function onNetworkOnline() {
+  patch({ online: true });
+  if (get(cloud).session && get(cloud).syncPending) scheduleSync(700);
+}
+
+function onNetworkOffline() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = null;
+  patch({ online: false, syncPending: !!get(cloud).session, syncing: false });
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible' && get(cloud).session && isOnline()) scheduleSync(1200);
+}
 
 function patch(updates) {
   cloud.update((state) => ({ ...state, ...updates }));
 }
 
 function clientOrThrow() {
-  if (!client) client = getSupabaseClient();
+  if (!client) client = getNeonClient();
   return client;
 }
 
@@ -69,7 +92,11 @@ export async function initCloud() {
   }
 
   try {
-    client = getSupabaseClient();
+    client = getNeonClient();
+    patch({ online: isOnline() });
+    window.addEventListener('online', onNetworkOnline);
+    window.addEventListener('offline', onNetworkOffline);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     const { data, error } = await client.auth.getSession();
     if (error) throw error;
     applySession(data.session);
@@ -79,13 +106,13 @@ export async function initCloud() {
     });
     authSubscription = listener?.subscription || null;
 
-    // Silent auto-sync: 25 s after the last local change, plus tab return.
-    setSyncHandler(() => scheduleSync(25000));
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && get(cloud).session) scheduleSync(2000);
-    });
+    // Coalesce rapid edits but push changes soon in the background.
+    setSyncHandler(() => scheduleSync(3500));
 
-    if (data.session) scheduleSync(500);
+    if (data.session) {
+      patch({ syncPending: true });
+      scheduleSync(500);
+    }
   } catch (error) {
     patch({ ready: true, lastError: translateSyncError(error), message: '' });
   }
@@ -93,22 +120,27 @@ export async function initCloud() {
 
 export function stopCloud() {
   authSubscription?.unsubscribe?.();
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('online', onNetworkOnline);
+    window.removeEventListener('offline', onNetworkOffline);
+  }
+  if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityChange);
   authSubscription = null;
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = null;
 }
 
 export async function signIn(email, password) {
-  const supabase = clientOrThrow();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const neon = clientOrThrow();
+  const { error } = await neon.auth.signInWithPassword({ email, password });
   if (error) throw error;
   patch({ message: 'Angemeldet.' });
   scheduleSync(300);
 }
 
 export async function signUp(email, password) {
-  const supabase = clientOrThrow();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const neon = clientOrThrow();
+  const { data, error } = await neon.auth.signUp({ email, password });
   if (error) throw error;
   patch({
     message: data.session
@@ -117,19 +149,29 @@ export async function signUp(email, password) {
   });
 }
 
+export async function resetPassword(email) {
+  const neon = clientOrThrow();
+  const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#/settings` : undefined;
+  const { error } = await neon.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw error;
+}
+
 export async function signOut() {
-  const supabase = clientOrThrow();
-  const { error } = await supabase.auth.signOut();
+  const neon = clientOrThrow();
+  const { error } = await neon.auth.signOut();
   if (error) throw error;
   patch({ message: 'Abgemeldet. Lokale Daten bleiben.' });
 }
 
-export function scheduleSync(delay = 25000) {
-  if (!configured) return;
+export function scheduleSync(delay = 3500) {
+  if (!configured || !get(cloud).session) return;
+  patch({ syncPending: true });
   if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = null;
+  if (!isOnline()) return;
   syncTimer = setTimeout(() => {
     syncTimer = null;
-    if (get(cloud).session) runSync({ reason: 'auto' }).catch(() => {});
+    if (get(cloud).session && isOnline()) runSync({ reason: 'auto' }).catch(() => {});
   }, delay);
 }
 
@@ -143,34 +185,58 @@ async function applyMerged(result, { upload }) {
 /** Merge cloud + local, apply locally, and upload the merged result. */
 export async function runSync({ reason = 'manual', upload = true } = {}) {
   if (!configured) return null;
-  if (inFlight) return inFlight;
+  if (!isOnline()) {
+    patch({ online: false, syncPending: !!get(cloud).session });
+    if (reason === 'auto') return null;
+    throw Object.assign(new Error('Du bist offline. Die Änderungen warten auf eine Internetverbindung.'), { code: 'OFFLINE' });
+  }
+  if (inFlight) {
+    if (reason === 'auto') syncAfterFlight = true;
+    return inFlight;
+  }
 
   inFlight = (async () => {
     patch({ syncing: true, message: '', lastError: null });
     try {
-      const supabase = clientOrThrow();
-      await getSessionUserId(supabase);
-      const result = await syncState(supabase, getState());
+      const neon = clientOrThrow();
+      await getSessionUserId(neon);
+      const result = await syncState(neon, getState());
       await applyMerged(result, { upload });
       const direction = upload ? 'upload' : 'download';
       const status = recordSyncSuccess(direction);
+      autoRetryCount = 0;
       patch({
         syncing: false,
+        online: isOnline(),
+        syncPending: false,
+        lastError: null,
         lastSynced: formatLastSynced(status),
         accountUid: getLastSyncedUid(),
         message: reason === 'auto' ? '' : 'Synchronisiert.',
       });
       return result;
     } catch (error) {
-      recordSyncFailure(error?.code);
+      const translated = translateSyncError(error);
+      recordSyncFailure(error?.code || error?.status?.toString?.() || translated.code);
+      const connectivityFailure = translated.code === 'OFFLINE' || translated.code === 'NETWORK';
       patch({
         syncing: false,
-        lastError: translateSyncError(error),
+        online: isOnline(),
+        syncPending: connectivityFailure,
+        lastError: translated,
         message: '',
       });
+      if (connectivityFailure && isOnline() && autoRetryCount < 5) {
+        autoRetryCount += 1;
+        scheduleSync(Math.min(5000 * 2 ** (autoRetryCount - 1), 60000));
+      }
       throw error;
     } finally {
       inFlight = null;
+      if (syncAfterFlight) {
+        syncAfterFlight = false;
+        scheduleSync(900);
+      }
     }
   })();
 

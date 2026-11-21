@@ -1,12 +1,12 @@
 /**
- * Supabase sync for the v3 schema.
+ * Neon sync for the v3 schema.
  *
  * Local state is always the datastore. Sync is best-effort: merge the cloud
  * into the local state with last-write-wins, then upload the merged result.
  * Nothing here writes localStorage; the caller applies the merged state.
  */
 
-import { listUserRows, upsertUserRows } from './supabaseData.js';
+import { listUserRows, upsertUserRows } from './neonData.js';
 import {
   UPLOAD_ORDER,
   TABLE_FOR_COLLECTION,
@@ -76,11 +76,11 @@ export function clearLastSyncedUid() {
 }
 
 export async function getSessionUserId(client) {
-  if (!client?.auth?.getUser) throw new TypeError('A Supabase client is required.');
+  if (!client?.auth?.getUser) throw new TypeError('A Neon client is required.');
   const { data, error } = await client.auth.getUser();
   if (error) throw error;
   const uid = data?.user?.id;
-  if (!uid) throw new Error('Bitte melde dich zuerst bei Supabase an.');
+  if (!uid) throw new Error('Bitte melde dich zuerst bei Neon an.');
   return uid;
 }
 

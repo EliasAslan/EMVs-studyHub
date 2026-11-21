@@ -12,7 +12,7 @@
     "test:e2e": "playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.119.0"
+    "@neon/neon-js": "^0.10.2"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

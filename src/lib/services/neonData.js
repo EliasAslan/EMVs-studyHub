@@ -1,5 +1,5 @@
 /**
- * Explicit Supabase row access.
+ * Explicit Neon Data API row access.
  *
  * localStorage remains the app datastore; these helpers only move rows for
  * the signed-in user. Ownership always comes from the authenticated session,
@@ -23,18 +23,18 @@ export const ALLOWED_TABLES = Object.freeze(Object.keys(TABLES));
 
 function assertTable(table) {
   if (!Object.hasOwn(TABLES, table)) {
-    throw new TypeError(`Unsupported Supabase table: ${table}`);
+    throw new TypeError(`Unsupported cloud table: ${table}`);
   }
 }
 
 async function getAuthenticatedUserId(client) {
   if (!client?.auth?.getUser) {
-    throw new TypeError('A Supabase client is required.');
+    throw new TypeError('A Neon client is required.');
   }
   const { data, error } = await client.auth.getUser();
   if (error) throw error;
   const userId = data?.user?.id;
-  if (!userId) throw new Error('Bitte melde dich zuerst bei Supabase an.');
+  if (!userId) throw new Error('Bitte melde dich zuerst bei Neon an.');
   return userId;
 }
 
