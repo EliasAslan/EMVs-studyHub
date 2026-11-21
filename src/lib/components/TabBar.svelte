@@ -8,7 +8,7 @@
   $: isNotes = $route.name === 'notes' || $route.name === 'note';
   $: isMore =
     expanded ||
-    ['exams', 'links', 'focus', 'settings', 'calendar', 'modules', 'module', 'tokens', 'assistant'].includes($route.name);
+    ['exams', 'links', 'settings', 'calendar', 'modules', 'module', 'tokens', 'assistant'].includes($route.name);
 </script>
 
 <nav class="tabbar" aria-label="Mobile Navigation">
@@ -19,6 +19,10 @@
   <a class="tab" class:active={$route.name === 'homework'} href="#/homework" aria-current={$route.name === 'homework' ? 'page' : undefined}>
     <Icon name="homework" size={20} />
     <span>Hausaufgaben</span>
+  </a>
+  <a class="tab" class:active={$route.name === 'focus'} href="#/focus" aria-current={$route.name === 'focus' ? 'page' : undefined} title="Pomodoro-Timer">
+    <Icon name="focus" size={20} />
+    <span>Fokus</span>
   </a>
   <a class="tab" class:active={isNotes} href="#/notes" aria-current={isNotes ? 'page' : undefined}>
     <Icon name="notes" size={20} />
@@ -43,7 +47,7 @@
     inset: auto 0 0 0;
     z-index: 50;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: color-mix(in srgb, var(--surface) 92%, transparent);
@@ -55,7 +59,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 3px;
     border: 0;
     background: transparent;
     color: var(--ink-3);
@@ -66,6 +70,9 @@
   .tab.active {
     color: var(--accent-strong);
   }
+  .tab:hover { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); color:var(--accent-strong); }
+  .tab :global(svg) { transition: transform var(--motion); }
+  .tab.active :global(svg) { transform:translateY(-1px); }
   @media (min-width: 900px) {
     .tabbar {
       display: none;

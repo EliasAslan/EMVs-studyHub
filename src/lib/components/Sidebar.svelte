@@ -179,9 +179,13 @@
   {/if}
 
   <nav class="nav-scroll" bind:this={navEl} aria-label="Seiten" use:closeDrawerOnNavigation>
-    <a class="nav-link" class:active={$route.name === 'today'} href="#/" aria-current={$route.name === 'today' ? 'page' : undefined}>
+    <a class="nav-link" class:active={$route.name === 'today'} href="#/" aria-current={$route.name === 'today' ? 'page' : undefined} title={compact ? 'Heute' : undefined}>
       <Icon name="today" />
       {#if !compact}<span>Heute</span>{/if}
+    </a>
+    <a class="nav-link" class:active={$route.name === 'focus'} href="#/focus" aria-current={$route.name === 'focus' ? 'page' : undefined} title={compact ? 'Fokus-Timer' : 'Pomodoro-Timer öffnen'}>
+      <Icon name="focus" />
+      {#if !compact}<span>Fokus-Timer</span>{/if}
     </a>
 
     {#if !compact}
@@ -440,10 +444,10 @@
     gap: 11px;
     flex: none;
     width: 100%;
-    min-height: 36px;
+    min-height: 40px;
     padding: 0 10px;
     border: 0;
-    border-radius: 8px;
+    border-radius: 9px;
     background: transparent;
     color: var(--ink-2);
     font-size: 13.5px;
@@ -453,13 +457,13 @@
     text-decoration: none;
   }
   .nav-link:hover {
-    background: var(--surface-2);
+    background: color-mix(in srgb, var(--accent-soft) 42%, var(--surface-2));
     color: var(--ink);
   }
   .nav-link.active {
-    background: var(--surface-2);
-    color: var(--ink);
-    font-weight: 600;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-weight: 650;
   }
   .nav-link.active :global(svg) {
     color: var(--accent-strong);

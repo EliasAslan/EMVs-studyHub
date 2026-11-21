@@ -10,6 +10,9 @@
     moduleTitle,
   } from '../stores/app.js';
   import { openPalette } from '../stores/ui.js';
+  import { navigate } from '../router.js';
+  import { subscribePomodoro, getPomodoroPrefs, startPomodoro, STATUS, PHASE, remainingMs } from '../services/pomodoroEngine.js';
+  import { formatClock, progressPct, roundLabel } from '../services/pomodoro.js';
   import {
     todayKey,
     formatDate,
@@ -26,6 +29,10 @@
 
   let captureOpen = false;
   let captureMode = 'note';
+  let timerState = null;
+  let timerPrefs = { workMinutes: 25 };
+  let timerNow = Date.now();
+  let timerTick = 0;
 
   const isMac =
     typeof navigator !== 'undefined' &&
@@ -33,6 +40,11 @@
   const shortcutLabel = isMac ? '⌘K' : 'Ctrl K';
 
   $: today = todayKey();
+  $: timerClock = timerState ? formatClock(remainingMs(timerState, timerNow)) : formatClock((Number(timerPrefs.workMinutes) || 25) * 60000);
+  $: timerRound = timerState ? roundLabel(timerState) : '25 min Fokus · 5 min Pause';
+  $: timerProgress = timerState ? progressPct(timerState, timerNow) : 0;
+  $: timerStatus = !timerState ? 'Bereit für eine fokussierte Runde?' : timerState.status === STATUS.paused ? 'Pausiert — mach weiter, wenn du bereit bist.' : timerState.status === STATUS.workDone ? 'Stark gemacht. Zeit für eine Pause.' : timerState.status === STATUS.breakDone ? 'Pause vorbei. Bereit für die nächste Runde?' : timerState.phase === PHASE.work ? 'Du bist gerade in deiner Fokusrunde.' : 'Deine Pause läuft gerade.';
+  $: timerActionLabel = !timerState ? 'Fokus starten' : timerState.status === STATUS.paused ? 'Timer fortsetzen' : timerState.status === STATUS.workDone ? 'Pause auswählen' : timerState.status === STATUS.breakDone ? 'Nächste Runde' : timerState.phase === PHASE.work ? 'Weiter fokussieren' : 'Pause fortsetzen';
   $: nextExam =
     ($appState.exams || [])
       .filter((exam) => exam.date && exam.date >= today)
@@ -46,6 +58,35 @@
   $: shortcuts = ($appState.links || [])
     .filter((link) => !link.moduleId || programModules.some((m) => m.id === link.moduleId))
     .slice(0, 2);
+
+  onMount(() => {
+    timerPrefs = getPomodoroPrefs();
+    const unsubscribe = subscribePomodoro(({ state, prefs }) => {
+      timerState = state;
+      timerPrefs = prefs;
+    });
+    const interval = setInterval(() => {
+      timerTick += 1;
+      timerNow = Date.now();
+    }, 1000);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  });
+
+  $: if (timerTick >= 0) timerNow = Date.now();
+
+  function goToFocus() {
+    navigate('/focus');
+  }
+
+  function startFromHome() {
+    if (!timerState) {
+      startPomodoro({ minutes: Number(timerPrefs.workMinutes) || 25 });
+    }
+    navigate('/focus');
+  }
 
   function openCapture(mode) {
     captureMode = mode;
@@ -88,6 +129,33 @@
       </span>
     </a>
   {/if}
+
+  <section class="focus-hero" aria-label="Fokus-Timer">
+    <div class="focus-copy">
+      <span class="focus-kicker"><Icon name="focus" size={15} /> DEIN FOKUS</span>
+      <h2>{timerState?.phase === PHASE.work ? 'Eine Sache nach der anderen.' : 'Mach Raum für konzentriertes Lernen.'}</h2>
+      <p>{timerStatus}</p>
+      <div class="focus-meta">
+        <span>{timerRound}</span>
+        {#if timerState?.completedRounds}
+          <span class="meta-dot">·</span><span>{timerState.completedRounds} {timerState.completedRounds === 1 ? 'Runde geschafft' : 'Runden geschafft'}</span>
+        {/if}
+      </div>
+      <button class="btn focus-cta" type="button" on:click={startFromHome} title="Zum Pomodoro-Timer">
+        {#if timerState}<span class="hero-clock mono">{timerClock}</span>{/if}
+        {timerActionLabel}<Icon name="chevronRight" size={16} />
+      </button>
+    </div>
+    <button class="focus-orbit" type="button" on:click={goToFocus} aria-label="Pomodoro-Timer öffnen" title="Pomodoro-Timer öffnen">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="orbit-track" cx="50" cy="50" r="43" />
+        <circle class="orbit-progress" cx="50" cy="50" r="43" stroke-dasharray="270.18" stroke-dashoffset={270.18 * (1 - timerProgress / 100)} />
+      </svg>
+      <span class="orbit-time mono">{timerClock}</span>
+      <span class="orbit-caption">{timerState?.phase === PHASE.work ? 'FOKUS' : timerState ? 'PAUSE' : 'START'}</span>
+    </button>
+    <a class="focus-more" href="#/focus" title="Timer, Pausen und Verlauf öffnen">Pomodoro öffnen <Icon name="arrowUpRight" size={14} /></a>
+  </section>
 
   <section class="block" aria-labelledby="checklist-title">
     <div class="section-title">
@@ -238,6 +306,40 @@
   .block {
     min-width: 0;
   }
+  .focus-hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-4);
+    min-height: 214px;
+    padding: clamp(var(--space-5), 4vw, var(--space-7));
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--rule));
+    border-radius: 20px;
+    background: radial-gradient(ellipse at 90% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 48%), linear-gradient(125deg, var(--surface), color-mix(in srgb, var(--accent-soft) 60%, var(--surface)));
+    box-shadow: var(--shadow-1);
+  }
+  .focus-copy { position: relative; z-index: 1; min-width: 0; }
+  .focus-kicker { display: inline-flex; align-items: center; gap: 7px; margin-bottom: var(--space-2); color: var(--accent-strong); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+  .focus-copy h2 { max-width: 28ch; font-family: var(--font-read); font-size: clamp(1.45rem, 3vw, 2rem); letter-spacing: -.025em; }
+  .focus-copy p { margin-top: var(--space-2); color: var(--ink-2); font-size: var(--text-sm); }
+  .focus-meta { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; margin-top: var(--space-3); color: var(--ink-3); font-size: var(--text-xs); }
+  .focus-cta { margin-top: var(--space-4); min-height: 44px; border-radius: var(--radius-2); background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+  .focus-cta:hover { background: var(--accent); border-color: var(--accent); }
+  .hero-clock { padding-right: var(--space-2); border-right: 1px solid rgb(255 255 255 / 35%); font-weight: 700; }
+  .focus-orbit { position: relative; display: grid; place-items: center; width: clamp(92px, 14vw, 142px); aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink); transition: transform var(--motion); }
+  .focus-orbit:hover { transform: scale(1.04); }
+  .focus-orbit svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .orbit-track, .orbit-progress { fill: none; stroke-width: 3; }
+  .orbit-track { stroke: color-mix(in srgb, var(--accent) 18%, var(--rule)); }
+  .orbit-progress { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 900ms linear; }
+  .orbit-time { font-size: clamp(1rem, 2vw, 1.35rem); font-weight: 700; }
+  .orbit-caption { position: absolute; top: 62%; color: var(--ink-3); font-size: 8px; font-weight: 800; letter-spacing: .12em; }
+  .focus-more { position: absolute; right: var(--space-4); bottom: var(--space-3); display: inline-flex; align-items: center; gap: 4px; color: var(--ink-3); font-size: 11px; text-decoration: none; }
+  .focus-more:hover { color: var(--accent-strong); }
+  @media (max-width: 480px) { .focus-hero { grid-template-columns: minmax(0, 1fr) 76px; padding: var(--space-4); } .focus-orbit { width: 76px; } .orbit-time { font-size: .9rem; } .orbit-caption { font-size: 7px; } .focus-copy h2 { font-size: 1.35rem; } }
+  @media (prefers-reduced-motion: reduce) { .focus-orbit, .orbit-progress { transition: none; } }
   .count {
     font-size: var(--text-xs);
     color: var(--ink-3);

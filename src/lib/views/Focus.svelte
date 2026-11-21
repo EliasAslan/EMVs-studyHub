@@ -32,6 +32,7 @@
   let custom = '';
   let tick = 0;
   let now = Date.now();
+  let focusMode = false;
 
   onMount(() => {
     prefs = getPomodoroPrefs();
@@ -57,6 +58,8 @@
   $: label = state ? phaseLabel(state) : 'Bereit';
   $: round = state ? roundLabel(state) : '';
   $: notification = prefs && typeof window !== 'undefined' && 'Notification' in window ? notificationStatus() : 'unsupported';
+  $: remainingPercent = Math.max(0, Math.ceil(remainingMs(state, now) / 60000));
+  $: timerStatus = !state ? 'Wähle eine Dauer und starte deine erste Runde.' : paused ? 'Pausiert. Setze fort, wenn du bereit bist.' : workDone ? 'Runde geschafft. Gönn dir eine Pause.' : breakDone ? 'Pause vorbei. Starte die nächste Runde.' : isWork ? 'Eine Aufgabe, ein Tab, ein Schritt nach dem anderen.' : 'Lass den Bildschirm kurz hinter dir.';
 
   const RADIUS = 108;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -107,9 +110,18 @@
   }
 </script>
 
-<div class="focus-page">
+<div class="focus-page" class:focus-mode={focusMode}>
   <header class="focus-head">
-    <h1>Fokus</h1>
+    <div>
+      <p class="eyebrow">STUDY HUB · POMODORO</p>
+      <h1>Fokus</h1>
+      <p class="focus-intro">Arbeite in klaren Intervallen. Pausen und dein Verlauf bleiben automatisch gespeichert.</p>
+    </div>
+    {#if state}
+      <button class="btn btn-ghost focus-toggle" type="button" aria-pressed={focusMode} on:click={() => (focusMode = !focusMode)} title="Timer im Fokus-Modus anzeigen">
+        <Icon name={focusMode ? 'x' : 'focus'} size={16} /> {focusMode ? 'Ansicht verlassen' : 'Fokus-Modus'}
+      </button>
+    {/if}
   </header>
 
   <section class="timer-card" class:is-break={state && !isWork} aria-label="Fokus-Timer">
@@ -134,10 +146,17 @@
         />
       </svg>
       <div class="clock-wrap">
-        <span class="clock mono" role="timer" aria-live="off">{clock}</span>
+        <span class="clock mono" role="timer" aria-live="off" aria-label="{clock} verbleibend">{clock}</span>
         <span class="clock-label">{state && !isWork ? 'Pause' : 'Fokus'}</span>
       </div>
     </div>
+
+    {#if state}
+      <div class="timer-context">
+        <p>{timerStatus}</p>
+        <span class="remaining-label">{remainingPercent} Min verbleibend</span>
+      </div>
+    {/if}
 
     {#if !state}
       <div class="duration" role="group" aria-label="Dauer wählen">
@@ -169,7 +188,7 @@
       <button class="btn btn-primary start" type="button" on:click={start}>
         <Icon name="focus" size={18} /> Fokus starten
       </button>
-      <p class="hint">Bereit</p>
+      <p class="hint">Deine Zeit bleibt gespeichert, auch wenn du zu einer anderen Seite wechselst.</p>
     {:else if isWork && !workDone}
       <div class="actions">
         <button class="btn btn-primary" type="button" on:click={toggle}>
@@ -223,7 +242,8 @@
 
   <section class="prefs card" aria-labelledby="prefs-title">
     <div class="prefs-head">
-      <h2 id="prefs-title">Timer</h2>
+      <div><p class="eyebrow">PERSÖNLICH</p><h2 id="prefs-title">Timer-Einstellungen</h2></div>
+      <p class="prefs-subtitle">Passe den Klang, Hinweise und deinen Lernverlauf an.</p>
     </div>
     <label class="pref-row check-row">
       <input
@@ -261,9 +281,16 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
-    max-width: 620px;
+    max-width: 720px;
     margin: 0 auto;
   }
+  .focus-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-4); text-align:left; }
+  .eyebrow { margin-bottom:var(--space-1); color:var(--accent-strong); font-size:10px; font-weight:800; letter-spacing:.13em; }
+  .focus-intro { margin-top:var(--space-2); max-width:52ch; color:var(--ink-2); font-size:var(--text-sm); }
+  .focus-toggle { flex:none; }
+  .focus-mode .focus-head, .focus-mode .prefs { display:none; }
+  .focus-mode { max-width:760px; min-height:calc(100dvh - 120px); justify-content:center; }
+  .focus-mode .timer-card { min-height: min(680px, 76dvh); justify-content:center; }
   .focus-head {
     text-align: center;
     display: flex;
@@ -281,10 +308,11 @@
     flex-direction: column;
     align-items: center;
     gap: var(--space-4);
-    padding: var(--space-5);
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-3);
-    background: var(--surface);
+    padding: clamp(var(--space-5), 6vw, var(--space-7));
+    border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--rule));
+    border-radius: 20px;
+    background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 56%), var(--surface);
+    box-shadow: var(--shadow-1);
   }
   .timer-card.is-break {
     background: var(--surface-2);
@@ -299,8 +327,8 @@
     color: var(--ink-3);
   }
   .phase {
-    font-weight: 600;
-    color: var(--ink-2);
+    font-weight: 700;
+    color: var(--accent-strong);
   }
   .round,
   .rounds {
@@ -381,16 +409,23 @@
     gap: var(--space-2);
   }
   .hint {
+    max-width: 44ch;
     font-size: var(--text-xs);
     color: var(--ink-3);
     text-align: center;
   }
+  .timer-context { max-width:48ch; text-align:center; }
+  .timer-context p { color:var(--ink-2); font-size:var(--text-sm); }
+  .remaining-label { display:inline-block; margin-top:var(--space-1); color:var(--ink-3); font-family:var(--font-mono); font-size:10px; }
+
   .prefs {
-    padding: var(--space-4);
+    padding: var(--space-5);
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
   }
+  .prefs-head { display:flex; flex-direction:column; gap:var(--space-1); margin-bottom:var(--space-2); }
+  .prefs-subtitle { color:var(--ink-3); font-size:var(--text-xs); }
   .prefs-head h2 {
     font-size: 0.9375rem;
     font-weight: 600;
@@ -418,6 +453,11 @@
   }
   .pref-label {
     flex: 1;
+  }
+  @media (max-width: 600px) {
+    .focus-head { align-items:flex-start; flex-direction:column; }
+    .timer-card { padding:var(--space-4); }
+    .breaks { flex-wrap:wrap; justify-content:center; }
   }
   @media (min-width: 700px) {
     .ring-wrap {
