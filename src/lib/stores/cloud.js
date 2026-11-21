@@ -117,6 +117,13 @@ export async function signUp(email, password) {
   });
 }
 
+export async function resetPassword(email) {
+  const neon = clientOrThrow();
+  const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#/settings` : undefined;
+  const { error } = await neon.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw error;
+}
+
 export async function signOut() {
   const neon = clientOrThrow();
   const { error } = await neon.auth.signOut();
