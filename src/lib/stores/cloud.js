@@ -4,7 +4,7 @@
  */
 
 import { writable, get } from 'svelte/store';
-import { getSupabaseClient, isSupabaseConfigured } from '../services/supabaseClient.js';
+import { getNeonClient, isNeonConfigured } from '../services/neonClient.js';
 import {
   syncState,
   uploadMergedData,
@@ -21,7 +21,7 @@ import {
 import { normalizeState } from '../data/entities.js';
 import { getState, replaceState, applyTheme, setSyncHandler } from './app.js';
 
-const configured = isSupabaseConfigured();
+const configured = isNeonConfigured();
 
 export const cloud = writable({
   configured,
@@ -46,7 +46,7 @@ function patch(updates) {
 }
 
 function clientOrThrow() {
-  if (!client) client = getSupabaseClient();
+  if (!client) client = getNeonClient();
   return client;
 }
 
@@ -69,7 +69,7 @@ export async function initCloud() {
   }
 
   try {
-    client = getSupabaseClient();
+    client = getNeonClient();
     const { data, error } = await client.auth.getSession();
     if (error) throw error;
     applySession(data.session);
@@ -99,16 +99,16 @@ export function stopCloud() {
 }
 
 export async function signIn(email, password) {
-  const supabase = clientOrThrow();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const neon = clientOrThrow();
+  const { error } = await neon.auth.signInWithPassword({ email, password });
   if (error) throw error;
   patch({ message: 'Angemeldet.' });
   scheduleSync(300);
 }
 
 export async function signUp(email, password) {
-  const supabase = clientOrThrow();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const neon = clientOrThrow();
+  const { data, error } = await neon.auth.signUp({ email, password });
   if (error) throw error;
   patch({
     message: data.session
@@ -118,8 +118,8 @@ export async function signUp(email, password) {
 }
 
 export async function signOut() {
-  const supabase = clientOrThrow();
-  const { error } = await supabase.auth.signOut();
+  const neon = clientOrThrow();
+  const { error } = await neon.auth.signOut();
   if (error) throw error;
   patch({ message: 'Abgemeldet. Lokale Daten bleiben.' });
 }
@@ -148,9 +148,9 @@ export async function runSync({ reason = 'manual', upload = true } = {}) {
   inFlight = (async () => {
     patch({ syncing: true, message: '', lastError: null });
     try {
-      const supabase = clientOrThrow();
-      await getSessionUserId(supabase);
-      const result = await syncState(supabase, getState());
+      const neon = clientOrThrow();
+      await getSessionUserId(neon);
+      const result = await syncState(neon, getState());
       await applyMerged(result, { upload });
       const direction = upload ? 'upload' : 'download';
       const status = recordSyncSuccess(direction);
