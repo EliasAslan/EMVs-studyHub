@@ -1,8 +1,6 @@
 <script>
   import {
     appState,
-    openHomework,
-    toggleHomework,
     todayChecklist,
     toggleChecklistItem,
     addChecklistItem,
@@ -17,7 +15,6 @@
     formatDate,
     formatTimeRange,
     relativeDayLabel,
-    daysUntil,
     WEEKDAYS,
   } from '../data/dates.js';
   import { nextLesson, lessonLabel } from '../data/schedule.js';
@@ -26,7 +23,6 @@
   import QuickCapture from '../components/QuickCapture.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
-  import { toast } from '../stores/toast.js';
 
   let captureOpen = false;
   let captureMode = 'note';
@@ -37,9 +33,6 @@
   const shortcutLabel = isMac ? '⌘K' : 'Ctrl K';
 
   $: today = todayKey();
-  $: open = $openHomework;
-  $: dueNow = open.filter((hw) => hw.dueDate && daysUntil(hw.dueDate) <= 0);
-  $: dueLater = open.filter((hw) => !hw.dueDate || daysUntil(hw.dueDate) > 0);
   $: nextExam =
     ($appState.exams || [])
       .filter((exam) => exam.date && exam.date >= today)
@@ -59,10 +52,6 @@
     captureOpen = true;
   }
 
-  function complete(hw) {
-    toggleHomework(hw.id);
-    toast('Erledigt');
-  }
 </script>
 
 <div class="today">
@@ -87,46 +76,6 @@
     </a>
   {/if}
 
-  <section class="block" aria-labelledby="due-title">
-    <div class="section-title">
-      <h2 id="due-title">Fällig</h2>
-      <a href="#/homework" class="quiet-link">{open.length} offen</a>
-    </div>
-
-    {#if dueNow.length}
-      <div class="due-list">
-        {#each dueNow as hw (hw.id)}
-          {@const days = daysUntil(hw.dueDate)}
-          <div class="due-row" class:overdue={days < 0}>
-            <button
-              class="check"
-              type="button"
-              aria-label={`${hw.title} erledigen`}
-              on:click={() => complete(hw)}
-            ></button>
-            <a class="due-body" href="#/homework">
-              <span class="due-title">{hw.title}</span>
-              <span class="due-meta">
-                {#if hw.moduleId}<span>{moduleTitle($appState, hw.moduleId)}</span>{/if}
-                <span>{formatDate(hw.dueDate, 'short')}</span>
-                <span class:overdue-text={days < 0}>{days < 0 ? relativeDayLabel(hw.dueDate) : 'heute fällig'}</span>
-              </span>
-            </a>
-            <span class="due-status" class:overdue={days < 0}>{days < 0 ? 'Überfällig' : 'Heute'}</span>
-          </div>
-        {/each}
-      </div>
-    {:else}
-      <div class="calm-row">
-        <Icon name="check" size={18} />
-        <p>Nichts fällig.</p>
-        {#if dueLater.length}
-          <a href="#/homework" class="quiet-link">{dueLater.length} weitere</a>
-        {/if}
-      </div>
-    {/if}
-  </section>
-
   {#if nextExam}
     <a class="exam-line" href="#/exams">
       <span class="exam-kind"><Icon name="exams" size={16} /> Nächste Prüfung</span>
@@ -142,7 +91,7 @@
 
   <section class="block" aria-labelledby="checklist-title">
     <div class="section-title">
-      <h2 id="checklist-title">Checkliste</h2>
+      <h2 id="checklist-title">Aufgaben &amp; Checkliste</h2>
       <span class="count">{remaining === 0 ? 'alles erledigt' : `${remaining} offen`}</span>
     </div>
     <div class="card pad">
@@ -224,7 +173,7 @@
     container-type: inline-size;
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
+    gap: clamp(var(--space-5), 3vw, var(--space-6));
   }
   .page-head {
     display: flex;
@@ -305,104 +254,6 @@
   .pad {
     padding: var(--space-3);
   }
-  .due-list {
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-3);
-    background: var(--surface);
-    overflow: hidden;
-  }
-  .due-row {
-    display: grid;
-    grid-template-columns: 26px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 58px;
-    padding: var(--space-2) var(--space-4);
-    border-bottom: 1px solid var(--rule);
-  }
-  .due-row:last-child {
-    border-bottom: 0;
-  }
-  .due-row:hover {
-    background: var(--surface-2);
-  }
-  .due-row.overdue {
-    box-shadow: inset 3px 0 0 var(--warn);
-  }
-  .check {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    flex: none;
-    border: 1.5px solid var(--rule-strong);
-    border-radius: 7px;
-    background: var(--surface);
-    color: var(--accent-ink);
-  }
-  .check:hover {
-    border-color: var(--accent);
-  }
-  .due-body {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    min-width: 0;
-    color: var(--ink);
-    text-decoration: none;
-  }
-  .due-body:hover {
-    color: var(--ink);
-  }
-  .due-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-sm);
-    font-weight: 600;
-    line-height: 1.3;
-  }
-  .due-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    color: var(--ink-3);
-    font-size: 12px;
-  }
-  .overdue-text {
-    color: var(--warn);
-    font-weight: 600;
-  }
-  .due-status {
-    padding: 2px var(--space-2);
-    border-radius: var(--radius-pill);
-    background: var(--surface-2);
-    color: var(--ink-2);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .due-status.overdue {
-    background: var(--warn-soft);
-    color: var(--warn);
-  }
-  .calm-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-4);
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-3);
-    background: var(--surface);
-    color: var(--ink-2);
-    font-size: var(--text-sm);
-  }
-  .calm-row :global(svg) {
-    color: var(--ok);
-  }
-  .calm-row p {
-    flex: 1;
-  }
   .exam-line {
     display: flex;
     align-items: center;
@@ -410,7 +261,8 @@
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--rule);
     border-radius: var(--radius-3);
-    background: var(--tint-exams);
+    background: var(--surface);
+    border-left: 3px solid var(--warn);
     color: var(--ink);
     text-decoration: none;
   }
@@ -460,7 +312,8 @@
     width: 36px;
     height: 36px;
     border-radius: var(--radius-1);
-    background: var(--surface-2);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
     font-size: var(--text-xs);
     font-weight: 600;
   }

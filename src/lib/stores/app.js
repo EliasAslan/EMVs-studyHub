@@ -402,6 +402,9 @@ export function deleteLesson(id) {
 /* ------------------------------------------------------------------ */
 
 export function toggleChecklistItem(item) {
+  if (item?.kind === 'homework' && item.homeworkId) {
+    return toggleHomework(item.homeworkId);
+  }
   const today = todayKey();
   return commit((s) => store.setChecklistItem(s, item, !item.checked, today));
 }

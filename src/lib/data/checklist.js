@@ -2,7 +2,7 @@
  * Daily checklist derivation. Pure and DOM-free.
  *
  * Rules (Part 4):
- * - homework due today (or overdue, not done) appears automatically
+ * - all unfinished homework appears automatically, sorted by due date
  * - custom items are always visible
  * - "studiert heute" is a per-day item
  * - checked state is per-day and resets on the next day
@@ -10,7 +10,7 @@
  */
 
 import { STUDIED_ID } from './entities.js';
-import { todayKey } from './dates.js';
+import { todayKey, relativeDayLabel } from './dates.js';
 
 export function checkedForDay(state, now = new Date()) {
   const today = todayKey(now);
@@ -24,14 +24,20 @@ export function checklistForDay(state, now = new Date()) {
   const checked = checkedForDay(state, now);
 
   const homework = (state.homework || [])
-    .filter((h) => !h.done && h.dueDate && h.dueDate <= today)
-    .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : (a.createdAt || 0) - (b.createdAt || 0)))
+    .filter((h) => !h.done)
+    .sort((a, b) => {
+      const ad = a.dueDate || '9999-12-31';
+      const bd = b.dueDate || '9999-12-31';
+      return ad < bd ? -1 : ad > bd ? 1 : (a.createdAt || 0) - (b.createdAt || 0);
+    })
     .map((h) => ({
       id: `hw:${h.id}`,
       kind: 'homework',
       homeworkId: h.id,
       text: h.title,
-      dueDate: h.dueDate,
+      dueDate: h.dueDate || null,
+      dueLabel: h.dueDate ? relativeDayLabel(h.dueDate, now) : '',
+      isOverdue: !!h.dueDate && h.dueDate < today,
       checked: false,
     }));
 
