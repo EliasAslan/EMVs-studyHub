@@ -4,7 +4,7 @@
  * Both URLs are public endpoints. Auth issues the session JWT; the Data API
  * attaches it to per-user, row-level secured database queries.
  */
-import { createClient, SupabaseAuthAdapter } from '@neon/neon-js';
+import { createClient } from '@neon/neon-js/supabase';
 
 export const NEON_AUTH_URL =
   import.meta.env.VITE_NEON_AUTH_URL ||
@@ -26,7 +26,7 @@ export function getNeonClient() {
   }
   if (!client) {
     client = createClient({
-      auth: { adapter: SupabaseAuthAdapter(), url: NEON_AUTH_URL },
+      auth: { url: NEON_AUTH_URL },
       dataApi: { url: NEON_DATA_API_URL },
     });
   }
