@@ -41,7 +41,7 @@
 
   $: today = todayKey();
   $: timerClock = timerState ? formatClock(remainingMs(timerState, timerNow)) : formatClock((Number(timerPrefs.workMinutes) || 25) * 60000);
-  $: timerRound = timerState ? roundLabel(timerState) : '25 min Fokus · 5 min Pause';
+  $: timerRound = timerState ? (roundLabel(timerState) || (timerState.phase === PHASE.work ? 'Fokus-Runde' : 'Pause')) : `${Number(timerPrefs.workMinutes) || 25} min Fokus · 5 min Pause`;
   $: timerProgress = timerState ? progressPct(timerState, timerNow) : 0;
   $: timerStatus = !timerState ? 'Bereit für eine fokussierte Runde?' : timerState.status === STATUS.paused ? 'Pausiert — mach weiter, wenn du bereit bist.' : timerState.status === STATUS.workDone ? 'Stark gemacht. Zeit für eine Pause.' : timerState.status === STATUS.breakDone ? 'Pause vorbei. Bereit für die nächste Runde?' : timerState.phase === PHASE.work ? 'Du bist gerade in deiner Fokusrunde.' : 'Deine Pause läuft gerade.';
   $: timerActionLabel = !timerState ? 'Fokus starten' : timerState.status === STATUS.paused ? 'Timer fortsetzen' : timerState.status === STATUS.workDone ? 'Pause auswählen' : timerState.status === STATUS.breakDone ? 'Nächste Runde' : timerState.phase === PHASE.work ? 'Weiter fokussieren' : 'Pause fortsetzen';

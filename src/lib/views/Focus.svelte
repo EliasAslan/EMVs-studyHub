@@ -146,7 +146,7 @@
         />
       </svg>
       <div class="clock-wrap">
-        <span class="clock mono" role="timer" aria-live="off" aria-label="{clock} verbleibend">{clock}</span>
+        <span class="clock mono" role="timer" aria-live="off" aria-label={`${clock} verbleibend`}>{clock}</span>
         <span class="clock-label">{state && !isWork ? 'Pause' : 'Fokus'}</span>
       </div>
     </div>
@@ -291,12 +291,6 @@
   .focus-mode .focus-head, .focus-mode .prefs { display:none; }
   .focus-mode { max-width:760px; min-height:calc(100dvh - 120px); justify-content:center; }
   .focus-mode .timer-card { min-height: min(680px, 76dvh); justify-content:center; }
-  .focus-head {
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
   h1 {
     font-family: var(--font-read);
     font-size: clamp(1.8rem, 4vw, 2.4rem);
@@ -315,7 +309,7 @@
     box-shadow: var(--shadow-1);
   }
   .timer-card.is-break {
-    background: var(--surface-2);
+    background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--ok) 8%, transparent), transparent 56%), var(--surface);
   }
   .status-row {
     display: flex;
@@ -426,6 +420,7 @@
   }
   .prefs-head { display:flex; flex-direction:column; gap:var(--space-1); margin-bottom:var(--space-2); }
   .prefs-subtitle { color:var(--ink-3); font-size:var(--text-xs); }
+  .prefs :global(.badge[title]) { cursor:help; text-decoration:underline dotted; text-underline-offset:3px; }
   .prefs-head h2 {
     font-size: 0.9375rem;
     font-weight: 600;
