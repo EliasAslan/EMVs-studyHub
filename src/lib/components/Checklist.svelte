@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import Icon from './Icon.svelte';
+  import { formatDate, relativeDayLabel } from '../data/dates.js';
 
   export let items = [];
   const dispatch = createEventDispatcher();
@@ -36,6 +37,9 @@
       <span class="text">{item.text}</span>
       {#if item.kind === 'homework'}
         <span class="tag">Hausaufgabe</span>
+        <span class="homework-due" class:overdue={item.isOverdue}>
+          {#if item.dueDate}{formatDate(item.dueDate, 'short') || item.dueDate}{#if item.dueLabel} · {item.dueLabel}{/if}{:else}Kein Termin{/if}
+        </span>
       {/if}
       {#if item.kind === 'custom'}
         <button class="remove" type="button" aria-label={`${item.text} entfernen`} on:click={() => dispatch('remove', item)}>
@@ -79,7 +83,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    min-height: 44px;
+    min-height: 48px;
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-2);
   }
@@ -152,5 +156,29 @@
     display: flex;
     gap: var(--space-2);
     padding: var(--space-2);
+  }
+
+  .homework-due {
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+  .homework-due.overdue {
+    color: var(--warn);
+    font-weight: 600;
+  }
+  @media (max-width: 620px) {
+    .item {
+      flex-wrap: wrap;
+      column-gap: var(--space-2);
+      row-gap: 3px;
+    }
+    .item .text {
+      min-width: calc(100% - 36px);
+    }
+    .homework-due {
+      margin-left: 34px;
+      white-space: normal;
+    }
   }
 </style>

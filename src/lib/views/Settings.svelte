@@ -863,39 +863,21 @@
       </div>
     {:else if !signedIn}
       <div class="auth-layout">
-        <div class="auth-story">
-          <span class="auth-kicker"><span class="status-pip" aria-hidden="true"></span> STUDY HUB CLOUD</span>
-          <h3>Dein Lernalltag.<br /><em>Immer dabei.</em></h3>
-          <p class="auth-lede">Melde dich an und halte deine Notizen, Hausaufgaben und Planung auf allen Geräten aktuell.</p>
-          <div class="auth-benefits">
-            <div><span class="benefit-icon" aria-hidden="true">↻</span><span><strong>Automatisch aktuell</strong><small>Sync im Hintergrund, sobald Internet da ist.</small></span></div>
-            <div><span class="benefit-icon" aria-hidden="true">⌂</span><span><strong>Offline weiterarbeiten</strong><small>Deine Daten bleiben auf diesem Gerät verfügbar.</small></span></div>
-          </div>
-        </div>
         <div class="auth-card">
           <div class="auth-card-heading">
-            <h3>{authMode === 'signin' ? 'Willkommen zurück' : 'Konto erstellen'}</h3>
-            <p>{authMode === 'signin' ? 'Melde dich mit deinem Study-Hub-Konto an.' : 'Ein neues Konto ist in wenigen Schritten bereit.'}</p>
+            <h3>{authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}</h3>
           </div>
-          <div class="auth-tabs" role="group" aria-label="Kontoaktion">
-            <button class:active={authMode === 'signin'} type="button" aria-pressed={authMode === 'signin'} on:click={() => setAuthMode('signin')}>Anmelden</button>
-            <button class:active={authMode === 'signup'} type="button" aria-pressed={authMode === 'signup'} on:click={() => setAuthMode('signup')}>Konto erstellen</button>
-          </div>
-          {#if authMode === 'signup'}
-            <p class="auth-note">Erstelle ein neues Neon-Konto. Frühere Supabase-Konten funktionieren hier nicht; deine Daten auf diesem Gerät bleiben erhalten.</p>
-          {/if}
           <form class="auth-form" on:submit|preventDefault={authMode === 'signin' ? doSignIn : doSignUp}>
             <label class="field">
-              <span>E-Mail-Adresse</span>
-              <input class="input" type="email" bind:value={authEmail} autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="du@beispiel.ch" required />
+              <span>E-Mail</span>
+              <input class="input" type="email" bind:value={authEmail} autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="name@beispiel.ch" required />
             </label>
             <label class="field">
               <span>Passwort</span>
               <div class="password-control">
-                <input class="input" type={showAuthPassword ? 'text' : 'password'} bind:value={authPassword} autocomplete={authMode === 'signin' ? 'current-password' : 'new-password'} minlength={authMode === 'signup' ? 8 : 1} placeholder={authMode === 'signup' ? 'Mindestens 8 Zeichen' : 'Dein Passwort'} required />
+                <input class="input" type={showAuthPassword ? 'text' : 'password'} bind:value={authPassword} autocomplete={authMode === 'signin' ? 'current-password' : 'new-password'} minlength={authMode === 'signup' ? 8 : 1} placeholder={authMode === 'signup' ? 'Mindestens 8 Zeichen' : 'Passwort'} required />
                 <button type="button" class="password-toggle" aria-label={showAuthPassword ? 'Passwort verbergen' : 'Passwort anzeigen'} aria-pressed={showAuthPassword} on:click={() => (showAuthPassword = !showAuthPassword)}>{showAuthPassword ? 'Verbergen' : 'Anzeigen'}</button>
               </div>
-              {#if authMode === 'signup'}<span class="auth-help">Mindestens 8 Zeichen.</span>{/if}
             </label>
             <button class="btn btn-primary auth-submit" type="submit" disabled={authBusy || !authEmail.trim() || !authPassword}>
               {authBusy ? 'Bitte warten…' : authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
@@ -903,11 +885,12 @@
           </form>
           {#if authMode === 'signin'}
             <button class="text-button" type="button" on:click={requestPasswordReset} disabled={authBusy || !authEmail.trim()}>Passwort vergessen?</button>
+            <button class="text-button auth-switch" type="button" on:click={() => setAuthMode('signup')}>Konto erstellen</button>
+          {:else}
+            <button class="text-button auth-switch" type="button" on:click={() => setAuthMode('signin')}>Schon ein Konto? Anmelden</button>
           {/if}
-          <div class="auth-footnote"><span aria-hidden="true">🔒</span> Deine Cloud-Daten sind nur für dein Konto zugänglich.</div>
         </div>
-      </div>
-    {:else}
+      </div>    {:else}
       <div class="sync-dashboard">
         <div class="sync-identity">
           <span class="account-avatar" aria-hidden="true">{($cloud.email || 'S').slice(0, 1).toUpperCase()}</span>
@@ -2146,5 +2129,60 @@
     .sync-actions .btn {
       flex: 1 1 auto;
     }
+  }
+
+  #settings-cloud {
+    background: var(--surface);
+    border-color: var(--rule);
+    box-shadow: none;
+  }
+  .auth-layout {
+    display: block;
+    max-width: 460px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .auth-card {
+    gap: var(--space-3);
+    max-width: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .auth-card-heading h3 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .auth-tabs {
+    background: var(--surface-2);
+    border-color: var(--rule);
+  }
+  .auth-tabs button.active {
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .auth-form {
+    gap: var(--space-3);
+  }
+  .auth-form .input {
+    min-height: 42px;
+  }
+  .auth-submit {
+    min-height: 42px;
+    margin-top: var(--space-1);
+    box-shadow: none;
+  }
+  .password-toggle {
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+  .auth-footnote,
+  .auth-story,
+  .auth-note {
+    display: none;
   }
 </style>
