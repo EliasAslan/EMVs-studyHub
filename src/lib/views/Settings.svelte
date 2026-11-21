@@ -808,8 +808,13 @@
       </span>
     </div>
 
+    <div class="setup-notice" role="status">
+      <span class="notice-mark" aria-hidden="true">i</span>
+      <div><strong>E-Mail-Versand noch nicht verfügbar.</strong><p>Diese Einstellungen werden gespeichert, aber aktuell werden keine Erinnerungs-E-Mails versendet.</p></div>
+    </div>
+
     {#if !signedIn}
-      <p class="muted small">Bitte dich zuerst bei Supabase anmelden.</p>
+      <p class="muted small">Bitte melde dich zuerst bei Study Hub an.</p>
     {:else}
       <div>
         <label class="field">
