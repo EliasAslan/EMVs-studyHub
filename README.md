@@ -77,7 +77,7 @@ available on the tag if one of them is needed later.
 | Pomodoro engine | `src/lib/services/pomodoro.js`, `pomodoroEngine.js` |
 | JSON backup | `src/lib/services/backup.js` |
 | Cloud mapping / sync | `src/lib/services/cloudMap.js`, `cloudSync.js` |
-| Neon client / row access | `src/lib/services/supabaseClient.js`, `supabaseData.js` |
+| Neon client / row access | `src/lib/services/neonClient.js`, `neonData.js` |
 | Sync status + German errors | `src/lib/services/syncStatus.js` |
 | Reactive cloud store | `src/lib/stores/cloud.js` |
 | Shell, navigation, palette | `src/lib/components/Shell.svelte`, `Palette.svelte` |
@@ -204,7 +204,7 @@ Sync is optional. The device remains the source of truth; Neon stores an authent
 per-user copy. The Neon Auth and Data API integration is configured for this project.
 
 1. Set `VITE_NEON_DATABASE_URL` to the Neon HTTPS database URL when using another
-   project. This project URL is the default in `src/lib/services/supabaseClient.js`.
+   project. This project URL is the default in `src/lib/services/neonClient.js`.
 2. Open **Settings → Cloud** and create a Neon account or sign in. Supabase passwords
    do not transfer to Neon Auth, so create a new Neon account.
 3. Sync runs silently after local changes, on sign-in, and when the tab becomes visible.
