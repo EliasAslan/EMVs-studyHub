@@ -439,12 +439,6 @@
     return WEEKDAYS.find((d) => d.value === value)?.label || '';
   }
 
-  function setAuthMode(mode) {
-    authMode = mode;
-    authError = '';
-    authMessage = '';
-  }
-
   function explainAuthError(error, fallback) {
     const raw = String(error?.message || '').toLowerCase();
     if (/invalid.*(credential|password)|incorrect.*password|user.*not found|invalid email or password/.test(raw)) {
