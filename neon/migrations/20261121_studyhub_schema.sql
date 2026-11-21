@@ -56,6 +56,7 @@ ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS email_reminders boolea
 ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS last_export_at bigint;
 ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS change_count integer NOT NULL DEFAULT 0;
 ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS current_program_id text;
+ALTER TABLE public.user_settings ALTER COLUMN current_program_id TYPE text USING current_program_id::text;
 ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS updated_at bigint NOT NULL DEFAULT 0;
 ALTER TABLE public.modules ALTER COLUMN overview_note_id TYPE text USING overview_note_id::text;
 ALTER TABLE public.notes ALTER COLUMN overview_note_id TYPE text USING overview_note_id::text;
