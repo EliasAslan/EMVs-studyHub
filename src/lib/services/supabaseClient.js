@@ -1,40 +1,25 @@
 /**
- * Supabase browser client.
+ * Neon Auth + Data API client.
  *
- * Only the public publishable key belongs in a browser app. Never put a
- * service_role key or database password here.
+ * Only the public Neon database URL belongs in a browser app. Database access
+ * is protected by authenticated JWTs and per-user row-level security.
  */
+import { createClient } from '@neon/neon-js/supabase';
 
-import { createClient } from '@supabase/supabase-js';
-
-export const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || 'https://atotphhdrsjcxjtpptkg.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  'sb_publishable_uRP3ELY3TJtQRxuL0aS5Uw_gaxfKSKx';
+export const NEON_DATABASE_URL =
+  import.meta.env.VITE_NEON_DATABASE_URL ||
+  'https://ep-polished-sunset-bdyv6pbx.c-8.us-east-2.aws.neon.tech/neondb';
 
 export function isSupabaseConfigured() {
-  return Boolean(
-    SUPABASE_URL.startsWith('https://') &&
-      SUPABASE_PUBLISHABLE_KEY &&
-      !SUPABASE_PUBLISHABLE_KEY.includes('PASTE_YOUR_'),
-  );
+  return NEON_DATABASE_URL.startsWith('https://') && !NEON_DATABASE_URL.includes('PASTE_YOUR_');
 }
 
 let client = null;
 
 export function getSupabaseClient() {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase ist nicht konfiguriert.');
+    throw new Error('Neon ist nicht konfiguriert.');
   }
-  if (!client) {
-    client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-      },
-    });
-  }
+  if (!client) client = createClient(NEON_DATABASE_URL);
   return client;
 }
