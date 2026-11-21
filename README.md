@@ -3,7 +3,7 @@
 A calm, offline-first personal school hub for one EMVs apprentice doing the BM at BFO.
 German UI (`de-CH`), English code and docs. Svelte 5 + Vite, no backend required for daily use.
 
-This is the deliberately reduced v2 rebuild: new storage keys, new data model, new Supabase
+This is the deliberately reduced v2 rebuild: new storage keys, new data model, new Neon
 schema, and a smaller, calmer feature set. The previous vanilla app is preserved on the
 `archive/vanilla-app` tag and in Git history. There is no data migration from the old app:
 the rebuild starts clean.
@@ -48,7 +48,7 @@ automatically on `127.0.0.1:5173`. On systems without Edge, run
 - **Mobile shell** — sidebar drawer below 900 px with focus trap and a bottom tab bar.
 - **PWA** — installable, app shell precached, works offline.
 - **JSON backup** — export/import all state. Attachments never enter the JSON file.
-- **Cloud sync** — optional Supabase copy. The device stays the source of truth.
+- **Cloud sync** — optional Neon copy. The device stays the source of truth.
 - **Email reminders** — optional weekly deadline email via Supabase Edge Function and Resend.
 
 ### Intentionally not ported
@@ -77,13 +77,13 @@ available on the tag if one of them is needed later.
 | Pomodoro engine | `src/lib/services/pomodoro.js`, `pomodoroEngine.js` |
 | JSON backup | `src/lib/services/backup.js` |
 | Cloud mapping / sync | `src/lib/services/cloudMap.js`, `cloudSync.js` |
-| Supabase client / row access | `src/lib/services/supabaseClient.js`, `supabaseData.js` |
+| Neon client / row access | `src/lib/services/supabaseClient.js`, `supabaseData.js` |
 | Sync status + German errors | `src/lib/services/syncStatus.js` |
 | Reactive cloud store | `src/lib/stores/cloud.js` |
 | Shell, navigation, palette | `src/lib/components/Shell.svelte`, `Palette.svelte` |
 | Views | `src/lib/views/*.svelte` |
 | PWA manifest / icons | `public/manifest.webmanifest`, `public/icons/` |
-| Supabase schema | `PHASE_6_SETUP.sql` |
+| Neon schema migration | `neon/migrations/20261121_studyhub_schema.sql` |
 | Unit tests | `tests/*.test.js` (Vitest) |
 | Browser tests | `e2e/study-hub-e2e.test.ts`, `e2e/v2-1-features.test.ts`, `e2e/a11y.test.ts` (Playwright) |
 
@@ -198,21 +198,17 @@ The assistant is off by default. Nothing is sent anywhere until you enable it in
 Rolling back to v2.0 is safe for reading, but v2.0 ignores the new fields. Export a JSON backup
 before downgrading if you care about overview or recurrence metadata.
 
-## Cloud sync (Supabase)
+## Cloud sync (Neon)
 
-Sync is optional. The device is the datastore; the cloud is a convergent copy.
+Sync is optional. The device remains the source of truth; Neon stores an authenticated,
+per-user copy. The Neon Auth and Data API integration is configured for this project.
 
-1. Create/choose a Supabase project.
-2. Run `PHASE_6_SETUP.sql` in the SQL editor. The optional §R rollback block drops the archived
-   vanilla-app tables and any previous v3 tables. Skip it if you still need that data. For an
-   existing v2.0 project, run `supabase/migrations/20261107_v2_1_fields.sql` instead; it only
-   adds the new columns.
-3. Optionally set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`; the current project
-   defaults live in `src/lib/services/supabaseClient.js`. Only the publishable/anon key belongs
-   in the browser.
-4. In Settings → Cloud, sign in or create an account with email/password.
-5. Sync runs silently 25 s after the last local change, on sign-in, and when the tab becomes
-   visible. Settings also has manual "Synchronisieren" and "Cloud laden" buttons.
+1. Set `VITE_NEON_DATABASE_URL` to the Neon HTTPS database URL when using another
+   project. This project URL is the default in `src/lib/services/supabaseClient.js`.
+2. Open **Settings → Cloud** and create a Neon account or sign in. Supabase passwords
+   do not transfer to Neon Auth, so create a new Neon account.
+3. Sync runs silently after local changes, on sign-in, and when the tab becomes visible.
+   Settings also has manual **Synchronisieren** and **Cloud laden** buttons.
 
 Semantics:
 
@@ -225,6 +221,11 @@ Semantics:
   links → lessons → checklist items → settings.
 - After upload the app re-fetches and verifies every row; mismatches fail loudly without
   touching local data.
+- Neon Auth JWTs are checked by the Data API. PostgreSQL row-level security restricts every
+  app table to `auth.uid() = user_id`; browser clients receive no database password.
+
+The schema applied to this Neon project is recorded in
+`neon/migrations/20261121_studyhub_schema.sql`.
 
 ## Email reminders (optional)
 
