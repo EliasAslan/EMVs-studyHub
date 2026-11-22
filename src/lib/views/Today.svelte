@@ -6,7 +6,7 @@
     addChecklistItem,
     deleteChecklistItem,
     toggleHomework,
-    backupReminder,
+    cloudUpdateReminder,
     recentNotes,
     moduleTitle,
   } from '../stores/app.js';
@@ -145,10 +145,10 @@
     </div>
   </header>
 
-  {#if $backupReminder}
+  {#if $cloudUpdateReminder}
     <a class="backup-note" href="#/settings">
       <span class="dot" aria-hidden="true"></span>
-      Backup fällig — kurz exportieren?
+      Cloud-Update fällig — 25 Änderungen noch nicht synchronisiert.
     </a>
   {/if}
 

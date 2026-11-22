@@ -855,10 +855,21 @@
     </div>
     {#if settings.changeCount >= 25 && (reminderDismissed === false || settings.changeCount >= reminderDismissedAtChangeCount)}
       <div class="reminder-banner">
-        <p class="reminder">25 Änderungen seit dem letzten Export.</p>
-        <button class="btn btn-ghost btn-xs" type="button" on:click={() => { reminderDismissed = true; reminderDismissedAtChangeCount = settings.changeCount + 25; }} aria-label="Erinnerung ausblenden">
-          <Icon name="x" size={12} aria-hidden="true" />
-        </button>
+        <p class="reminder">25 Änderungen ohne Cloud-Sync — jetzt synchronisieren?</p>
+        <div class="reminder-actions">
+          {#if signedIn}
+            <button class="btn btn-primary btn-xs" type="button" on:click={() => syncNow(true)} disabled={$cloud.syncing}>
+              {$cloud.syncing ? 'Synchronisiert…' : 'Jetzt synchronisieren'}
+            </button>
+          {:else}
+            <button class="btn btn-primary btn-xs" type="button" on:click={() => { activeTab = 'behaviour'; setTimeout(() => document.getElementById('settings-cloud')?.scrollIntoView({ block: 'start' }), 50); }}>
+              Cloud einrichten
+            </button>
+          {/if}
+          <button class="btn btn-ghost btn-xs" type="button" on:click={() => { reminderDismissed = true; reminderDismissedAtChangeCount = settings.changeCount + 25; }} aria-label="Erinnerung ausblenden">
+            <Icon name="x" size={12} aria-hidden="true" />
+          </button>
+        </div>
       </div>
     {/if}
   </section>
@@ -2478,4 +2489,17 @@
     border-radius: 50%;
     background: var(--dot, var(--accent));
   }
+  .reminder-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    margin-top: var(--space-3);
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--rule));
+    border-radius: var(--radius-2);
+    background: var(--accent-soft, color-mix(in srgb, var(--accent) 8%, transparent));
+  }
+  .reminder-banner .reminder { margin: 0; font-size: var(--text-sm); color: var(--ink); }
+  .reminder-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
 </style>

@@ -76,9 +76,11 @@
 
 <style>
   .number-stepper {
-    display: inline-flex;
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 4px;
+    width: 100%;
     height: 40px;
     padding: 3px;
     border: 1px solid var(--rule-strong);
@@ -112,7 +114,10 @@
   .value {
     display: inline-flex;
     align-items: baseline;
+    justify-content: center;
     gap: 3px;
+    flex: 1;
+    min-width: 0;
     padding: 0 2px;
   }
   .value input {
@@ -127,7 +132,7 @@
     font-family: var(--font-mono);
     font-size: 13px;
     font-weight: 650;
-    text-align: right;
+    text-align: center;
     appearance: textfield;
   }
   .value input::-webkit-inner-spin-button {

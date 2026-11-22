@@ -462,6 +462,13 @@ export function exportBackup() {
   return store.serializeData(state);
 }
 
+export function markCloudSynced() {
+  const state = get(appState);
+  store.markSynced(state);
+  appState.set({ ...state });
+  persist(state, true);
+}
+
 export function importBackup(jsonString) {
   const result = store.importData(jsonString);
   if (!result.success) return result;
@@ -500,7 +507,8 @@ export const modulesByProgram = derived(appState, ($s) => {
   for (const list of map.values()) list.sort((a, b) => (a.order || 0) - (b.order || 0));
   return map;
 });
-export const backupReminder = derived(appState, ($s) => store.needsBackupReminder($s));
+export const cloudUpdateReminder = derived(appState, ($s) => store.needsCloudUpdateReminder($s));
+export const backupReminder = cloudUpdateReminder;
 
 /**
  * Change fingerprint for the slices that feed the desktop widget snapshot

@@ -219,7 +219,7 @@ export function deleteChecklistItem(state, id, now = Date.now()) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Backup reminder                                                     */
+/* Cloud update reminder                                               */
 /* ------------------------------------------------------------------ */
 
 export function markChanged(state, now = Date.now()) {
@@ -236,10 +236,21 @@ export function markExported(state, now = Date.now()) {
   return state;
 }
 
-export const BACKUP_REMINDER_AFTER = 25;
+export function markSynced(state) {
+  state.settings = state.settings || {};
+  state.settings.changeCount = 0;
+  return state;
+}
+
+export const CLOUD_UPDATE_REMINDER_AFTER = 25;
+export const BACKUP_REMINDER_AFTER = CLOUD_UPDATE_REMINDER_AFTER;
+
+export function needsCloudUpdateReminder(state) {
+  return (state.settings?.changeCount || 0) >= CLOUD_UPDATE_REMINDER_AFTER;
+}
 
 export function needsBackupReminder(state) {
-  return (state.settings?.changeCount || 0) >= BACKUP_REMINDER_AFTER;
+  return needsCloudUpdateReminder(state);
 }
 
 /* ------------------------------------------------------------------ */

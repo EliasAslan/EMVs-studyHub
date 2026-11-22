@@ -19,7 +19,7 @@ import {
   formatLastSynced,
 } from '../services/syncStatus.js';
 import { normalizeState } from '../data/entities.js';
-import { getState, replaceState, applyTheme, setSyncHandler } from './app.js';
+import { getState, replaceState, applyTheme, setSyncHandler, markCloudSynced } from './app.js';
 
 const configured = isNeonConfigured();
 
@@ -204,6 +204,7 @@ export async function runSync({ reason = 'manual', upload = true } = {}) {
       await applyMerged(result, { upload });
       const direction = upload ? 'upload' : 'download';
       const status = recordSyncSuccess(direction);
+      markCloudSynced();
       autoRetryCount = 0;
       patch({
         syncing: false,

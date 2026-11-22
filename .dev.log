@@ -4781,3 +4781,301 @@ https://svelte.dev/e/export_let_unused
 [2m15:53:13[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mplaywright-report/trace/index.html[22m
 [2m15:53:13[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mplaywright-report/trace/snapshot.html[22m
 [2m15:53:13[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mplaywright-report/trace/uiMode.html[22m
+[2m16:01:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte, /src/lib/components/Shell.svelte, /src/lib/views/Settings.svelte, /src/lib/components/Sidebar.svelte, /src/lib/components/Palette.svelte, /src/lib/components/QuickCapture.svelte, /src/lib/views/Homework.svelte, /src/lib/components/HomeworkRow.svelte, /src/lib/views/Links.svelte, /src/lib/components/LinkRow.svelte, /src/lib/views/Today.svelte, /src/lib/components/NoteCard.svelte, /src/lib/views/Exams.svelte, /src/lib/views/Calendar.svelte, /src/lib/views/Modules.svelte and 7 more[22m
+[2m16:02:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte, /src/lib/components/Shell.svelte, /src/lib/views/Settings.svelte, /src/lib/components/Sidebar.svelte, /src/lib/components/Palette.svelte, /src/lib/components/QuickCapture.svelte, /src/lib/views/Homework.svelte, /src/lib/components/HomeworkRow.svelte, /src/lib/views/Links.svelte, /src/lib/components/LinkRow.svelte, /src/lib/views/Today.svelte, /src/lib/components/NoteCard.svelte, /src/lib/views/Exams.svelte, /src/lib/views/Calendar.svelte, /src/lib/views/Modules.svelte and 5 more[22m
+[2m16:02:41[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/views/Today.svelte[22m
+[2m16:02:58[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte, /src/lib/components/Shell.svelte, /src/lib/views/Settings.svelte, /src/lib/components/Sidebar.svelte, /src/lib/components/Palette.svelte, /src/lib/components/QuickCapture.svelte, /src/lib/views/Homework.svelte, /src/lib/components/HomeworkRow.svelte, /src/lib/views/Links.svelte, /src/lib/components/LinkRow.svelte, /src/lib/views/Today.svelte, /src/lib/components/NoteCard.svelte, /src/lib/views/Exams.svelte, /src/lib/views/Calendar.svelte, /src/lib/views/Modules.svelte and 5 more[22m
+[2m16:03:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/Shell.svelte, /src/lib/views/Settings.svelte[22m
+[2m16:03:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/Shell.svelte, /src/lib/views/Settings.svelte[22m
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1148:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1163:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1171:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1181:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1185:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1185:14 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1213:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1228:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1236:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1246:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1250:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1250:14 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1646:2 Unused CSS selector ".sync-account"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1815:2 Unused CSS selector ".textarea"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1827:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1840:2 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1851:2 Unused CSS selector ".auth-kicker"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1861:2 Unused CSS selector ".status-pip"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1868:2 Unused CSS selector ".auth-story > h3"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1874:2 Unused CSS selector ".auth-story > h3 em"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1878:2 Unused CSS selector ".auth-lede"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1884:2 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1890:2 Unused CSS selector ".auth-benefits > div"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1895:2 Unused CSS selector ".benefit-icon"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1908:2 Unused CSS selector ".auth-benefits strong"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1909:2 Unused CSS selector ".auth-benefits small"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1912:2 Unused CSS selector ".auth-benefits strong"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1916:2 Unused CSS selector ".auth-benefits small"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1940:2 Unused CSS selector ".auth-card-heading p"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1941:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1946:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1952:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1959:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1964:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1997:2 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2016:2 Unused CSS selector ".auth-footnote"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2025:2 Unused CSS selector ".auth-footnote span"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2201:4 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2206:4 Unused CSS selector ".auth-story > h3"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2210:4 Unused CSS selector ".auth-lede"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2213:4 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2218:4 Unused CSS selector ".auth-benefits > div"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2234:4 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2286:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2290:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2309:2 Unused CSS selector ".auth-footnote"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2310:2 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2311:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+[2m16:04:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/views/Settings.svelte[22m
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1148:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1163:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1171:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1181:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1185:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1185:14 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1213:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1228:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1236:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1246:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1250:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1250:14 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1646:2 Unused CSS selector ".sync-account"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1815:2 Unused CSS selector ".textarea"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1827:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1840:2 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1851:2 Unused CSS selector ".auth-kicker"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1861:2 Unused CSS selector ".status-pip"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1868:2 Unused CSS selector ".auth-story > h3"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1874:2 Unused CSS selector ".auth-story > h3 em"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1878:2 Unused CSS selector ".auth-lede"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1884:2 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1890:2 Unused CSS selector ".auth-benefits > div"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1895:2 Unused CSS selector ".benefit-icon"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1908:2 Unused CSS selector ".auth-benefits strong"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1909:2 Unused CSS selector ".auth-benefits small"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1912:2 Unused CSS selector ".auth-benefits strong"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1916:2 Unused CSS selector ".auth-benefits small"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1940:2 Unused CSS selector ".auth-card-heading p"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1941:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1946:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1952:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1959:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1964:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:1997:2 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2016:2 Unused CSS selector ".auth-footnote"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2025:2 Unused CSS selector ".auth-footnote span"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2201:4 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2206:4 Unused CSS selector ".auth-story > h3"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2210:4 Unused CSS selector ".auth-lede"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2213:4 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2218:4 Unused CSS selector ".auth-benefits > div"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2234:4 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2286:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2290:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2309:2 Unused CSS selector ".auth-footnote"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2310:2 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:04:39 [vite-plugin-svelte] src/lib/views/Settings.svelte:2311:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1148:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1163:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1171:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1181:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1185:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1185:14 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1213:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1228:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1236:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1246:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1250:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1250:14 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1646:2 Unused CSS selector ".sync-account"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1815:2 Unused CSS selector ".textarea"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1827:2 Unused CSS selector ".auth-intro"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1840:2 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1851:2 Unused CSS selector ".auth-kicker"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1861:2 Unused CSS selector ".status-pip"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1868:2 Unused CSS selector ".auth-story > h3"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1874:2 Unused CSS selector ".auth-story > h3 em"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1878:2 Unused CSS selector ".auth-lede"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1884:2 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1890:2 Unused CSS selector ".auth-benefits > div"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1895:2 Unused CSS selector ".benefit-icon"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1908:2 Unused CSS selector ".auth-benefits strong"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1909:2 Unused CSS selector ".auth-benefits small"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1912:2 Unused CSS selector ".auth-benefits strong"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1916:2 Unused CSS selector ".auth-benefits small"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1940:2 Unused CSS selector ".auth-card-heading p"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1941:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1946:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1952:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1959:2 Unused CSS selector ".auth-tabs button"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1964:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:1997:2 Unused CSS selector ".auth-help"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2016:2 Unused CSS selector ".auth-footnote"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2025:2 Unused CSS selector ".auth-footnote span"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2201:4 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2206:4 Unused CSS selector ".auth-story > h3"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2210:4 Unused CSS selector ".auth-lede"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2213:4 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2218:4 Unused CSS selector ".auth-benefits > div"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2234:4 Unused CSS selector ".auth-benefits"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2286:2 Unused CSS selector ".auth-tabs"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2290:2 Unused CSS selector ".auth-tabs button.active"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2309:2 Unused CSS selector ".auth-footnote"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2310:2 Unused CSS selector ".auth-story"
+https://svelte.dev/e/css_unused_selector
+16:05:24 [vite-plugin-svelte] src/lib/views/Settings.svelte:2311:2 Unused CSS selector ".auth-note"
+https://svelte.dev/e/css_unused_selector
+[2m16:05:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/views/Settings.svelte?svelte&type=style&lang.css[22m
+[2m16:06:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/NumberStepper.svelte?svelte&type=style&lang.css[22m
+[2m16:06:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/NumberStepper.svelte?svelte&type=style&lang.css[22m
