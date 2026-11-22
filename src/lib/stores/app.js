@@ -371,6 +371,7 @@ export function createLink(data = {}) {
       label: String(data.label || '').trim(),
       url: String(data.url || '').trim(),
       kind: data.kind || 'custom',
+      color: String(data.color || '').trim(),
       order: (s.links || []).filter((l) => (l.moduleId || null) === (data.moduleId || null)).length,
     }),
   );

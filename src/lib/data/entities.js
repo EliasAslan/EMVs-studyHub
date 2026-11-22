@@ -9,6 +9,18 @@ export const SCHEMA_VERSION = 1;
 
 export const NOTE_TYPES = ['note', 'mistake', 'question', 'summary'];
 export const LINK_KINDS = ['teams', 'onenote', 'website', 'youtube', 'custom'];
+
+export const LINK_KIND_COLORS = {
+  teams: '#6264a7',
+  onenote: '#7719aa',
+  website: '#2563eb',
+  youtube: '#ff0000',
+  custom: '#4f46e5',
+};
+
+export function defaultLinkColor(kind = 'custom') {
+  return LINK_KIND_COLORS[kind] || LINK_KIND_COLORS.custom;
+}
 export const CHECKLIST_KINDS = ['custom', 'studied'];
 export const STUDIED_ID = 'studied';
 
@@ -153,6 +165,7 @@ export function ensureLink(l, now = Date.now()) {
   l.label = str(l.label);
   l.url = str(l.url);
   l.kind = LINK_KINDS.includes(l.kind) ? l.kind : 'custom';
+  l.color = str(l.color) || defaultLinkColor(l.kind);
   l.order = num(l.order, 0);
   l.createdAt = num(l.createdAt, now);
   l.updatedAt = num(l.updatedAt, l.createdAt);
