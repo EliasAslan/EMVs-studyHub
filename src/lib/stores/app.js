@@ -86,17 +86,25 @@ export function replaceState(next, { saveNow = true } = {}) {
 /* ------------------------------------------------------------------ */
 
 export function createModule(data) {
-  return commit((s) =>
-    store.addEntity(s, 'modules', {
-      programId: data.programId || s.settings.currentProgramId || s.programs[0]?.id,
+  return commit((s) => {
+    const programs = s.programs || [];
+    const requestedProgramId = data.programId;
+    const currentProgramId = s.settings.currentProgramId;
+    const programId = programs.some((program) => program.id === requestedProgramId)
+      ? requestedProgramId
+      : programs.some((program) => program.id === currentProgramId)
+        ? currentProgramId
+        : programs[0]?.id;
+    return store.addEntity(s, 'modules', {
+      programId,
       code: String(data.code || '').trim(),
       title: String(data.title || '').trim(),
       accent: data.accent || '#4f46e5',
       order: (s.modules || []).length,
       attachments: [],
       overviewNoteId: null,
-    }),
-  );
+    });
+  });
 }
 
 export function updateModule(id, patch) {

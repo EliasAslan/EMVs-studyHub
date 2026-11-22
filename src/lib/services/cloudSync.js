@@ -197,6 +197,24 @@ export function mergeStates(localState = {}, cloudState = {}) {
     merged[collection] = rows;
   }
 
+  // A deleted program takes its modules with it. Keep the merge consistent
+  // with the database FK, which cascades from programs to modules.
+  const deletedPrograms = new Map(
+    mergedTombstones
+      .filter((t) => t.collection === 'programs')
+      .map((t) => [t.id, t.deletedAt]),
+  );
+  if (deletedPrograms.size) {
+    merged.modules = (merged.modules || []).filter((module) => {
+      if (!deletedPrograms.has(module.programId)) return true;
+      const deletedAt = deletedPrograms.get(module.programId);
+      if (!mergedTombstones.some((t) => t.collection === 'modules' && t.id === module.id)) {
+        mergedTombstones.push({ collection: 'modules', id: module.id, deletedAt });
+      }
+      return false;
+    });
+  }
+
   // A deleted module takes its children with it (FK closure).
   const deletedModules = new Map(
     mergedTombstones
