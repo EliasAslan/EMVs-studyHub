@@ -221,6 +221,12 @@ export function normalizeState(input = {}) {
 
   state.programs.forEach((p) => ensureProgram(p, now));
   state.modules.forEach((m) => ensureModule(m, now));
+  const programIds = new Set(state.programs.map((program) => program.id));
+  const fallbackProgram =
+    state.programs.find((program) => program.id === state.settings.currentProgramId) || state.programs[0];
+  for (const module of state.modules) {
+    if (!programIds.has(module.programId)) module.programId = fallbackProgram.id;
+  }
   state.topics.forEach((t) => ensureTopic(t, now));
   state.notes.forEach((n) => ensureNote(n, now));
   state.homework.forEach((h) => ensureHomework(h, now));
