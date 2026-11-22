@@ -8,11 +8,11 @@
   const dispatch = createEventDispatcher();
 
   const icons = {
-    teams: 'notes',
-    onenote: 'file',
-    website: 'links',
+    teams: 'teams',
+    onenote: 'onenote',
+    website: 'website',
     youtube: 'youtube',
-    custom: 'links',
+    custom: 'sparkle',
   };
 
   $: host = (() => {

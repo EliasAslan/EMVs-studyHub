@@ -25,6 +25,7 @@
     isLessonNow,
   } from '../data/schedule.js';
   import { toast } from '../stores/toast.js';
+  import { calendarPrefs } from '../stores/viewPrefs.js';
   import { cloud, signIn, signUp, signOut, resetPassword, runSync, loadCloud } from '../stores/cloud.js';
   import { sendDeadlineReminders } from '../services/sendDeadlineReminders.js';
   import { aiSettings, saveAiSettings } from '../stores/ai.js';
@@ -32,6 +33,7 @@
   import { isLoopbackUrl, normalizeBaseUrl } from '../data/aiConfig.js';
   import Modal from '../components/Modal.svelte';
   import Icon from '../components/Icon.svelte';
+  import NumberStepper from '../components/NumberStepper.svelte';
 
   let importInput;
   let resetOpen = false;
@@ -52,6 +54,29 @@
   let formEl;
   let formTouched = false;
   let now = new Date();
+
+  const sectionLinks = [
+    ['settings-programs', 'Programme'],
+    ['settings-theme', 'Darstellung'],
+    ['settings-shortcuts', 'Tastatur'],
+    ['settings-ai', 'KI'],
+    ['settings-schedule', 'Stundenplan'],
+    ['settings-data', 'Backups'],
+    ['settings-desktop-widgets', 'Widgets'],
+    ['settings-email', 'E-Mail'],
+    ['settings-cloud', 'Cloud'],
+  ];
+  const sectionIds = sectionLinks.map(([id]) => id);
+  let activeSection = sectionIds[0];
+  let scheduleOpen = true;
+  let lessonFormOpen = false;
+  let widgetsOpen = false;
+  let remindersOpen = false;
+
+  function goToSection(id) {
+    activeSection = id;
+    document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
 
   let authEmail = '';
   let authPassword = '';
@@ -220,7 +245,23 @@
 
   onMount(() => {
     const timer = setInterval(() => (now = new Date()), 60_000);
-    return () => clearInterval(timer);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) activeSection = visible[0].target.id;
+      },
+      { rootMargin: '-110px 0px -65% 0px' },
+    );
+    sectionIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => {
+      clearInterval(timer);
+      observer.disconnect();
+    };
   });
 
   function moduleFor(lesson) {
@@ -235,7 +276,12 @@
     return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
   }
 
+  function setLessonDuration(minutes) {
+    lessonEnd = shiftTime(lessonStart, minutes);
+  }
+
   async function revealForm() {
+    lessonFormOpen = true;
     await tick();
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     formEl?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
@@ -427,6 +473,7 @@
     const day = payload.dayOfWeek;
     resetLessonForm();
     lessonDay = day;
+    lessonFormOpen = false;
   }
 
   function removeLesson(lesson) {
@@ -503,15 +550,14 @@
   </header>
 
   <nav class="subnav" aria-label="Einstellungsbereiche">
-    <a href="#settings-programs" on:click|preventDefault={() => document.getElementById('settings-programs')?.scrollIntoView({ block: 'start' })}>Programme</a>
-    <a href="#settings-theme" on:click|preventDefault={() => document.getElementById('settings-theme')?.scrollIntoView({ block: 'start' })}>Darstellung</a>
-    <a href="#settings-shortcuts" on:click|preventDefault={() => document.getElementById('settings-shortcuts')?.scrollIntoView({ block: 'start' })}>Tastatur</a>
-    <a href="#settings-ai" on:click|preventDefault={() => document.getElementById('settings-ai')?.scrollIntoView({ block: 'start' })}>KI</a>
-    <a href="#settings-schedule" on:click|preventDefault={() => document.getElementById('settings-schedule')?.scrollIntoView({ block: 'start' })}>Stundenplan</a>
-    <a href="#settings-data" on:click|preventDefault={() => document.getElementById('settings-data')?.scrollIntoView({ block: 'start' })}>Backups</a>
-    <a href="#settings-desktop-widgets" on:click|preventDefault={() => document.getElementById('settings-desktop-widgets')?.scrollIntoView({ block: 'start' })}>Widgets</a>
-    <a href="#settings-email" on:click|preventDefault={() => document.getElementById('settings-email')?.scrollIntoView({ block: 'start' })}>E-Mail</a>
-    <a href="#settings-cloud" on:click|preventDefault={() => document.getElementById('settings-cloud')?.scrollIntoView({ block: 'start' })}>Cloud</a>
+    {#each sectionLinks as [id, label] (id)}
+      <a
+        href={`#${id}`}
+        class:active={activeSection === id}
+        aria-current={activeSection === id ? 'location' : undefined}
+        on:click|preventDefault={() => goToSection(id)}
+      >{label}</a>
+    {/each}
   </nav>
 
   <section class="card section" id="settings-programs" aria-labelledby="programs-title">
@@ -562,7 +608,7 @@
     <p class="muted small">Suche, Erfassen und Seitenwechsel ohne Maus.</p>
     <div class="button-row">
       <button class="btn" type="button" on:click={openShortcuts}>
-        <Icon name="help" size={15} /> Kürzel anzeigen
+        <Icon name="keyboard" size={15} /> Kürzel anzeigen
       </button>
     </div>
   </section>
@@ -594,13 +640,12 @@
         </label>
         <label class="field">
           <span>Kontextfenster</span>
-          <input
-            class="input"
-            type="number"
-            min="1024"
-            max="32768"
-            step="1024"
+          <NumberStepper
             bind:value={aiNumCtx}
+            min={1024}
+            max={32768}
+            step={1024}
+            label="Kontextfenster"
             on:change={() => saveAiSettings({ numCtx: Number(aiNumCtx) })}
           />
         </label>
@@ -627,7 +672,31 @@
     <div class="section-title">
       <h2 id="schedule-title">Stundenplan</h2>
       <span class="hint">{lessons.length} {lessons.length === 1 ? 'Lektion' : 'Lektionen'} pro Woche</span>
+      <button
+        class="section-toggle"
+        type="button"
+        aria-expanded={scheduleOpen}
+        aria-controls="settings-schedule-body"
+        aria-label={scheduleOpen ? 'Stundenplan einklappen' : 'Stundenplan ausklappen'}
+        on:click={() => (scheduleOpen = !scheduleOpen)}
+      >
+        <Icon name={scheduleOpen ? 'chevronDown' : 'chevronRight'} size={14} />
+      </button>
     </div>
+
+    {#if scheduleOpen}
+    <div id="settings-schedule-body" class="section-body">
+    <label class="pref-row pref-select">
+      <span>Kalender-Ansicht</span>
+      <select
+        class="select"
+        value={$calendarPrefs.agenda}
+        on:change={(e) => calendarPrefs.update((prefs) => ({ ...prefs, agenda: e.target.value }))}
+      >
+        <option value="list">Liste</option>
+        <option value="grid">Raster</option>
+      </select>
+    </label>
 
     <div class="schedule">
       {#each scheduleDays as group (group.value)}
@@ -679,6 +748,11 @@
       {/each}
     </div>
 
+      <button class="form-toggle" type="button" aria-expanded={lessonFormOpen} on:click={() => (lessonFormOpen = !lessonFormOpen)}>
+        <Icon name={lessonFormOpen ? 'chevronDown' : 'plus'} size={14} />
+        {lessonFormOpen ? 'Formular schliessen' : 'Lektion hinzufügen'}
+      </button>
+      {#if lessonFormOpen}
     <form
       class="lesson-form"
       bind:this={formEl}
@@ -693,20 +767,39 @@
             {#each WEEKDAYS as day (day.value)}<option value={day.value}>{day.label}</option>{/each}
           </select>
         </label>
-        <label class="field">
-          <span>Start</span>
-          <input class="input" type="time" bind:value={lessonStart} />
-        </label>
-        <label class="field">
-          <span>Ende</span>
-          <input class="input" type="time" bind:value={lessonEnd} />
-        </label>
+        <div class="time-group">
+          <span class="group-caption">Zeit</span>
+          <div class="time-row">
+            <label class="field">
+              <span>Start</span>
+              <input class="input" type="time" bind:value={lessonStart} />
+            </label>
+            <label class="field">
+              <span>Ende</span>
+              <input class="input" type="time" bind:value={lessonEnd} />
+            </label>
+          </div>
+          <div class="duration-presets" role="group" aria-label="Dauer wählen">
+            {#each [45, 60, 90] as mins (mins)}
+              <button class="chip" type="button" on:click={() => setLessonDuration(mins)}>{mins} Min</button>
+            {/each}
+          </div>
+        </div>
         <label class="field">
           <span>Modul</span>
           <select class="select" bind:value={lessonModule}>
             <option value="">Kein Modul</option>
             {#each modules as m (m.id)}<option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>{/each}
           </select>
+          {#if lessonModule}
+            {@const selectedModule = modules.find((m) => m.id === lessonModule)}
+            {#if selectedModule}
+              <span class="module-preview">
+                <span class="mod-dot" style:--dot={selectedModule.accent} aria-hidden="true"></span>
+                {selectedModule.code || selectedModule.title}
+              </span>
+            {/if}
+          {/if}
         </label>
         <label class="field">
           <span>Bezeichnung</span>
@@ -730,6 +823,9 @@
         <button class="btn btn-primary" type="submit">{lessonEditing ? 'Speichern' : 'Erfassen'}</button>
       </div>
     </form>
+      {/if}
+    </div>
+    {/if}
   </section>
 
   <section class="card section" id="settings-data" aria-labelledby="backup-title">
@@ -770,33 +866,35 @@
   <section class="card section" id="settings-desktop-widgets" aria-labelledby="desktop-widgets-title">
     <div class="section-title">
       <h2 id="desktop-widgets-title">Desktop-Widget</h2>
-      <span class="hint">Rainmeter · Windows Desktop</span>
-    </div>
-    <p class="muted small">
-      Snapshot für Desktop-Widgets. Keine Notiztexte, Noten, E-Mails oder IDs. Der Inhalt ist rein lesbar.
-    </p>
-    <div class="button-row">
-      <button class="btn btn-primary" type="button" on:click={downloadWidgetJson} disabled={widgetBusy}>
-        <Icon name="file" size={15} /> JSON herunterladen
+      <span class="hint">Rainmeter · Windows</span>
+      <button
+        class="section-toggle"
+        type="button"
+        aria-expanded={widgetsOpen}
+        aria-controls="settings-widgets-body"
+        aria-label={widgetsOpen ? 'Desktop-Widget einklappen' : 'Desktop-Widget ausklappen'}
+        on:click={() => (widgetsOpen = !widgetsOpen)}
+      >
+        <Icon name={widgetsOpen ? 'chevronDown' : 'chevronRight'} size={14} />
       </button>
-      <button class="btn" type="button" on:click={downloadWidgetText} disabled={widgetBusy}>
-        <Icon name="file" size={15} /> TXT für Rainmeter
-      </button>
     </div>
-    <p class="muted small">
-      JSON ist für zukünftige Widgets vorgesehen. Die TXT-Datei ist im einfachen
-      key=value-Format und lässt sich mit Rainmeter WebParser einlesen.
-    </p>
-    <label class="pref-row">
-      <input type="checkbox" bind:checked={widgetAutoSave} on:change={saveWidgetAutoSave} />
-      <span>Snapshot automatisch speichern</span>
-    </label>
-    <p class="muted small">
-      Aktiviere das Widget-Snapshot für automatische Updates: Study Hub schreibt
-      dann bei Änderungen an Hausaufgaben und Prüfungen die TXT-Datei in deinen
-      ausgewählten Speicherort. Die Desktop-Widgets (Rainmeter) lesen die Datei beim
-      nächsten Refresh.
-    </p>
+    {#if widgetsOpen}
+      <div id="settings-widgets-body" class="section-body">
+        <p class="muted small">Lesbarer Snapshot ohne Notiztexte, Noten oder E-Mails.</p>
+        <div class="button-row">
+          <button class="btn btn-primary" type="button" on:click={downloadWidgetJson} disabled={widgetBusy}>
+            <Icon name="file" size={15} /> JSON
+          </button>
+          <button class="btn" type="button" on:click={downloadWidgetText} disabled={widgetBusy}>
+            <Icon name="file" size={15} /> TXT für Rainmeter
+          </button>
+        </div>
+        <label class="pref-row">
+          <input type="checkbox" bind:checked={widgetAutoSave} on:change={saveWidgetAutoSave} />
+          <span>Snapshot automatisch speichern</span>
+        </label>
+      </div>
+    {/if}
   </section>
 
   <section class="card section" id="settings-email" aria-labelledby="email-title">
@@ -806,8 +904,20 @@
         <span class="sync-dot" aria-hidden="true"></span>
         {remindersOptIn ? 'ein' : 'aus'}
       </span>
+      <button
+        class="section-toggle"
+        type="button"
+        aria-expanded={remindersOpen}
+        aria-controls="settings-reminders-body"
+        aria-label={remindersOpen ? 'Erinnerungen einklappen' : 'Erinnerungen ausklappen'}
+        on:click={() => (remindersOpen = !remindersOpen)}
+      >
+        <Icon name={remindersOpen ? 'chevronDown' : 'chevronRight'} size={14} />
+      </button>
     </div>
 
+    {#if remindersOpen}
+    <div id="settings-reminders-body" class="section-body">
     <div class="setup-notice" role="status">
       <span class="notice-mark" aria-hidden="true">i</span>
       <div><strong>E-Mail-Versand noch nicht verfügbar.</strong><p>Diese Einstellungen werden gespeichert, aber aktuell werden keine Erinnerungs-E-Mails versendet.</p></div>
@@ -845,12 +955,14 @@
       {#if remindersError}<p class="error small" role="alert">{remindersError}</p>{/if}
       {#if remindersMessage}<p class="muted small">{remindersMessage}</p>{/if}
     {/if}
+    </div>
+    {/if}
   </section>
 
   <section class="card section" id="settings-cloud" aria-labelledby="sync-title">
     <div class="section-title">
       <h2 id="sync-title">Cloud</h2>
-      <span class="sync-badge" class:on={signedIn && !$cloud.lastError} class:busy={$cloud.syncing} class:error={!!$cloud.lastError}>
+      <span class="sync-badge" class:on={signedIn && !$cloud.lastError} class:busy={$cloud.syncing} class:error={!!$cloud.lastError} class:pending={$cloud.syncPending && !$cloud.syncing}>
         <span class="sync-dot" aria-hidden="true"></span>
         {syncStateLabel}
       </span>
@@ -895,10 +1007,6 @@
         <div class="sync-identity">
           <span class="account-avatar" aria-hidden="true">{($cloud.email || 'S').slice(0, 1).toUpperCase()}</span>
           <div class="identity-copy"><strong>{$cloud.email}</strong><span>Dein Study-Hub-Konto</span></div>
-          <span class="sync-badge" class:on={$cloud.online && !$cloud.lastError} class:busy={$cloud.syncing} class:error={!!$cloud.lastError} class:pending={$cloud.syncPending && !$cloud.syncing}>
-            <span class="sync-dot" aria-hidden="true"></span>
-            {syncStateLabel}
-          </span>
         </div>
         <div class="sync-details">
           <div><span class="detail-label">Letzte Synchronisierung</span><strong>{$cloud.lastSynced}</strong></div>
@@ -1599,28 +1707,38 @@
     letter-spacing: -0.045em;
   }
   .subnav {
-    gap: 5px;
-    padding: 6px;
-    border-color: color-mix(in srgb, var(--rule-strong) 62%, transparent);
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--surface) 88%, transparent);
-    box-shadow: var(--shadow-1);
-    backdrop-filter: blur(14px);
+    top: 6px;
+    gap: 3px;
+    padding: 4px;
+    border-color: var(--rule);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    box-shadow: none;
+    backdrop-filter: blur(10px);
+    scrollbar-width: none;
+  }
+  .subnav::-webkit-scrollbar {
+    display: none;
   }
   .subnav a {
-    min-height: 36px;
+    min-height: 30px;
     display: inline-flex;
     align-items: center;
-    padding: 0 12px;
-    border-radius: 10px;
-    color: var(--ink-2);
-    letter-spacing: 0.005em;
-    transition: color var(--motion), background var(--motion), transform var(--motion);
+    padding: 0 10px;
+    border-radius: 7px;
+    color: var(--ink-3);
+    font-size: 11px;
+    white-space: nowrap;
+    transition: color var(--motion), background var(--motion);
   }
   .subnav a:hover {
-    transform: translateY(-1px);
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .subnav a.active {
     background: var(--accent-soft);
     color: var(--accent-strong);
+    font-weight: 650;
   }
   .section {
     position: relative;
@@ -2112,9 +2230,6 @@
       flex-wrap: wrap;
       padding: 14px;
     }
-    .sync-badge {
-      margin-left: 54px;
-    }
     .sync-details {
       padding: 0 14px 14px;
     }
@@ -2184,5 +2299,183 @@
   .auth-story,
   .auth-note {
     display: none;
+  }
+
+  /* Quieter utility sections */
+  #settings-shortcuts,
+  #settings-desktop-widgets {
+    gap: 10px;
+    padding: 14px 16px;
+    border-color: var(--rule);
+    background: var(--surface);
+    box-shadow: none;
+  }
+  #settings-shortcuts .section-title h2,
+  #settings-desktop-widgets .section-title h2 {
+    font-size: 0.9375rem;
+  }
+  #settings-shortcuts .button-row .btn,
+  #settings-desktop-widgets .button-row .btn {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: var(--text-xs);
+  }
+  #settings-desktop-widgets .btn-primary {
+    border-color: var(--rule);
+    background: var(--surface-2);
+    box-shadow: none;
+    color: var(--ink);
+  }
+  #settings-desktop-widgets .btn-primary:hover {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+  .pref-select {
+    justify-content: space-between;
+    min-height: 32px;
+    padding: 4px 2px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+  }
+  .pref-select .select {
+    width: auto;
+    min-width: 96px;
+    min-height: 30px;
+    font-size: var(--text-xs);
+  }
+
+  /* Checkboxes as compact switches */
+  .check-row input[type='checkbox'],
+  .pref-row input[type='checkbox'] {
+    position: relative;
+    flex: none;
+    width: 34px;
+    height: 20px;
+    margin: 0;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    appearance: none;
+    cursor: pointer;
+    transition: background var(--motion), border-color var(--motion);
+  }
+  .check-row input[type='checkbox']::before,
+  .pref-row input[type='checkbox']::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--ink-3);
+    transition: transform var(--motion), background var(--motion);
+  }
+  .check-row input[type='checkbox']:checked,
+  .pref-row input[type='checkbox']:checked {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .check-row input[type='checkbox']:checked::before,
+  .pref-row input[type='checkbox']:checked::before {
+    background: var(--accent);
+    transform: translateX(14px);
+  }
+  .check-row input[type='checkbox']:focus-visible,
+  .pref-row input[type='checkbox']:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .check-row input[type='checkbox'],
+    .check-row input[type='checkbox']::before,
+    .pref-row input[type='checkbox'],
+    .pref-row input[type='checkbox']::before {
+      transition: none;
+    }
+  }
+
+  /* Collapsible sections and lesson form affordances */
+  .section-toggle {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    margin-left: auto;
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--ink-3);
+  }
+  .section-toggle:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+  .section-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .form-toggle {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px dashed var(--rule-strong);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  .form-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+  .time-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--rule);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--surface) 80%, transparent);
+  }
+  .group-caption {
+    color: var(--ink-3);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .time-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .duration-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .module-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+  }
+  .module-preview .mod-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--dot, var(--accent));
   }
 </style>

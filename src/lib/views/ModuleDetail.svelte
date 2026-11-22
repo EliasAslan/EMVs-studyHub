@@ -43,6 +43,7 @@
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
+  import NumberStepper from '../components/NumberStepper.svelte';
 
   const tabs = [
     { id: 'overview', label: 'Übersicht' },
@@ -677,7 +678,7 @@
       <label class="field"><span>Datum</span><input class="input" type="date" bind:value={examEdit.date} /></label>
       <label class="field"><span>Notizen</span><textarea class="textarea" bind:value={examEdit.notes} rows="3"></textarea></label>
       <div class="two">
-        <label class="field"><span>Note (1–6)</span><input class="input" type="number" min="1" max="6" step="0.5" bind:value={examEdit.grade} /></label>
+        <label class="field"><span>Note (1–6)</span><NumberStepper bind:value={examEdit.grade} min={1} max={6} step={0.5} label="Note (1–6)" /></label>
         <label class="field"><span>Notiz zur Note</span><input class="input" bind:value={examEdit.gradeNote} /></label>
       </div>
     {:else}

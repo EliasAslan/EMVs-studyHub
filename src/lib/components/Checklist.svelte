@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher, tick } from 'svelte';
   import Icon from './Icon.svelte';
-  import { formatDate, relativeDayLabel } from '../data/dates.js';
+  import { formatDate } from '../data/dates.js';
 
   export let items = [];
   const dispatch = createEventDispatcher();
@@ -20,6 +20,19 @@
     dispatch('toggle', item);
   }
 
+  /** Keep the visible row text inside the accessible name for axe/AT. */
+  function itemLabel(item) {
+    const state = item.checked ? 'Erledigt' : 'Offen';
+    let label = `${state}: ${item.text}`;
+    if (item.kind === 'homework') {
+      const due = item.dueDate
+        ? `${formatDate(item.dueDate, 'short') || item.dueDate}${item.dueLabel ? ` · ${item.dueLabel}` : ''}`
+        : 'Kein Termin';
+      label += ` Hausaufgabe ${due}`;
+    }
+    return label;
+  }
+
   function add() {
     const value = newText.trim();
     if (!value) return;
@@ -36,7 +49,7 @@
         class="item-toggle"
         type="button"
         aria-pressed={item.checked}
-        aria-label={`${item.checked ? 'Erledigt' : 'Offen'}: ${item.text}`}
+        aria-label={itemLabel(item)}
         on:click={() => toggle(item)}
       >
         <span class="check" aria-hidden="true">

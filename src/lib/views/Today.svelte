@@ -273,7 +273,7 @@
           {/each}
         </div>
       {:else}
-        <p class="muted small">Noch keine Links. <a href="#/links">Hinzufügen</a></p>
+        <p class="muted small">Noch keine Links. <a class="quiet-link" href="#/links">Hinzufügen</a></p>
       {/if}
     </section>
   </div>
@@ -450,11 +450,15 @@
   .quiet-link {
     font-size: var(--text-xs);
     color: var(--ink-3);
-    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-color: var(--rule-strong);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
   .quiet-link:hover {
     color: var(--accent-strong);
-    text-decoration: underline;
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 2px;
   }
   .pad {
     padding: var(--space-3);

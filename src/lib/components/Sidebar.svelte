@@ -279,7 +279,7 @@
       title={footCollapsed ? 'Ausklappen' : 'Einklappen'}
       on:click={toggleFoot}
     >
-      <Icon name="chevronDown" size={14} />
+      <Icon name="chevronDown" size={16} />
     </button>
     <div class="foot-clip" inert={footCollapsed}>
       <div class="foot" id="sidebar-foot" use:closeDrawerOnNavigation>
@@ -485,32 +485,50 @@
   .module-head {
     display: flex;
     align-items: center;
-    margin: 14px 0 3px;
+    margin: 10px 0 4px;
   }
   .module-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     width: 100%;
-    min-height: 40px;
+    min-height: 38px;
     padding: 0 10px;
-    border: 0;
-    border-radius: 6px;
+    border: 1px solid transparent;
+    border-radius: 8px;
     background: transparent;
-    color: var(--ink-3);
-    font-size: 12px;
-    font-weight: 600;
+    color: var(--ink-2);
+    font-size: 12.5px;
+    font-weight: 650;
     text-align: left;
+    transition:
+      background var(--motion),
+      border-color var(--motion),
+      color var(--motion);
   }
   .module-toggle:hover {
+    border-color: var(--rule);
     background: var(--surface-2);
-    color: var(--ink-2);
+    color: var(--ink);
+  }
+  .module-toggle :global(svg) {
+    color: var(--ink-3);
+    transition: transform var(--motion);
   }
   .module-count {
     margin-left: auto;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
+    min-width: 20px;
+    padding: 2px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
     color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-align: center;
+  }
+  .module-toggle:hover .module-count {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
   }
   .module-link {
     gap: 9px;
@@ -615,13 +633,13 @@
   }
   .foot-toggle {
     position: absolute;
-    top: -32px;
+    top: -34px;
     left: 50%;
     z-index: 1;
     display: grid;
     place-items: center;
-    width: 44px;
-    height: 44px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     border: 1px solid var(--rule);
     border-radius: 50%;
@@ -639,7 +657,7 @@
     color: var(--ink);
   }
   .foot-toggle:active {
-    transform: translateX(-50%) scale(0.9);
+    transform: translateX(-50%) scale(0.92);
   }
   .foot-toggle :global(svg) {
     transform: none;

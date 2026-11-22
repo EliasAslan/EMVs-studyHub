@@ -22,6 +22,7 @@
   import { formatClock, progressPct, phaseLabel, roundLabel } from '../services/pomodoro.js';
   import { toast } from '../stores/toast.js';
   import Icon from '../components/Icon.svelte';
+  import NumberStepper from '../components/NumberStepper.svelte';
   import PomodoroStats from '../components/PomodoroStats.svelte';
   import { hint } from '../actions/hint.js';
 
@@ -142,13 +143,13 @@
   }
 
   function applyCustom() {
+    if (custom === '' || custom == null) return;
     const value = Number(custom);
     if (!Number.isFinite(value) || value < 1 || value > 480) {
       toast('Bitte 1 bis 480 Minuten.');
       return;
     }
     minutes = Math.round(value);
-    custom = '';
     updatePomodoroPrefs({ workMinutes: minutes });
   }
 
@@ -237,17 +238,17 @@
           </button>
         {/each}
         <div class="custom">
-          <input
-            class="input custom-input"
-            type="number"
-            min="1"
-            max="480"
-            placeholder="Eigene"
-            aria-label="Eigene Dauer in Minuten"
+          <NumberStepper
             bind:value={custom}
-            on:keydown={(e) => e.key === 'Enter' && applyCustom()}
+            min={1}
+            max={480}
+            step={1}
+            fallback={minutes}
+            label="Eigene Dauer in Minuten"
+            unit="Min"
+            placeholder="—"
+            on:change={applyCustom}
           />
-          <button class="btn btn-sm" type="button" on:click={applyCustom} disabled={!custom}>Setzen</button>
         </div>
       </div>
       <button class="btn btn-primary start" type="button" on:click={start}>
@@ -401,18 +402,19 @@
     letter-spacing: -0.02em;
   }
   .timer-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-4);
     padding: clamp(var(--space-5), 6vw, var(--space-7));
-    border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--rule));
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--rule));
     border-radius: var(--radius-3);
     background: var(--surface);
     box-shadow: var(--shadow-1);
   }
   .timer-card.is-break {
-    border-color: color-mix(in srgb, var(--ok) 30%, var(--rule));
+    border-color: color-mix(in srgb, var(--ok) 34%, var(--rule));
   }
   .status-row {
     display: flex;
@@ -436,7 +438,7 @@
   }
   .ring-wrap {
     position: relative;
-    width: min(260px, 68vw);
+    width: min(280px, 72vw);
     aspect-ratio: 1;
   }
   .ring {
@@ -466,7 +468,7 @@
     gap: var(--space-1);
   }
   .clock {
-    font-size: clamp(2.6rem, 9vw, 3.6rem);
+    font-size: clamp(2.8rem, 9.5vw, 3.9rem);
     font-weight: 600;
     letter-spacing: -0.03em;
     line-height: 1;
@@ -483,14 +485,13 @@
     justify-content: center;
     gap: var(--space-2);
   }
+  .duration .chip {
+    min-height: 40px;
+    padding: 0 14px;
+  }
   .custom {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-  }
-  .custom-input {
-    width: 96px;
-    min-height: 34px;
   }
   .start {
     min-width: 200px;
@@ -545,9 +546,46 @@
     cursor: pointer;
   }
   .pref-row input[type='checkbox'] {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--accent);
+    position: relative;
+    flex: none;
+    width: 34px;
+    height: 20px;
+    margin: 0;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    appearance: none;
+    cursor: pointer;
+    transition: background var(--motion), border-color var(--motion);
+  }
+  .pref-row input[type='checkbox']::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--ink-3);
+    transition: transform var(--motion), background var(--motion);
+  }
+  .pref-row input[type='checkbox']:checked {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .pref-row input[type='checkbox']:checked::before {
+    background: var(--accent);
+    transform: translateX(14px);
+  }
+  .pref-row input[type='checkbox']:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pref-row input[type='checkbox'],
+    .pref-row input[type='checkbox']::before {
+      transition: none;
+    }
   }
   .pref-label {
     flex: 1;
@@ -559,7 +597,7 @@
   }
   @media (min-width: 700px) {
     .ring-wrap {
-      width: 300px;
+      width: 320px;
     }
   }
   @media (max-height: 620px) {
@@ -573,11 +611,6 @@
   @media (prefers-reduced-motion: reduce) {
     .ring-progress {
       transition: none;
-    }
-  }
-  @media (pointer: coarse) {
-    .custom-input {
-      min-height: 48px;
     }
   }
 </style>

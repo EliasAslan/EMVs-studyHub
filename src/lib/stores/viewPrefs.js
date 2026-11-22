@@ -19,3 +19,6 @@ export function persistedStore(key, initial) {
   });
   return store;
 }
+
+/** Shared layout preference used by the calendar and its settings control. */
+export const calendarPrefs = persistedStore('studyhub_calendar_prefs', { agenda: 'list' });

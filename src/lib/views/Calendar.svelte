@@ -1,9 +1,10 @@
 <script>
-  import { appState, createHomework, createExam, openHomework } from '../stores/app.js';
+  import { appState, createHomework, createExam } from '../stores/app.js';
   import { monthModel } from '../data/calendar.js';
-  import { monthRange, formatMonth, formatDate, todayKey, weekdayShort, relativeDayLabel } from '../data/dates.js';
+  import { formatMonth, formatDate, todayKey, weekdayShort, relativeDayLabel } from '../data/dates.js';
   import { upcomingDeadlines } from '../data/deadlines.js';
   import { toast } from '../stores/toast.js';
+  import { calendarPrefs } from '../stores/viewPrefs.js';
   import Modal from '../components/Modal.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -19,11 +20,22 @@
   let addDate = selected;
 
   $: weeks = monthModel(year, month, $appState);
-  $: range = monthRange(year, month);
   $: selectedHomework = ($appState.homework || []).filter((h) => h.dueDate === selected);
   $: selectedExams = ($appState.exams || []).filter((e) => e.date === selected);
-  $: deadlines = upcomingDeadlines($appState, { limit: 6 });
+  $: allDeadlines = upcomingDeadlines($appState, { limit: Infinity });
+  $: deadlines = allDeadlines.slice(0, 6);
   $: weekdayLabels = weeks[0].map((d) => weekdayShort(new Date(d.key + 'T00:00:00')));
+  $: weekEntries = weeks
+    .flat()
+    .filter((day) => isInMonth(day.key))
+    .reduce(
+      (acc, day) => ({ homework: acc.homework + day.homework.length, exams: acc.exams + day.exams.length }),
+      { homework: 0, exams: 0 },
+    );
+
+  function setAgenda(value) {
+    calendarPrefs.update((prefs) => ({ ...prefs, agenda: value }));
+  }
 
   function shift(delta) {
     const d = new Date(year, month + delta, 1);
@@ -88,6 +100,12 @@
       </div>
     </div>
 
+    <div class="overview" aria-label="Überblick">
+      <span><span class="overview-dot hw" aria-hidden="true"></span>{weekEntries.homework} {weekEntries.homework === 1 ? 'Hausaufgabe' : 'Hausaufgaben'}</span>
+      <span><span class="overview-dot exam" aria-hidden="true"></span>{weekEntries.exams} {weekEntries.exams === 1 ? 'Prüfung' : 'Prüfungen'}</span>
+      <span class="overview-muted">{allDeadlines.length} {allDeadlines.length === 1 ? 'offene Frist' : 'offene Fristen'}</span>
+    </div>
+
     <div class="weekdays" aria-hidden="true">
       {#each weekdayLabels as label}<span>{label}</span>{/each}
     </div>
@@ -121,11 +139,17 @@
   <section class="day-panel" aria-labelledby="day-title">
     <div class="section-title">
       <h2 id="day-title">{formatDate(selected, 'long')}</h2>
-      <span class="muted small">{relativeDayLabel(selected)}</span>
+      <div class="day-tools">
+        <span class="muted small">{relativeDayLabel(selected)}</span>
+        <div class="view-switch" role="group" aria-label="Ansicht wählen">
+          <button type="button" class:active={$calendarPrefs.agenda === 'list'} aria-pressed={$calendarPrefs.agenda === 'list'} title="Liste" aria-label="Als Liste anzeigen" on:click={() => setAgenda('list')}><Icon name="menu" size={14} /></button>
+          <button type="button" class:active={$calendarPrefs.agenda === 'grid'} aria-pressed={$calendarPrefs.agenda === 'grid'} title="Raster" aria-label="Als Raster anzeigen" on:click={() => setAgenda('grid')}><Icon name="modules" size={14} /></button>
+        </div>
+      </div>
     </div>
 
     {#if selectedHomework.length || selectedExams.length}
-      <div class="card list">
+      <div class="card list" class:grid={$calendarPrefs.agenda === 'grid'}>
         {#each selectedExams as exam (exam.id)}
           <a class="item" href="#/exams">
             <span class="badge exam">Prüfung</span>
@@ -156,7 +180,7 @@
       <h2 id="deadlines-title">Nächste Fristen</h2>
     </div>
     {#if deadlines.length}
-      <div class="card list">
+      <div class="card list" class:grid={$calendarPrefs.agenda === 'grid'}>
         {#each deadlines as d (d.kind + d.item.id)}
           <a class="item" href={d.kind === 'exam' ? '#/exams' : '#/homework'}>
             <span class="badge" class:exam={d.kind === 'exam'} class:hw={d.kind === 'homework'}>{d.kind === 'exam' ? 'Prüfung' : 'Hausaufgabe'}</span>
@@ -198,7 +222,7 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
+    gap: clamp(14px, 2vw, 20px);
     max-width: 1000px;
   }
   .page-head {
@@ -225,7 +249,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    padding: 10px var(--space-3);
     border-bottom: 1px solid var(--rule);
   }
   .cal-head h2 {
@@ -236,6 +260,72 @@
     display: flex;
     align-items: center;
     gap: var(--space-1);
+  }
+  .overview {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    padding: 8px var(--space-3);
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+  }
+  .overview span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .overview-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .overview-dot.hw {
+    background: var(--ink-3);
+  }
+  .overview-dot.exam {
+    background: var(--warn);
+  }
+  .overview .overview-muted {
+    color: var(--ink-3);
+  }
+  .day-panel,
+  .page > section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .day-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .view-switch {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface-2);
+  }
+  .view-switch button {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 24px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink-3);
+  }
+  .view-switch button:hover {
+    color: var(--ink);
+  }
+  .view-switch button.active {
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+    color: var(--accent-strong);
   }
   .nav-btn {
     display: grid;
@@ -275,7 +365,7 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
-    min-height: 64px;
+    min-height: 58px;
     padding: var(--space-1) var(--space-2);
     border: 1px solid transparent;
     border-radius: var(--radius-1);
@@ -333,6 +423,24 @@
   }
   .list {
     padding: var(--space-1);
+  }
+  .list.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: var(--space-2);
+    padding: var(--space-2);
+  }
+  .list.grid .item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-height: 78px;
+    padding: var(--space-2);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-2);
+  }
+  .list.grid .item:hover {
+    border-color: var(--rule-strong);
   }
   .item {
     display: flex;
@@ -425,7 +533,7 @@
   }
   @media (min-width: 700px) {
     .day {
-      min-height: 84px;
+      min-height: 76px;
     }
   }
 </style>

@@ -127,10 +127,10 @@
         <LinkRow {link} showModule={$filters.moduleId === 'all'}>
           <svelte:fragment slot="actions">
             <button class="icon" type="button" aria-label={`${link.label} bearbeiten`} on:click={() => openEdit(link)}>
-              <Icon name="edit" size={15} />
+              <Icon name="edit" size={16} />
             </button>
             <button class="icon" type="button" aria-label={`${link.label} löschen`} on:click={() => remove(link)}>
-              <Icon name="trash" size={15} />
+              <Icon name="trash" size={16} />
             </button>
           </svelte:fragment>
         </LinkRow>

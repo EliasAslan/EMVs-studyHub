@@ -305,7 +305,7 @@
     class:open={drawerOpen}
     type="button"
     tabindex="-1"
-    aria-label="Navigation schliessen"
+    aria-hidden="true"
     on:click={() => closeDrawer({ restoreFocus: true })}
   ></button>
   <div inert={captureMenuOpen}>

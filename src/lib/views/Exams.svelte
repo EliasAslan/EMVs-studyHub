@@ -7,11 +7,13 @@
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
+  import NumberStepper from '../components/NumberStepper.svelte';
 
   let open = false;
   let editing = null;
   let gradeError = '';
   let gradeInput = null;
+  let dateInput = null;
   let form = { title: '', moduleId: '', date: todayKey(), notes: '', grade: '', gradeNote: '' };
 
   $: modules = $appState.modules || [];
@@ -78,17 +80,25 @@
     });
   }
 
+  function openDatePicker() {
+    try {
+      dateInput?.showPicker?.();
+    } catch {
+      dateInput?.focus();
+    }
+  }
+
   function gradeLabel(grade) {
     if (typeof grade !== 'number') return '';
     return Number.isInteger(grade) ? String(grade) : grade.toFixed(1);
   }
 
-  /** Grade bands for the small feedback display: rot < mid < grün. */
+  /** Schulnoten: 6 ist am besten, 1 am schlechtesten. */
   function gradeBand(grade) {
     if (typeof grade !== 'number') return null;
-    if (grade >= 4) return 'high';
-    if (grade >= 2.5) return 'mid';
-    return 'low';
+    if (grade >= 5) return 'good';
+    if (grade >= 4) return 'ok';
+    return 'bad';
   }
 
   /** 6-segment fill: 1-5 full, 6th segment half when the grade has a .5 */
@@ -194,13 +204,11 @@
             </button>
             {#if typeof exam.grade === 'number'}
               <span class="grade-block">
-                <span class="grade mono" class:low={gradeBand(exam.grade) === 'low'} class:mid={gradeBand(exam.grade) === 'mid'} class:high={gradeBand(exam.grade) === 'high'}>{gradeLabel(exam.grade)}</span>
-                <span class="grade-scale" aria-hidden="true">
-                  <span class="scale-end">1</span>
+                <span class="grade mono" class:good={gradeBand(exam.grade) === 'good'} class:ok={gradeBand(exam.grade) === 'ok'} class:bad={gradeBand(exam.grade) === 'bad'}>{gradeLabel(exam.grade)}</span>
+                <span class="grade-scale {gradeBand(exam.grade)}" aria-hidden="true">
                   {#each [1, 2, 3, 4, 5, 6] as i (i)}
                     <span class="grade-seg {gradeState(exam.grade, i)}"></span>
                   {/each}
-                  <span class="scale-end">6</span>
                 </span>
                 <span class="sr-only">Note {gradeLabel(exam.grade)} von 6</span>
               </span>
@@ -232,24 +240,29 @@
           {#each modules as m (m.id)}<option value={m.id}>{m.code ? `${m.code} · ` : ''}{m.title}</option>{/each}
         </select>
       </label>
-      <label class="field"><span>Datum</span><input class="input" type="date" bind:value={form.date} /></label>
+      <div class="field date-field">
+        <span id="exam-date-label">Datum</span>
+        <span class="date-control">
+          <button class="date-icon" type="button" aria-label="Kalender öffnen" on:click={openDatePicker}>
+            <Icon name="calendar" size={15} />
+          </button>
+          <input class="input" type="date" aria-labelledby="exam-date-label" bind:value={form.date} bind:this={dateInput} />
+        </span>
+      </div>
     </div>
     <label class="field"><span>Notizen</span><textarea class="textarea" bind:value={form.notes} rows="3"></textarea></label>
     <div class="two">
       <label class="field">
         <span>Note (1–6, halbe Schritte)</span>
-        <input
-          class="input"
-          class:invalid={!!gradeError}
-          type="number"
-          min="1"
-          max="6"
-          step="0.5"
-          inputmode="decimal"
+        <NumberStepper
           bind:value={form.grade}
-          bind:this={gradeInput}
-          aria-invalid={!!gradeError}
-          aria-describedby={gradeError ? 'exam-grade-error' : undefined}
+          bind:inputEl={gradeInput}
+          min={1}
+          max={6}
+          step={0.5}
+          label="Note (1–6, halbe Schritte)"
+          invalid={!!gradeError}
+          describedBy={gradeError ? 'exam-grade-error' : undefined}
           on:input={() => (gradeError = '')}
         />
         {#if gradeError}
@@ -326,6 +339,49 @@
   .input.invalid {
     border-color: var(--danger);
   }
+  .date-control {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--rule-strong);
+    border-radius: 11px;
+    background: var(--surface);
+    transition: border-color var(--motion), box-shadow var(--motion);
+  }
+  .date-control:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .date-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 38px;
+    padding: 0;
+    border: 0;
+    border-right: 1px solid var(--rule);
+    background: var(--surface-2);
+    color: var(--ink-3);
+    transition: background var(--motion), color var(--motion);
+  }
+  .date-icon:hover {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+  .date-control .input {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .date-control .input::-webkit-calendar-picker-indicator {
+    opacity: 0.5;
+    cursor: pointer;
+  }
   .date-block {
     display: flex;
     flex-direction: column;
@@ -401,8 +457,8 @@
   .grade {
     padding: 2px var(--space-3);
     border-radius: var(--radius-pill);
-    background: var(--ok-soft);
-    color: var(--ok);
+    background: var(--surface-2);
+    color: var(--ink-2);
     font-weight: 700;
   }
   .grade-block {
@@ -417,23 +473,26 @@
     align-items: center;
     gap: 3px;
   }
-  .scale-end {
-    color: var(--ink-3);
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
+  .grade-scale.good {
+    --seg: var(--ok);
   }
-  .grade.low {
-    background: var(--danger-soft);
-    color: var(--danger);
+  .grade-scale.ok {
+    --seg: var(--warn);
   }
-  .grade.mid {
+  .grade-scale.bad {
+    --seg: var(--danger);
+  }
+  .grade.good {
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+  .grade.ok {
     background: var(--warn-soft);
     color: var(--warn);
   }
-  .grade.high {
-    background: var(--ok-soft);
-    color: var(--ok);
+  .grade.bad {
+    background: var(--danger-soft);
+    color: var(--danger);
   }
   .grade-seg {
     width: 8px;
@@ -443,12 +502,12 @@
     border: 1px solid var(--rule-strong);
   }
   .grade-seg.on {
-    background: var(--ok);
-    border-color: var(--ok);
+    background: var(--seg, var(--ok));
+    border-color: var(--seg, var(--ok));
   }
   .grade-seg.half {
-    background: linear-gradient(90deg, var(--ok) 50%, var(--surface-2) 50%);
-    border-color: var(--ok);
+    background: linear-gradient(90deg, var(--seg, var(--ok)) 50%, var(--surface-2) 50%);
+    border-color: var(--seg, var(--ok));
   }
   .icon {
     display: grid;

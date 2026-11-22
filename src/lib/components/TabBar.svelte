@@ -5,10 +5,9 @@
   export let onMore;
   export let expanded = false;
 
-  $: isNotes = $route.name === 'notes' || $route.name === 'note';
   $: isMore =
     expanded ||
-    ['exams', 'links', 'settings', 'calendar', 'modules', 'module', 'tokens', 'assistant'].includes($route.name);
+    ['links', 'settings', 'calendar', 'modules', 'module', 'tokens', 'assistant'].includes($route.name);
 </script>
 
 <nav class="tabbar" aria-label="Mobile Navigation">
@@ -24,9 +23,9 @@
     <Icon name="focus" size={20} />
     <span>Fokus</span>
   </a>
-  <a class="tab" class:active={isNotes} href="#/notes" aria-current={isNotes ? 'page' : undefined}>
-    <Icon name="notes" size={20} />
-    <span>Notizen</span>
+  <a class="tab" class:active={$route.name === 'exams'} href="#/exams" aria-current={$route.name === 'exams' ? 'page' : undefined}>
+    <Icon name="exams" size={20} />
+    <span>Prüfungen</span>
   </a>
   <button
     class="tab"
@@ -69,6 +68,7 @@
   }
   .tab.active {
     color: var(--accent-strong);
+    box-shadow: inset 0 2px 0 var(--accent);
   }
   .tab:hover { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); color:var(--accent-strong); }
   .tab :global(svg) { transition: transform var(--motion); }

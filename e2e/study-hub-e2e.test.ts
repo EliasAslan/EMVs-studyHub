@@ -204,7 +204,7 @@ test.describe('Study Hub v2 — mobile shell', () => {
 
     await page.getByRole('button', { name: 'Navigation öffnen' }).click();
     await expect(aside).toHaveClass(/\bopen\b/);
-    await expect(page.getByRole('link', { name: 'Prüfungen' })).toBeVisible();
+    await expect(aside.getByRole('link', { name: 'Prüfungen' })).toBeVisible();
 
     // The drawer slides in from the left on mobile.
     await expect
