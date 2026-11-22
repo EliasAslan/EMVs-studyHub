@@ -11,11 +11,20 @@
  * - unchecked items are never hidden
  */
 
+/** How far ahead the daily checklist lists open homework (default 5). */
+const DEFAULT_HORIZON_DAYS = 5;
+
+/** Derive checked state for a given day from the checklist box. */
+export function checkedForDay(state, now = new Date()) {
+  const today = todayKey(now);
+  const box = state.checklist;
+  if (!box || box.date !== today) return {};
+  return box.checked || {};
+}
+
 import { STUDIED_ID } from './entities.js';
 import { todayKey, relativeDayLabel } from './dates.js';
-
-/** How far ahead the daily checklist lists open homework. */
-const CHECKLIST_HORIZON_DAYS = 5;
+import { $preferences } from '../stores/preferences.js';
 
 function addDaysKey(key, days) {
   const d = new Date(`${key}T00:00:00`);
@@ -26,16 +35,22 @@ function addDaysKey(key, days) {
   return `${y}-${m}-${day}`;
 }
 
-export function checkedForDay(state, now = new Date()) {
-  const today = todayKey(now);
-  const box = state.checklist;
-  if (!box || box.date !== today) return {};
-  return box.checked || {};
-}
-
-export function checklistForDay(state, now = new Date()) {
+/**
+ * Derive the daily checklist for today.
+ * @param state   The app state containing homework and checklist items.
+ * @param now     The current date (default: new Date()).
+ * @param horizonDays Number of days ahead to look for homework (default DEFAULT_HORIZON_DAYS).
+ * @param includeOverdue If true, include homework whose dueDate is before today.
+ *                       If false, only show homework due today or in the future.
+ *                       Defaults to true.
+ */
+export function checklistForDay(state, now = new Date(), horizonDays = DEFAULT_HORIZON_DAYS, includeOverdue = true) {
   const today = todayKey(now);
   const checked = checkedForDay(state, now);
+
+  const horizonFromPrefs = $preferences.checklistHorizon;
+  const effectiveHorizon = horizonDays ?? horizonFromPrefs ?? DEFAULT_HORIZON_DAYS;
+  const effectiveIncludeOverdue = includeOverdue !== false && ($preferences.includeOverdue ?? includeOverdue);
 
   const homework = (state.homework || [])
     .filter((h) => {
@@ -46,7 +61,8 @@ export function checklistForDay(state, now = new Date()) {
       return (
         (!h.done || completedToday) &&
         h.dueDate &&
-        h.dueDate <= addDaysKey(today, CHECKLIST_HORIZON_DAYS)
+        h.dueDate <= addDaysKey(today, effectiveHorizon) &&
+        (effectiveIncludeOverdue || h.dueDate >= today),
       );
     })
     .sort((a, b) => {
@@ -61,8 +77,8 @@ export function checklistForDay(state, now = new Date()) {
       text: h.title,
       dueDate: h.dueDate || null,
       dueLabel: h.dueDate ? relativeDayLabel(h.dueDate, now) : '',
-      isOverdue: !!h.dueDate && h.dueDate < today,
-      checked: !!h.done,
+      isOverdue: !!h.dueDate && h.dueDate < today && effectiveIncludeOverdue,
+      checked: false,
     }));
 
   const custom = (state.checklistItems || [])

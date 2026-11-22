@@ -28,6 +28,7 @@
   import { checklistForDay } from '../data/checklist.js';
   import { now as clockNow } from '../stores/clock.js';
   import { toast } from '../stores/toast.js';
+  import { preferences } from '../services/appearance.js';
   import {
     todayKey,
     formatDate,
@@ -66,7 +67,7 @@
       .filter((exam) => exam.date && exam.date >= today)
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))[0] || null;
   $: upcoming = nextLesson($appState, dayNow);
-  $: checklist = checklistForDay($appState, dayNow);
+  $: checklist = checklistForDay($appState, dayNow, $preferences.checklistHorizon, $preferences.includeOverdue);
   $: remaining = checklist.items.filter((item) => !item.checked).length;
   $: hero = pickStartHere($appState, dayNow);
   $: recent = $recentNotes.slice(0, 3);

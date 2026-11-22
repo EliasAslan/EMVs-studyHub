@@ -90,13 +90,32 @@ export function weekdayShort(date) {
   return formatter({ weekday: 'short' }).format(date);
 }
 
+/** Compute the day-offset for startOfWeek based on the configured week start. */
+let dateFormat = 'ch';
+let weekStart = 'monday';
+
+export function configureDates(format, weekStartVal) {
+  dateFormat = format || 'ch';
+  weekStart = weekStartVal || 'monday';
+}
+
+export function _weekStartOffset(d) {
+  // Monday-relative: (getDay() + 6) % 7 gives 0 for Monday, 6 for Sunday
+  // Sunday-relative: getDay() gives 0 for Sunday, 6 for Saturday
+  if (weekStart === 'sunday') {
+    return d.getDay();
+  }
+  return (d.getDay() + 6) % 7;
+}
+
 export function startOfWeek(date = new Date()) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const day = (d.getDay() + 6) % 7; // Monday = 0
+  const day = _weekStartOffset(d);
   d.setDate(d.getDate() - day);
   return d;
 }
 
+/** Week date keys starting from the configured week start. */
 export function weekDateKeys(date = new Date()) {
   const start = startOfWeek(date);
   return Array.from({ length: 7 }, (_, i) => {

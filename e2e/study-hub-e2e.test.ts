@@ -22,6 +22,30 @@ test.describe('Study Hub v2 — Core Flows', () => {
           checklist: { date: null, checked: {} },
         }),
       );
+      localStorage.setItem(
+        'studyhub_preferences_v1',
+        JSON.stringify({
+          accent: { value: 'indigo', customHex: '#4f46e5' },
+          textSize: 'default',
+          density: 'cozy',
+          reduceMotion: false,
+          home: {
+            hero: true,
+            nextExam: true,
+            focusStrip: true,
+            checklist: true,
+            nextLesson: true,
+            recentNotes: true,
+            links: true,
+          },
+          homeOrder: ['hero', 'nextExam', 'focusStrip', 'checklist', 'nextLesson', 'recentNotes', 'links'],
+          checklistHorizon: 5,
+          includeOverdue: true,
+          gradeBands: { midMin: 2.5, highMin: 4 },
+          dateFormat: 'ch',
+          weekStart: 'monday',
+        }),
+      );
     });
     await page.goto(BASE_URL);
     await expect(page).toHaveTitle(/Study Hub/);

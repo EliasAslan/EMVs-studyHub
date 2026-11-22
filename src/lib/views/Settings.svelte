@@ -11,7 +11,11 @@
     importBackup,
     resetAll,
   } from '../stores/app.js';
+import { preferences, apply } from '../services/appearance.js';
   import { downloadBackup } from '../services/backup.js';
+
+  // Apply CSS tokens when preferences that affect appearance change.
+  $: apply();
   import {
     downloadWidgetSnapshotJson,
     downloadWidgetSnapshotText,
@@ -511,6 +515,8 @@
     <a href="#settings-data" on:click|preventDefault={() => document.getElementById('settings-data')?.scrollIntoView({ block: 'start' })}>Backups</a>
     <a href="#settings-desktop-widgets" on:click|preventDefault={() => document.getElementById('settings-desktop-widgets')?.scrollIntoView({ block: 'start' })}>Widgets</a>
     <a href="#settings-email" on:click|preventDefault={() => document.getElementById('settings-email')?.scrollIntoView({ block: 'start' })}>E-Mail</a>
+    <a href="#settings-appearance" on:click|preventDefault={() => document.getElementById('settings-appearance')?.scrollIntoView({ block: 'start' })}>Darstellung</a>
+    <a href="#settings-today" on:click|preventDefault={() => document.getElementById('settings-today')?.scrollIntoView({ block: 'start' })}>Heute</a>
     <a href="#settings-cloud" on:click|preventDefault={() => document.getElementById('settings-cloud')?.scrollIntoView({ block: 'start' })}>Cloud</a>
   </nav>
 
@@ -551,6 +557,133 @@
           {option.label}
         </button>
       {/each}
+    </div>
+  </section>
+
+  <section class="card section" id="settings-appearance" aria-labelledby="appearance-title">
+    <div class="section-title">
+      <h2 id="appearance-title">Erscheinungsbild</h2>
+    </div>
+    <div class="segmented" role="group" aria-label="Akzentfarbe wählen">
+      {#each ['indigo', 'teal', 'amber', 'rose', 'violet', 'slate'] as color (color)}
+        <button
+          class="seg"
+          class:active={$preferences.accent.value === color}
+          type="button"
+          aria-pressed={$preferences.accent.value === color}
+          on:click={() => {
+            const hexMap = {
+              indigo: '#4f46e5',
+              teal: '#14b8a6',
+              amber: '#f59e0b',
+              rose: '#ec4899',
+              violet: '#8b5cf6',
+              slate: '#64748b',
+            };
+            $preferences.accent = { value: color, customHex: hexMap[color] };
+            apply();
+          }}
+        >
+          {color}
+        </button>
+      {/each}
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Benutzerdefinierter Hex-Code</span>
+        <input
+          class="input"
+          type="color"
+          bind:value={$preferences.accent.customHex}
+          on:change={(e) => {
+            const hex = e.target.value;
+            $preferences.accent = { value: hex.replace('#', '') || hex, customHex: hex };
+            apply();
+          }}
+          placeholder="#4f46e5"
+        />
+      </label>
+      <label class="field">
+        <span>Vorschau</span>
+        <div class="preview-accent" style="color: var(--accent-base);"></div>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Schriftgröße</span>
+        <select class="select" bind:value={$preferences.textSize}>
+          <option value="compact">Kompat</option>
+          <option value="default" selected>Standard</option>
+          <option value="large">Groß</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Dichte</span>
+        <select class="select" bind:value={$preferences.density}>
+          <option value="cozy">Gemütlich</option>
+          <option value="compact">Kompat</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Reduzierte Bewegung</span>
+        <input type="checkbox" bind:checked={$preferences.reduceMotion} on:change={apply} />
+      </label>
+    </div>
+  </section>
+
+  <section class="card section" id="settings-today" aria-labelledby="today-title">
+    <div class="section-title">
+      <h2 id="today-title">Heute-Ansicht</h2>
+    </div>
+    <div class="pref-row">
+      <input type="checkbox" id="hero-toggle" bind:checked={$preferences.home.hero} />
+      <label for="hero-toggle">Heldenbereich</label>
+    </div>
+    <div class="pref-row">
+      <input type="checkbox" id="next-exam-toggle" bind:checked={$preferences.home.nextExam} />
+      <label for="next-exam-toggle">Nächste Prüfung</label>
+    </div>
+    <div class="pref-row">
+      <input type="checkbox" id="focus-strip-toggle" bind:checked={$preferences.home.focusStrip} />
+      <label for="focus-strip-toggle">Fokus-Leiste</label>
+    </div>
+    <div class="pref-row">
+      <input type="checkbox" id="checklist-toggle" bind:checked={$preferences.home.checklist} />
+      <label for="checklist-toggle">Checkliste</label>
+    </div>
+    <div class="pref-row">
+      <input type="checkbox" id="next-lesson-toggle" bind:checked={$preferences.home.nextLesson} />
+      <label for="next-lesson-toggle">Nächste Lektion</label>
+    </div>
+    <div class="pref-row">
+      <input type="checkbox" id="recent-notes-toggle" bind:checked={$preferences.home.recentNotes} />
+      <label for="recent-notes-toggle">Letzte Notizen</label>
+    </div>
+    <div class="pref-row">
+      <input type="checkbox" id="links-toggle" bind:checked={$preferences.home.links} />
+      <label for="links-toggle">Links</label>
+    </div>
+    <h3>Reihenfolge</h3>
+    <div class="reorder-list">
+      {#each $preferences.homeOrder as section, index}
+        <div class="reorder-item" data-section={section} aria-label="Section ${section} position ${index + 1}">
+          <span class="reorder-handle">⋮⋮</span>
+          <span class="reorder-label">{section}</span>
+        </div>
+      {/each}
+    </div>
+    <h3>Checkliste</h3>
+    <div class="pref-row">
+      <select class="select" bind:value={$preferences.checklistHorizon}>
+        <option value="3">3 Tage</option>
+        <option value="5" selected>5 Tage</option>
+        <option value="7">7 Tage</option>
+        <option value="14">14 Tage</option>
+      </select>
+    </div>
+    <div class="pref-row">
+      <input type="checkbox" id="include-overdue-toggle" bind:checked={$preferences.home.includeOverdue} />
+      <label for="include-overdue-toggle">Überfällig einbeziehen</label>
     </div>
   </section>
 

@@ -105,12 +105,37 @@ const SEED = {
     currentProgramId: 'program-emvs',
     updatedAt: 0,
   },
+  preferences: {
+    accent: { value: 'indigo', customHex: '#4f46e5' },
+    textSize: 'default',
+    density: 'cozy',
+    reduceMotion: false,
+    home: {
+      hero: true,
+      nextExam: true,
+      focusStrip: true,
+      checklist: true,
+      nextLesson: true,
+      recentNotes: true,
+      links: true,
+    },
+    homeOrder: ['hero', 'nextExam', 'focusStrip', 'checklist', 'nextLesson', 'recentNotes', 'links'],
+    checklistHorizon: 5,
+    includeOverdue: true,
+    gradeBands: { midMin: 2.5, highMin: 4 },
+    dateFormat: 'ch',
+    weekStart: 'monday',
+  },
 };
 
 async function seed(page: Page, aiOn = false) {
   await page.addInitScript(
     ({ state, settings }) => {
       localStorage.setItem('studyhub_v1', JSON.stringify(state));
+      localStorage.setItem(
+        'studyhub_preferences_v1',
+        JSON.stringify({ ...SEED.preferences, state: SEED.schemaVersion }),
+      );
       if (settings) localStorage.setItem('studyhub_ai_v1', JSON.stringify(settings));
     },
     { state: SEED, settings: aiOn ? AI_ON : null },
