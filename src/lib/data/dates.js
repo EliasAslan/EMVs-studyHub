@@ -72,6 +72,16 @@ export function formatDate(key, style = 'numeric') {
   return formatter({ day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
 }
 
+/** Two-line date block: { day: '22', month: 'Nov.' }. */
+export function formatDayMonth(key) {
+  const d = parseDateKey(key);
+  if (!d) return { day: '–', month: '' };
+  return {
+    day: String(d.getDate()),
+    month: formatter({ month: 'short' }).format(d),
+  };
+}
+
 export function formatMonth(year, monthIndex) {
   return formatter({ month: 'long', year: 'numeric' }).format(new Date(year, monthIndex, 1));
 }

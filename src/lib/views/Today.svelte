@@ -2,18 +2,32 @@
   import { onMount } from 'svelte';
   import {
     appState,
-    todayChecklist,
     toggleChecklistItem,
     addChecklistItem,
     deleteChecklistItem,
+    toggleHomework,
     backupReminder,
     recentNotes,
     moduleTitle,
   } from '../stores/app.js';
   import { openPalette } from '../stores/ui.js';
   import { navigate } from '../router.js';
-  import { subscribePomodoro, getPomodoroPrefs, startPomodoro, STATUS, PHASE, remainingMs } from '../services/pomodoroEngine.js';
+  import {
+    subscribePomodoro,
+    getPomodoroPrefs,
+    startPomodoro,
+    resumePomodoro,
+    startNextRound,
+    POMODORO_DEFAULTS,
+    STATUS,
+    PHASE,
+    remainingMs,
+  } from '../services/pomodoroEngine.js';
   import { formatClock, progressPct, roundLabel } from '../services/pomodoro.js';
+  import { pickStartHere } from '../data/startHere.js';
+  import { checklistForDay } from '../data/checklist.js';
+  import { now as clockNow } from '../stores/clock.js';
+  import { toast } from '../stores/toast.js';
   import {
     todayKey,
     formatDate,
@@ -33,25 +47,28 @@
   let timerState = null;
   let timerPrefs = { workMinutes: 25 };
   let timerNow = Date.now();
-  let timerTick = 0;
 
   const isMac =
     typeof navigator !== 'undefined' &&
     /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
   const shortcutLabel = isMac ? '⌘K' : 'Ctrl K';
 
-  $: today = todayKey();
+  $: dayNow = new Date($clockNow);
+  $: today = todayKey(dayNow);
   $: timerClock = timerState ? formatClock(remainingMs(timerState, timerNow)) : formatClock((Number(timerPrefs.workMinutes) || 25) * 60000);
-  $: timerRound = timerState ? (roundLabel(timerState) || (timerState.phase === PHASE.work ? 'Fokus-Runde' : 'Pause')) : `${Number(timerPrefs.workMinutes) || 25} min Fokus · 5 min Pause`;
+  $: timerRound = timerState ? (roundLabel(timerState) || (timerState.phase === PHASE.work ? 'Fokus-Runde' : 'Pause')) : `${Number(timerPrefs.workMinutes) || 25} min Fokus · ${POMODORO_DEFAULTS.shortBreakMinutes} min Pause`;
   $: timerProgress = timerState ? progressPct(timerState, timerNow) : 0;
-  $: timerStatus = !timerState ? 'Bereit für eine fokussierte Runde?' : timerState.status === STATUS.paused ? 'Pausiert — mach weiter, wenn du bereit bist.' : timerState.status === STATUS.workDone ? 'Stark gemacht. Zeit für eine Pause.' : timerState.status === STATUS.breakDone ? 'Pause vorbei. Bereit für die nächste Runde?' : timerState.phase === PHASE.work ? 'Du bist gerade in deiner Fokusrunde.' : 'Deine Pause läuft gerade.';
-  $: timerActionLabel = !timerState ? 'Fokus starten' : timerState.status === STATUS.paused ? 'Timer fortsetzen' : timerState.status === STATUS.workDone ? 'Pause auswählen' : timerState.status === STATUS.breakDone ? 'Nächste Runde' : timerState.phase === PHASE.work ? 'Weiter fokussieren' : 'Pause fortsetzen';
+  $: timerHeadline = !timerState ? 'Fokuszeit' : timerState.status === STATUS.paused ? 'Pausiert' : timerState.status === STATUS.workDone ? 'Runde geschafft' : timerState.status === STATUS.breakDone ? 'Pause vorbei' : timerState.phase === PHASE.work ? 'Fokus läuft' : 'Pause läuft';
+  $: timerStatus = !timerState ? 'Bereit für eine fokussierte Runde?' : timerState.status === STATUS.paused ? 'Mach weiter, wenn du bereit bist.' : timerState.status === STATUS.workDone ? 'Stark gemacht. Zeit für eine Pause.' : timerState.status === STATUS.breakDone ? 'Bereit für die nächste Runde?' : timerState.phase === PHASE.work ? 'Du bist gerade in deiner Fokusrunde.' : 'Deine Pause läuft gerade.';
+  $: timerActionLabel = !timerState ? 'Fokus starten' : timerState.status === STATUS.paused ? 'Fortsetzen' : timerState.status === STATUS.workDone ? 'Pause wählen' : timerState.status === STATUS.breakDone ? 'Nächste Runde' : timerState.phase === PHASE.work ? 'Öffnen' : 'Pause öffnen';
   $: nextExam =
     ($appState.exams || [])
       .filter((exam) => exam.date && exam.date >= today)
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))[0] || null;
-  $: upcoming = nextLesson($appState);
-  $: remaining = $todayChecklist.items.filter((item) => !item.checked).length;
+  $: upcoming = nextLesson($appState, dayNow);
+  $: checklist = checklistForDay($appState, dayNow);
+  $: remaining = checklist.items.filter((item) => !item.checked).length;
+  $: hero = pickStartHere($appState, dayNow);
   $: recent = $recentNotes.slice(0, 3);
 
   $: currentProgram = $appState.settings.currentProgramId;
@@ -62,31 +79,48 @@
 
   onMount(() => {
     timerPrefs = getPomodoroPrefs();
-    const unsubscribe = subscribePomodoro(({ state, prefs }) => {
+    return subscribePomodoro(({ state, prefs, reason }) => {
       timerState = state;
       timerPrefs = prefs;
+      if (reason === 'tick') timerNow = Date.now();
     });
-    const interval = setInterval(() => {
-      timerTick += 1;
-      timerNow = Date.now();
-    }, 1000);
-    return () => {
-      unsubscribe();
-      clearInterval(interval);
-    };
   });
 
-  $: if (timerTick >= 0) timerNow = Date.now();
-
-  function goToFocus() {
+  function handleTimerAction() {
+    if (!timerState) {
+      startPomodoro({ minutes: Number(timerPrefs.workMinutes) || 25 });
+    } else if (timerState.status === STATUS.paused) {
+      resumePomodoro();
+    } else if (timerState.status === STATUS.breakDone) {
+      startNextRound();
+    }
     navigate('/focus');
   }
 
-  function startFromHome() {
-    if (!timerState) {
-      startPomodoro({ minutes: Number(timerPrefs.workMinutes) || 25 });
+  function completeHero() {
+    if (!hero || hero.kind !== 'homework') return;
+    toggleHomework(hero.item.id);
+    toast('Erledigt');
+  }
+
+  function heroReasonLabel(pick) {
+    if (!pick) return '';
+    if (pick.kind === 'exam') {
+      if (pick.days === 0) return 'Prüfung heute';
+      if (pick.days === 1) return 'Prüfung morgen';
+      return `Prüfung in ${pick.days} Tagen`;
     }
-    navigate('/focus');
+    if (pick.reason === 'overdue') return `${Math.abs(pick.days)} Tage überfällig`;
+    if (pick.reason === 'today') return 'Heute fällig';
+    if (pick.days === 1) return 'Morgen fällig';
+    if (pick.days === 0) return 'Heute fällig';
+    return `Fällig in ${pick.days} Tagen`;
+  }
+
+  function heroDueLabel(pick) {
+    if (!pick) return '';
+    if (pick.kind === 'exam') return formatDate(pick.item.date, 'short');
+    return pick.item.dueDate ? formatDate(pick.item.dueDate, 'short') : 'Ohne Datum';
   }
 
   function openCapture(mode) {
@@ -118,7 +152,28 @@
     </a>
   {/if}
 
-  {#if nextExam}
+  {#if hero}
+    <section class="hero card" class:overdue={hero.reason === 'overdue'} aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <span class="hero-kind">{hero.kind === 'exam' ? 'Nächste Prüfung' : hero.reason === 'overdue' ? 'Überfällig' : 'Nächste Aufgabe'}</span>
+        <h2 id="hero-title">{hero.item.title}</h2>
+        <span class="hero-meta">
+          {#if hero.item.moduleId}{moduleTitle($appState, hero.item.moduleId)} · {/if}
+          {heroDueLabel(hero)} · <strong>{heroReasonLabel(hero)}</strong>
+        </span>
+      </div>
+      <div class="hero-actions">
+        {#if hero.kind === 'homework'}
+          <button class="btn btn-primary" type="button" on:click={completeHero}>Erledigen</button>
+          <a class="btn btn-ghost" href="#/homework">Öffnen</a>
+        {:else}
+          <a class="btn btn-primary" href="#/exams">Prüfung öffnen</a>
+        {/if}
+      </div>
+    </section>
+  {/if}
+
+  {#if nextExam && (!hero || hero.kind !== 'exam' || hero.item.id !== nextExam.id)}
     <a class="exam-line" href="#/exams">
       <span class="exam-kind"><Icon name="exams" size={16} /> Nächste Prüfung</span>
       <span class="exam-main">
@@ -133,23 +188,28 @@
 
   <section class="focus-compact" aria-label="Fokus-Timer">
     <div class="focus-compact-copy">
-      <strong>{timerState ? (timerState.phase === PHASE.work ? 'Fokus läuft' : 'Pause läuft') : 'Fokuszeit'}</strong>
+      <strong>{timerHeadline}</strong>
       <span>{timerState ? timerStatus : timerRound}</span>
     </div>
     <span class="focus-compact-clock mono">{timerClock}</span>
-    <button class="focus-compact-action" type="button" on:click={startFromHome} title="Pomodoro öffnen">
-      {timerState ? 'Öffnen' : 'Starten'} <Icon name="chevronRight" size={15} />
+    <button class="focus-compact-action" type="button" on:click={handleTimerAction}>
+      {timerActionLabel} <Icon name="chevronRight" size={15} />
     </button>
+    {#if timerState}
+      <span class="focus-compact-track" aria-hidden="true">
+        <span style={`transform: scaleX(${Math.max(0, Math.min(1, timerProgress / 100))})`}></span>
+      </span>
+    {/if}
   </section>
 
   <section class="block" aria-labelledby="checklist-title">
     <div class="section-title">
-      <h2 id="checklist-title">Aufgaben &amp; Checkliste</h2>
-      <span class="count">{remaining === 0 ? 'alles erledigt' : `${remaining} offen`}</span>
+      <h2 id="checklist-title">Aufgaben</h2>
+      <span class="count" aria-live="polite">{remaining === 0 ? 'alles erledigt' : `${remaining} offen`}</span>
     </div>
     <div class="card pad">
       <Checklist
-        items={$todayChecklist.items}
+        items={checklist.items}
         on:toggle={(e) => toggleChecklistItem(e.detail)}
         on:add={(e) => addChecklistItem(e.detail)}
         on:remove={(e) => deleteChecklistItem(e.detail.id)}
@@ -291,7 +351,63 @@
   .block {
     min-width: 0;
   }
+  .hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border-left: 3px solid var(--accent);
+  }
+  .hero.overdue {
+    border-left-color: var(--warn);
+  }
+  .hero-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .hero-kind {
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  .hero h2 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+  .hero-meta {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+  }
+  .hero-meta strong {
+    color: var(--warn);
+    font-weight: 600;
+  }
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: none;
+  }
+  @media (max-width: 600px) {
+    .hero {
+      align-items: flex-start;
+      flex-direction: column;
+      padding: var(--space-4);
+    }
+    .hero-actions {
+      width: 100%;
+    }
+    .hero-actions .btn {
+      flex: 1;
+    }
+  }
   .focus-compact {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-4);
@@ -302,13 +418,28 @@
   }
   .focus-compact-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:2px; }
   .focus-compact-copy strong { font-size:var(--text-sm); font-weight:650; }
-  .focus-compact-copy span { overflow:hidden; color:var(--ink-3); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
+  .focus-compact-copy span { color:var(--ink-3); font-size:var(--text-xs); line-height:1.3; }
   .focus-compact-clock { color:var(--accent-strong); font-size:var(--text-lg); font-weight:650; }
-  .focus-compact-action { display:inline-flex; align-items:center; gap:4px; min-height:36px; padding:0 var(--space-2); border:0; border-radius:var(--radius-1); background:transparent; color:var(--accent-strong); font-size:var(--text-sm); font-weight:600; }
+  .focus-compact-action { display:inline-flex; align-items:center; gap:4px; min-height:40px; padding:0 var(--space-2); border:0; border-radius:var(--radius-1); background:transparent; color:var(--accent-strong); font-size:var(--text-sm); font-weight:600; }
   .focus-compact-action:hover { background:var(--accent-soft); }
+  .focus-compact-track {
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    overflow: hidden;
+    background: var(--rule);
+  }
+  .focus-compact-track span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform-origin: left center;
+    transition: transform 900ms linear;
+  }
   @media (max-width: 480px) {
     .focus-compact { gap:var(--space-2); padding-inline:var(--space-2); }
-    .focus-compact-copy span { max-width:18ch; }
     .focus-compact-clock { font-size:var(--text-base); }
     .focus-compact-action { font-size:var(--text-xs); }
   }
@@ -342,6 +473,7 @@
   }
   .exam-line:hover {
     border-color: var(--rule-strong);
+    border-left-color: var(--warn);
   }
   .exam-kind {
     display: inline-flex;
@@ -419,7 +551,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    min-height: 36px;
+    min-height: 44px;
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-1);
     color: var(--ink-2);

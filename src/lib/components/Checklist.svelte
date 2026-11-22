@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import { formatDate, relativeDayLabel } from '../data/dates.js';
 
@@ -8,6 +8,13 @@
 
   let newText = '';
   let adding = false;
+  let inputEl = null;
+
+  async function openAdd() {
+    adding = true;
+    await tick();
+    inputEl?.focus();
+  }
 
   function toggle(item) {
     dispatch('toggle', item);
@@ -54,6 +61,7 @@
       <input
         class="input"
         bind:value={newText}
+        bind:this={inputEl}
         placeholder="Neuer Punkt"
         aria-label="Neuer Checklisten-Punkt"
         on:keydown={(e) => {
@@ -67,7 +75,7 @@
       <button class="btn btn-primary btn-sm" type="button" on:click={add}>Hinzufügen</button>
     </div>
   {:else}
-    <button class="add-btn" type="button" on:click={() => (adding = true)}>
+    <button class="add-btn" type="button" on:click={openAdd}>
       <Icon name="plus" size={14} /> Punkt hinzufügen
     </button>
   {/if}

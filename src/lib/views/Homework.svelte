@@ -9,7 +9,7 @@
     deleteHomework,
     restoreEntity,
   } from '../stores/app.js';
-  import { todayKey, addDays, parseDateKey } from '../data/dates.js';
+  import { todayKey, addDays, parseDateKey, daysUntil } from '../data/dates.js';
   import {
     RECURRENCE_OPTIONS,
     recurrenceFromValue,
@@ -17,6 +17,7 @@
   } from '../data/recurrence.js';
   import { persistedStore } from '../stores/viewPrefs.js';
   import { toast } from '../stores/toast.js';
+  import { now as clockNow } from '../stores/clock.js';
   import HomeworkRow from '../components/HomeworkRow.svelte';
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
@@ -52,8 +53,35 @@
     ($filters.programId === 'all' || visibleModules.some((m) => m.id === hw.moduleId));
   $: open = $openHomework.filter(matchesFilter);
   $: done = $doneHomework.filter(matchesFilter);
+  $: dayNow = new Date($clockNow);
+  $: groups = groupOpen(open, dayNow);
   $: activeFilterCount =
     ($filters.programId !== 'all' ? 1 : 0) + ($filters.moduleId !== 'all' ? 1 : 0);
+
+  const GROUP_ORDER = [
+    { key: 'overdue', label: 'Überfällig' },
+    { key: 'today', label: 'Heute' },
+    { key: 'week', label: 'Diese Woche' },
+    { key: 'later', label: 'Später' },
+    { key: 'none', label: 'Ohne Datum' },
+  ];
+
+  function groupKey(hw, now) {
+    if (!hw.dueDate) return 'none';
+    const days = daysUntil(hw.dueDate, now);
+    if (days === null) return 'none';
+    if (days < 0) return 'overdue';
+    if (days === 0) return 'today';
+    if (days <= 7) return 'week';
+    return 'later';
+  }
+
+  function groupOpen(items, now) {
+    return GROUP_ORDER.map((group) => ({
+      ...group,
+      items: items.filter((hw) => groupKey(hw, now) === group.key),
+    })).filter((group) => group.items.length);
+  }
 
   /** Tomorrow, or the next weekday when tomorrow is a weekend. */
   function defaultDueDate() {
@@ -135,11 +163,11 @@
 <div class="page">
   <header class="page-head">
     <div>
-      <p class="eyebrow">Arbeit</p>
       <h1>Hausaufgaben</h1>
+      <p class="sub">Nach Fälligkeit gruppiert, Überfälliges zuerst.</p>
     </div>
     <div class="head-actions">
-      <span class="count mono">{open.length} offen</span>
+      <span class="count mono" aria-live="polite">{open.length} offen</span>
       <AiButton ref="hausaufgaben" prompt="Was ist zuerst dran? Gib mir eine ruhige Reihenfolge." />
     </div>
   </header>
@@ -148,7 +176,13 @@
     <div class="add-grid">
       <label class="field">
         <span class="field-label">Titel</span>
-        <input class="input title-input" bind:value={title} placeholder="z. B. Auftrag 4 lösen" aria-label="Titel der Hausaufgabe" />
+        <input
+          class="input title-input"
+          bind:value={title}
+          placeholder="z. B. Auftrag 4 lösen"
+          aria-label="Titel der Hausaufgabe"
+          autocomplete="off"
+        />
       </label>
       <label class="field">
         <span class="field-label">Fällig</span>
@@ -234,16 +268,39 @@
   </div>
 
   {#if open.length}
-    <section class="list card" aria-label="Offene Hausaufgaben">
-      {#each open as hw (hw.id)}
-        <HomeworkRow {hw} on:toggle={(e) => toggle(e.detail)} on:edit={(e) => startEdit(e.detail)} on:delete={(e) => remove(e.detail)} />
+    <div class="groups">
+      {#each groups as group (group.key)}
+        <section class="group" aria-labelledby={`homework-group-${group.key}`}>
+          <div class="group-head">
+            <h2
+              id={`homework-group-${group.key}`}
+              class="group-label"
+              class:urgent={group.key === 'overdue'}
+            >
+              {group.label}
+            </h2>
+            <span class="group-count mono">{group.items.length}</span>
+          </div>
+          <div class="list card">
+            {#each group.items as hw (hw.id)}
+              <HomeworkRow {hw} now={dayNow} on:toggle={(e) => toggle(e.detail)} on:edit={(e) => startEdit(e.detail)} on:delete={(e) => remove(e.detail)} />
+            {/each}
+          </div>
+        </section>
       {/each}
-    </section>
+    </div>
+  {:else if activeFilterCount}
+    <EmptyState
+      title="Keine Treffer"
+      text="Für diese Filter ist nichts offen."
+      actionLabel="Filter zurücksetzen"
+      action={resetFilters}
+    />
   {:else}
     <EmptyState
       title="Nichts offen"
       text="Neue Hausaufgaben erscheinen hier und auf Heute."
-      actionLabel="Feld oben nutzen"
+      actionLabel="Hausaufgabe erfassen"
       action={() => document.querySelector('.title-input')?.focus()}
     />
   {/if}
@@ -254,7 +311,7 @@
       {#if done.length}
         <div class="list card muted-list">
           {#each done as hw (hw.id)}
-            <HomeworkRow {hw} on:toggle={(e) => toggle(e.detail)} on:edit={(e) => startEdit(e.detail)} on:delete={(e) => remove(e.detail)} />
+            <HomeworkRow {hw} now={dayNow} on:toggle={(e) => toggle(e.detail)} on:edit={(e) => startEdit(e.detail)} on:delete={(e) => remove(e.detail)} />
           {/each}
         </div>
       {:else}
@@ -305,8 +362,8 @@
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
-    max-width: 880px;
+    gap: var(--space-5);
+    max-width: 960px;
   }
   .page-head {
     display: flex;
@@ -314,15 +371,14 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
-  .eyebrow {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: -0.005em;
-    color: var(--ink-2);
-  }
   h1 {
-    font-size: clamp(1.9rem, 4vw, 2.4rem);
-    letter-spacing: -0.03em;
+    font-size: clamp(1.9rem, 3.4vw, 2.4rem);
+    letter-spacing: -0.035em;
+  }
+  .sub {
+    margin-top: 2px;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
   }
   .count {
     font-size: var(--text-sm);
@@ -365,7 +421,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-height: 36px;
+    min-height: 40px;
     padding: 0 var(--space-2);
     border: 0;
     border-radius: var(--radius-1);
@@ -421,6 +477,31 @@
   .filters .select {
     width: auto;
     min-width: 150px;
+  }
+  .groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .group-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+    padding: 0 var(--space-1);
+  }
+  .group-label {
+    font-size: var(--text-xs);
+    font-weight: 650;
+    color: var(--ink-2);
+  }
+  .group-label.urgent {
+    color: var(--warn);
+  }
+  .group-count {
+    color: var(--ink-3);
+    font-size: 10px;
   }
   .list {
     overflow: hidden;

@@ -1,28 +1,36 @@
 <script>
   import { appState, createExam, updateExam, deleteExam, restoreEntity } from '../stores/app.js';
-  import { todayKey, formatDate, relativeDayLabel } from '../data/dates.js';
+  import { todayKey, formatDate, formatDayMonth, relativeDayLabel } from '../data/dates.js';
   import { toast } from '../stores/toast.js';
+  import { now as clockNow } from '../stores/clock.js';
+  import { hint } from '../actions/hint.js';
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Icon from '../components/Icon.svelte';
 
   let open = false;
   let editing = null;
+  let gradeError = '';
+  let gradeInput = null;
   let form = { title: '', moduleId: '', date: todayKey(), notes: '', grade: '', gradeNote: '' };
 
   $: modules = $appState.modules || [];
+  $: dayNow = new Date($clockNow);
+  $: today = todayKey(dayNow);
   $: exams = [...($appState.exams || [])].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-  $: upcoming = exams.filter((e) => e.date && e.date >= todayKey()).sort((a, b) => (a.date < b.date ? -1 : 1));
-  $: past = exams.filter((e) => !e.date || e.date < todayKey());
+  $: upcoming = exams.filter((e) => e.date && e.date >= today).sort((a, b) => (a.date < b.date ? -1 : 1));
+  $: past = exams.filter((e) => !e.date || e.date < today);
 
   function openCreate() {
     editing = null;
+    gradeError = '';
     form = { title: '', moduleId: '', date: todayKey(), notes: '', grade: '', gradeNote: '' };
     open = true;
   }
 
   function openEdit(exam) {
     editing = exam;
+    gradeError = '';
     form = {
       title: exam.title,
       moduleId: exam.moduleId || '',
@@ -37,9 +45,11 @@
   function save() {
     const gradeNumber = form.grade === '' ? null : Number(form.grade);
     if (gradeNumber !== null && (Number.isNaN(gradeNumber) || gradeNumber < 1 || gradeNumber > 6)) {
-      toast('Note muss zwischen 1 und 6 liegen.');
+      gradeError = 'Bitte eine Note zwischen 1 und 6 angeben.';
+      gradeInput?.focus();
       return;
     }
+    gradeError = '';
     const payload = {
       title: form.title.trim() || 'Prüfung',
       moduleId: form.moduleId || null,
@@ -86,37 +96,54 @@
 <div class="page">
   <header class="page-head">
     <div>
-      <p class="eyebrow">Termine</p>
       <h1>Prüfungen</h1>
+      <p class="sub">Termine im Blick behalten, Noten später ergänzen.</p>
     </div>
-    <button class="btn btn-primary" type="button" on:click={openCreate}><Icon name="plus" size={16} /> Prüfung</button>
+    <button class="btn btn-primary" type="button" on:click={openCreate}>
+      <Icon name="plus" size={16} /> Prüfung erfassen
+    </button>
   </header>
 
   <section aria-labelledby="upcoming-title">
     <div class="section-title">
       <h2 id="upcoming-title">Demnächst</h2>
-      <span class="count">{upcoming.length}</span>
+      <span class="count" aria-live="polite">{upcoming.length}</span>
     </div>
     {#if upcoming.length}
       <div class="card list">
         {#each upcoming as exam (exam.id)}
+          {@const dm = formatDayMonth(exam.date)}
           <div class="exam-row">
-            <span class="date-block">
-              <span class="day mono">{exam.date ? exam.date.slice(8, 10) : '–'}</span>
-              <span class="month mono">{exam.date ? exam.date.slice(5, 7) : ''}</span>
-            </span>
-            <button class="exam-main" type="button" on:click={() => openEdit(exam)}>
-              <span class="title">{exam.title}</span>
-              <span class="meta">
-                {#if exam.moduleId}
-                  {@const mod = modules.find((m) => m.id === exam.moduleId)}
-                  {#if mod}<span>{mod.code || mod.title}</span>{/if}
-                {/if}
-                <span>{formatDate(exam.date, 'short')}</span>
-                <span class="rel">{relativeDayLabel(exam.date)}</span>
+            <button
+              class="exam-open"
+              type="button"
+              on:click={() => openEdit(exam)}
+              use:hint={{ text: 'Bearbeiten' }}
+            >
+              <span class="date-block" aria-hidden="true">
+                <span class="day mono">{dm.day}</span>
+                <span class="month">{dm.month}</span>
+              </span>
+              <span class="exam-main">
+                <span class="title">{exam.title}</span>
+                <span class="meta">
+                  {#if exam.moduleId}
+                    {@const mod = modules.find((m) => m.id === exam.moduleId)}
+                    {#if mod}<span>{mod.code || mod.title}</span>{/if}
+                  {/if}
+                  <span class="rel">{relativeDayLabel(exam.date, dayNow)}</span>
+                </span>
               </span>
             </button>
-            <button class="icon" type="button" aria-label={`${exam.title} löschen`} on:click={() => remove(exam)}><Icon name="trash" size={15} /></button>
+            <button
+              class="icon delete"
+              type="button"
+              aria-label={`${exam.title} löschen`}
+              on:click={() => remove(exam)}
+              use:hint={{ text: 'Löschen' }}
+            >
+              <Icon name="trash" size={15} />
+            </button>
           </div>
         {/each}
       </div>
@@ -133,31 +160,52 @@
       </div>
       <div class="card list">
         {#each past as exam (exam.id)}
+          {@const dm = formatDayMonth(exam.date)}
           <div class="exam-row past">
-            <span class="date-block">
-              <span class="day mono">{exam.date ? exam.date.slice(8, 10) : '–'}</span>
-              <span class="month mono">{exam.date ? exam.date.slice(5, 7) : ''}</span>
-            </span>
-            <button class="exam-main" type="button" on:click={() => openEdit(exam)}>
-              <span class="title">{exam.title}</span>
-              <span class="meta">
-                <span class="past-badge">Vorbei</span>
-                <span>{exam.date ? formatDate(exam.date, 'short') : 'ohne Datum'}</span>
-                {#if exam.gradeNote}<span class="note">{exam.gradeNote}</span>{/if}
+            <button
+              class="exam-open"
+              type="button"
+              on:click={() => openEdit(exam)}
+              use:hint={{ text: 'Bearbeiten' }}
+            >
+              <span class="date-block" aria-hidden="true">
+                <span class="day mono">{dm.day}</span>
+                <span class="month">{dm.month}</span>
+              </span>
+              <span class="exam-main">
+                <span class="title">{exam.title}</span>
+                <span class="meta">
+                  {#if exam.moduleId}
+                    {@const mod = modules.find((m) => m.id === exam.moduleId)}
+                    {#if mod}<span>{mod.code || mod.title}</span>{/if}
+                  {/if}
+                  <span>{exam.date ? formatDate(exam.date, 'short') : 'ohne Datum'}</span>
+                  {#if exam.gradeNote}<span class="note">{exam.gradeNote}</span>{/if}
+                </span>
               </span>
             </button>
             {#if typeof exam.grade === 'number'}
-              <span class="grade-block" title={`Note ${gradeLabel(exam.grade)} von 6`}>
+              <span class="grade-block">
                 <span class="grade mono">{gradeLabel(exam.grade)}</span>
                 <span class="grade-scale" aria-hidden="true">
+                  <span class="scale-end">1</span>
                   {#each [1, 2, 3, 4, 5, 6] as i (i)}
                     <span class="grade-seg {gradeState(exam.grade, i)}"></span>
                   {/each}
+                  <span class="scale-end">6</span>
                 </span>
                 <span class="sr-only">Note {gradeLabel(exam.grade)} von 6</span>
               </span>
             {/if}
-            <button class="icon" type="button" aria-label={`${exam.title} löschen`} on:click={() => remove(exam)}><Icon name="trash" size={15} /></button>
+            <button
+              class="icon delete"
+              type="button"
+              aria-label={`${exam.title} löschen`}
+              on:click={() => remove(exam)}
+              use:hint={{ text: 'Löschen' }}
+            >
+              <Icon name="trash" size={15} />
+            </button>
           </div>
         {/each}
       </div>
@@ -167,7 +215,7 @@
 
 <Modal open={open} title={editing ? 'Prüfung bearbeiten' : 'Neue Prüfung'} on:close={() => (open = false)}>
   <div class="stack">
-    <label class="field"><span>Titel</span><input class="input" bind:value={form.title} data-autofocus placeholder="z. B. Prüfung M294" /></label>
+    <label class="field"><span>Titel</span><input class="input" bind:value={form.title} data-autofocus placeholder="z. B. Prüfung M294" autocomplete="off" /></label>
     <div class="two">
       <label class="field">
         <span>Modul</span>
@@ -182,7 +230,23 @@
     <div class="two">
       <label class="field">
         <span>Note (1–6, halbe Schritte)</span>
-        <input class="input" type="number" min="1" max="6" step="0.5" bind:value={form.grade} />
+        <input
+          class="input"
+          class:invalid={!!gradeError}
+          type="number"
+          min="1"
+          max="6"
+          step="0.5"
+          inputmode="decimal"
+          bind:value={form.grade}
+          bind:this={gradeInput}
+          aria-invalid={!!gradeError}
+          aria-describedby={gradeError ? 'exam-grade-error' : undefined}
+          on:input={() => (gradeError = '')}
+        />
+        {#if gradeError}
+          <span class="field-error" id="exam-grade-error" role="alert">{gradeError}</span>
+        {/if}
       </label>
       <label class="field"><span>Notiz zur Note</span><input class="input" bind:value={form.gradeNote} /></label>
     </div>
@@ -198,7 +262,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
-    max-width: 900px;
+    max-width: 960px;
   }
   .page-head {
     display: flex;
@@ -206,15 +270,14 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
-  .eyebrow {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: -0.005em;
-    color: var(--ink-2);
-  }
   h1 {
-    font-size: clamp(1.9rem, 4vw, 2.4rem);
-    letter-spacing: -0.03em;
+    font-size: clamp(1.9rem, 3.4vw, 2.4rem);
+    letter-spacing: -0.035em;
+  }
+  .sub {
+    margin-top: 2px;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
   }
   .count {
     font-family: var(--font-mono);
@@ -245,13 +308,13 @@
   .exam-row.past .month {
     color: var(--ink-3);
   }
-  .past-badge {
-    padding: 1px var(--space-2);
-    border-radius: var(--radius-pill);
-    background: var(--surface-2);
-    color: var(--ink-2);
-    font-size: 10px;
-    font-weight: 650;
+  .field-error {
+    margin-top: 2px;
+    color: var(--danger);
+    font-size: var(--text-xs);
+  }
+  .input.invalid {
+    border-color: var(--danger);
   }
   .date-block {
     display: flex;
@@ -263,6 +326,8 @@
     flex: none;
     border-radius: var(--radius-1);
     background: var(--tint-exams);
+    color: var(--ink-2);
+    font-size: var(--text-xs);
   }
   .day {
     font-size: var(--text-base);
@@ -272,6 +337,30 @@
   .month {
     font-size: 9px;
     color: var(--ink-3);
+  }
+  .exam-row {
+    position: relative;
+    cursor: pointer;
+  }
+  .exam-open {
+    position: relative;
+    width: 100%;
+    min-height: 64px;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-2);
+    background: transparent;
+    border: 0;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .exam-row:hover .exam-open {
+    background: var(--surface-2);
+  }
+  .exam-open:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 2px;
   }
   .exam-main {
     display: flex;
@@ -283,7 +372,7 @@
     border: 0;
     background: transparent;
     text-align: left;
-    padding: var(--space-1) 0;
+    padding: 0;
   }
   .title {
     font-size: var(--text-sm);
@@ -314,12 +403,26 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     flex: none;
   }
   .grade-scale {
     display: flex;
+    align-items: center;
     gap: 3px;
+  }
+  .scale-end {
+    color: var(--ink-3);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+  .grade {
+    padding: 2px var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--ok-soft);
+    color: var(--ok);
+    font-weight: 700;
   }
   .grade-seg {
     width: 8px;
@@ -362,7 +465,17 @@
   }
   @media (pointer: coarse) {
     .icon {
+      min-width: 44px;
+      min-height: 44px;
       opacity: 1;
+    }
+    .exam-open {
+      min-height: 72px;
+    }
+  }
+  @media (max-width: 560px) {
+    .two {
+      grid-template-columns: 1fr;
     }
   }
 </style>

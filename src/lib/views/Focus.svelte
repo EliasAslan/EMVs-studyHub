@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import {
     subscribePomodoro,
     startPomodoro,
@@ -23,6 +23,7 @@
   import { toast } from '../stores/toast.js';
   import Icon from '../components/Icon.svelte';
   import PomodoroStats from '../components/PomodoroStats.svelte';
+  import { hint } from '../actions/hint.js';
 
   const presets = [15, 25, 45];
 
@@ -30,13 +31,13 @@
   let prefs = { sound: true, notificationsAsked: false };
   let minutes = POMODORO_DEFAULTS.workMinutes;
   let custom = '';
-  let tick = 0;
+  let engineTick = 0;
   let now = Date.now();
   let focusMode = false;
-  let edgeNavVisible = false;
-  let edgeTimer = null;
-  let fullscreenActive = false;
   let pageRoot = null;
+  let timerCard = null;
+  let focusToggle = null;
+  let previousOverflow = '';
 
   onMount(() => {
     prefs = getPomodoroPrefs();
@@ -45,23 +46,27 @@
     const unsubscribe = subscribePomodoro((detail) => {
       state = detail.state;
       prefs = detail.prefs;
-      if (detail.reason === 'tick') tick += 1;
+      if (detail.reason === 'tick') engineTick += 1;
     });
-    const onFullscreen = () => { fullscreenActive = !!document.fullscreenElement; };
-    const onPointerMove = (event) => {
-      if (!focusMode) return;
-      if (event.clientX <= 18) revealEdgeNav();
-      else if (event.clientX > 220) scheduleEdgeHide();
+    const onFullscreen = () => {
+      // Leaving fullscreen (Esc or the browser UI) must also leave focus mode.
+      if (!document.fullscreenElement && focusMode) setFocusMode(false);
+    };
+    const onKeydown = (event) => {
+      if (event.key === 'Escape' && focusMode) {
+        event.preventDefault();
+        setFocusMode(false);
+      }
     };
     document.addEventListener('fullscreenchange', onFullscreen);
-    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('keydown', onKeydown);
     return () => {
       unsubscribe();
       document.removeEventListener('fullscreenchange', onFullscreen);
-      window.removeEventListener('pointermove', onPointerMove);
-      clearTimeout(edgeTimer);
+      window.removeEventListener('keydown', onKeydown);
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-      document.body.classList.remove('pomodoro-immersive', 'pomodoro-nav-visible');
+      document.body.classList.remove('pomodoro-immersive');
+      document.body.style.overflow = previousOverflow;
     };
   });
 
@@ -71,7 +76,7 @@
   $: breakDone = state?.status === STATUS.breakDone;
   $: isWork = state?.phase === PHASE.work;
   $: recommended = state ? recommendedBreakType(state) : 'short';
-  $: if (tick >= 0) now = Date.now();
+  $: if (engineTick >= 0) now = Date.now();
   $: clock = state ? formatClock(remainingMs(state, now)) : formatClock(minutes * 60000);
   $: progress = state ? progressPct(state, now) : 0;
   $: label = state ? phaseLabel(state) : 'Bereit';
@@ -84,35 +89,28 @@
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   async function setFocusMode(enabled) {
+    if (enabled === focusMode) return;
     focusMode = enabled;
-    edgeNavVisible = false;
     document.body.classList.toggle('pomodoro-immersive', enabled);
-    document.body.classList.remove('pomodoro-nav-visible');
+
     if (enabled) {
+      previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
       try {
         await document.documentElement.requestFullscreen?.();
-        fullscreenActive = !!document.fullscreenElement;
       } catch {
-        fullscreenActive = false;
+        // Fullscreen can be blocked; the overlay still works without it.
       }
-    } else if (document.fullscreenElement) {
-      await document.exitFullscreen?.().catch(() => {});
+      await tick();
+      timerCard?.focus?.();
+    } else {
+      document.body.style.overflow = previousOverflow;
+      if (document.fullscreenElement) {
+        await document.exitFullscreen?.().catch(() => {});
+      }
+      await tick();
+      focusToggle?.focus?.();
     }
-  }
-
-  function revealEdgeNav() {
-    if (!focusMode) return;
-    clearTimeout(edgeTimer);
-    edgeNavVisible = true;
-    document.body.classList.add('pomodoro-nav-visible');
-  }
-
-  function scheduleEdgeHide() {
-    clearTimeout(edgeTimer);
-    edgeTimer = setTimeout(() => {
-      edgeNavVisible = false;
-      document.body.classList.remove('pomodoro-nav-visible');
-    }, 700);
   }
 
   function start() {
@@ -132,6 +130,7 @@
   }
 
   function stop() {
+    if (focusMode) setFocusMode(false);
     dismissPomodoro();
     toast('Timer beendet');
   }
@@ -161,25 +160,36 @@
   }
 </script>
 
-<div class="focus-page" class:focus-mode={focusMode} class:edge-visible={edgeNavVisible} bind:this={pageRoot}>
+<div class="focus-page" class:focus-mode={focusMode} bind:this={pageRoot}>
   {#if focusMode}
-    <div class="edge-trigger" aria-hidden="true" on:mouseenter={revealEdgeNav} on:mousemove={revealEdgeNav}></div>
-    <button class="focus-exit" type="button" on:click={() => setFocusMode(false)} on:mouseenter={revealEdgeNav} title="Fokusmodus beenden">Beenden</button>
+    <button
+      class="focus-exit"
+      type="button"
+      on:click={() => setFocusMode(false)}
+      use:hint={{ text: 'Fokusmodus beenden', shortcut: 'Esc' }}
+      aria-label="Fokusmodus beenden"
+    >
+      <Icon name="x" size={16} /> Beenden
+    </button>
   {/if}
   <header class="focus-head">
     <div>
-      <p class="eyebrow">STUDY HUB · POMODORO</p>
       <h1>Fokus</h1>
       <p class="focus-intro">Arbeite in klaren Intervallen. Pausen und dein Verlauf bleiben automatisch gespeichert.</p>
     </div>
-    {#if state}
-      <button class="btn btn-ghost focus-toggle" type="button" aria-pressed={focusMode} on:click={() => setFocusMode(!focusMode)} title="Timer im Vollbild anzeigen">
-        <Icon name={focusMode ? 'x' : 'focus'} size={16} /> {focusMode ? 'Ansicht verlassen' : 'Vollbild'}
-      </button>
-    {/if}
+    <button
+      class="btn btn-ghost focus-toggle"
+      type="button"
+      aria-pressed={focusMode}
+      on:click={() => setFocusMode(!focusMode)}
+      bind:this={focusToggle}
+      use:hint={{ text: focusMode ? 'Fokusmodus beenden' : 'Fokusmodus starten', shortcut: 'Esc' }}
+    >
+      <Icon name={focusMode ? 'x' : 'focus'} size={16} /> {focusMode ? 'Ansicht verlassen' : 'Vollbild'}
+    </button>
   </header>
 
-  <section class="timer-card" class:is-break={state && !isWork} aria-label="Fokus-Timer">
+  <section class="timer-card" class:is-break={state && !isWork} aria-label="Fokus-Timer" tabindex="-1" bind:this={timerCard}>
     <div class="status-row">
       <span class="phase">{label}</span>
       {#if round}<span class="round mono">{round}</span>{/if}
@@ -297,7 +307,7 @@
 
   <section class="prefs card" aria-labelledby="prefs-title">
     <div class="prefs-head">
-      <div><p class="eyebrow">PERSÖNLICH</p><h2 id="prefs-title">Timer-Einstellungen</h2></div>
+      <div><h2 id="prefs-title">Timer-Einstellungen</h2></div>
       <p class="prefs-subtitle">Passe den Klang, Hinweise und deinen Lernverlauf an.</p>
     </div>
     <label class="pref-row check-row">
@@ -339,37 +349,51 @@
     max-width: 720px;
     margin: 0 auto;
   }
-   .focus-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-4); text-align:left; }
-   :global(body.pomodoro-immersive .mobile-head), :global(body.pomodoro-immersive .tabbar), :global(body.pomodoro-immersive .fab) { visibility:hidden; }
+  .focus-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-4); text-align:left; }
+  :global(body.pomodoro-immersive .mobile-head), :global(body.pomodoro-immersive .tabbar), :global(body.pomodoro-immersive .fab) { visibility:hidden; }
   :global(body.pomodoro-immersive #main) { width:100%; max-width:none; height:100dvh; padding:0; }
   :global(body.pomodoro-immersive .toasts), :global(body.pomodoro-immersive .fab-menu), :global(body.pomodoro-immersive .fab-scrim) { display:none !important; }
   :global(body.pomodoro-immersive .scrim) { display:none !important; }
-  :global(body.pomodoro-immersive #app-sidebar) { z-index:1004; visibility:visible; transform:translateX(-100%); transition:transform 160ms ease-out; }
-   :global(body.pomodoro-nav-visible #app-sidebar) { transform:translateX(0); }
+  :global(body.pomodoro-immersive #app-sidebar) { display:none; }
 
-  .eyebrow { margin-bottom:var(--space-1); color:var(--accent-strong); font-size:10px; font-weight:800; letter-spacing:.13em; }
   .focus-intro { margin-top:var(--space-2); max-width:52ch; color:var(--ink-2); font-size:var(--text-sm); }
   .focus-toggle { flex:none; }
   .focus-mode .focus-head, .focus-mode .prefs, .focus-mode :global(.pomodoro-stats) { display:none; }
   .focus-mode {
     position:fixed; inset:0; z-index:1000; width:100vw; height:100dvh; max-width:none;
-    margin:0; padding:0; justify-content:center; gap:0; overflow:auto;
+    margin:0;
+    padding:
+      max(64px, calc(env(safe-area-inset-top, 0px) + 48px))
+      max(16px, env(safe-area-inset-right, 0px))
+      max(24px, env(safe-area-inset-bottom, 0px))
+      max(16px, env(safe-area-inset-left, 0px));
+    overflow:auto; overscroll-behavior:contain;
     background:var(--bg); color:var(--ink);
   }
   .focus-mode .timer-card {
-    width:min(100vw, 960px); min-height:100dvh; justify-content:center;
-    border:0; border-radius:0; box-shadow:none; background:var(--bg);
+    width:min(100%, 860px); min-height:0; margin:auto;
+    border:0; border-radius:0; box-shadow:none; background:transparent;
   }
-  .focus-mode .ring-wrap { width:min(48vh, 420px, 74vw); }
-  .focus-mode .clock { font-size:clamp(4rem, 12vw, 8rem); }
+  .focus-mode .timer-card:focus { outline:none; }
+  .focus-mode .ring-wrap { width:min(44vh, 400px, 72vw); }
+  .focus-mode .clock { font-size:clamp(3.5rem, 10vw, 7rem); }
+  .focus-mode .hint, .focus-mode .remaining-label { display:none; }
   .focus-mode .timer-context, .focus-mode .actions, .focus-mode .breaks, .focus-mode .duration { z-index:1; }
-  .edge-trigger { position:fixed; inset:0 auto 0 0; z-index:1002; width:18px; }
   .focus-exit {
-    position:fixed; top:var(--space-4); right:var(--space-4); z-index:1005;
-    padding:var(--space-2) var(--space-3); border:0; background:transparent;
-    color:var(--ink-3); opacity:0; transition:opacity 140ms ease-out; cursor:pointer;
+    position:fixed;
+    top:max(16px, env(safe-area-inset-top, 0px));
+    right:max(16px, env(safe-area-inset-right, 0px));
+    z-index:1005;
+    display:inline-flex; align-items:center; gap:6px;
+    min-height:40px; padding:var(--space-2) var(--space-3);
+    border:1px solid var(--rule); border-radius:var(--radius-2);
+    background:var(--surface); color:var(--ink-2);
+    box-shadow:var(--shadow-1);
+    opacity:.7;
+    transition:opacity var(--motion), background var(--motion), color var(--motion);
   }
-  .focus-mode.edge-visible .focus-exit, .focus-mode .focus-exit:focus-visible { opacity:1; }
+  .focus-exit:hover, .focus-exit:focus-visible { opacity:1; color:var(--ink); background:var(--surface-2); }
+  @media (pointer: coarse) { .focus-exit { opacity:1; } }
 
   h1 {
     font-family: var(--font-read);
@@ -384,12 +408,12 @@
     gap: var(--space-4);
     padding: clamp(var(--space-5), 6vw, var(--space-7));
     border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--rule));
-    border-radius: 20px;
-    background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 56%), var(--surface);
+    border-radius: var(--radius-3);
+    background: var(--surface);
     box-shadow: var(--shadow-1);
   }
   .timer-card.is-break {
-    background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--ok) 8%, transparent), transparent 56%), var(--surface);
+    border-color: color-mix(in srgb, var(--ok) 30%, var(--rule));
   }
   .status-row {
     display: flex;
@@ -538,6 +562,14 @@
     .ring-wrap {
       width: 300px;
     }
+  }
+  @media (max-height: 620px) {
+    .focus-mode {
+      padding-top: max(56px, calc(env(safe-area-inset-top, 0px) + 40px));
+    }
+    .focus-mode .ring-wrap { width: min(36vh, 300px, 64vw); }
+    .focus-mode .clock { font-size: clamp(2.8rem, 8vw, 5rem); }
+    .focus-mode .timer-card { gap: var(--space-3); }
   }
   @media (prefers-reduced-motion: reduce) {
     .ring-progress {

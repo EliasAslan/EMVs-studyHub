@@ -2,7 +2,7 @@
  * Daily checklist derivation. Pure and DOM-free.
  *
  * Rules (Part 4):
- * - all unfinished homework appears automatically, sorted by due date
+ * - homework due today or overdue appears automatically, sorted by due date
  * - custom items are always visible
  * - "studiert heute" is a per-day item
  * - checked state is per-day and resets on the next day
@@ -24,7 +24,7 @@ export function checklistForDay(state, now = new Date()) {
   const checked = checkedForDay(state, now);
 
   const homework = (state.homework || [])
-    .filter((h) => !h.done)
+    .filter((h) => !h.done && h.dueDate && h.dueDate <= today)
     .sort((a, b) => {
       const ad = a.dueDate || '9999-12-31';
       const bd = b.dueDate || '9999-12-31';

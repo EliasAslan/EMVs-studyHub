@@ -9,9 +9,23 @@ const BASE_URL = 'http://127.0.0.1:5173';
 
 test.describe('Study Hub v2 — Core Flows', () => {
   test('Heute answers "what now?" with one clear start action', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'studyhub_v1',
+        JSON.stringify({
+          schemaVersion: 1,
+          homework: [
+            { id: 'hw-1', moduleId: null, topicId: null, title: 'Aufgabe 3 lösen', dueDate: '2026-11-20', done: false, recurrence: null },
+          ],
+          exams: [],
+          checklistItems: [{ id: 'studied', text: 'studiert heute', kind: 'studied', order: 0 }],
+          checklist: { date: null, checked: {} },
+        }),
+      );
+    });
     await page.goto(BASE_URL);
     await expect(page).toHaveTitle(/Study Hub/);
-    await expect(page.locator('#due-title')).toBeVisible();
+    await expect(page.locator('#hero-title')).toBeVisible();
     await expect(page.locator('#checklist-title')).toBeVisible();
   });
 
@@ -60,7 +74,7 @@ test.describe('Study Hub v2 — Core Flows', () => {
 
   test('Create exam with Swiss grade 1–6 in .5 steps', async ({ page }) => {
     await page.goto(`${BASE_URL}/#/exams`);
-    await page.getByRole('button', { name: 'Prüfung', exact: true }).click();
+    await page.locator('.page-head').getByRole('button', { name: 'Prüfung erfassen' }).click();
     await page.getByPlaceholder('z. B. Prüfung M294').fill('Prüfung M294');
     await page.getByLabel('Datum').fill('2026-11-12');
     await page.getByLabel('Note (1–6, halbe Schritte)').fill('5.5');
@@ -83,9 +97,51 @@ test.describe('Study Hub v2 — Core Flows', () => {
     await expect(page.locator('text=Fokus starten')).toBeVisible();
     await expect(page.locator('#pomodoro-stats-title')).toBeVisible();
     await page.getByRole('button', { name: 'Fokus starten' }).click();
-    await expect(page.locator('text=Läuft')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: 'Pausieren' })).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: 'Pausieren' }).click();
-    await expect(page.locator('text=Pausiert')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fortsetzen' })).toBeVisible();
+  });
+
+  test.describe('Focus mode', () => {
+    test('entering focus mode hides sidebar and shows persistent exit', async ({ page }) => {
+      await page.goto(`${BASE_URL}/#/focus`);
+      const sidebar = page.locator('#app-sidebar');
+      await expect(sidebar).toBeVisible();
+
+      await page.getByRole('button', { name: 'Vollbild' }).click();
+
+      await expect(page.getByRole('button', { name: 'Fokusmodus beenden' })).toBeVisible();
+      await expect(page.locator('.focus-exit')).toBeVisible();
+      await expect(sidebar).toBeHidden();
+    });
+
+    test('Esc exits focus mode', async ({ page }) => {
+      await page.goto(`${BASE_URL}/#/focus`);
+      await page.getByRole('button', { name: 'Vollbild' }).click();
+      await expect(page.getByRole('button', { name: 'Fokusmodus beenden' })).toBeVisible();
+
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('button', { name: 'Vollbild' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Fokusmodus beenden' })).toHaveCount(0);
+    });
+
+    test('exit button leaves focus mode', async ({ page }) => {
+      await page.goto(`${BASE_URL}/#/focus`);
+      await page.getByRole('button', { name: 'Vollbild' }).click();
+      await expect(page.getByRole('button', { name: 'Fokusmodus beenden' })).toBeVisible();
+
+      await page.getByRole('button', { name: 'Fokusmodus beenden' }).click();
+      await expect(page.getByRole('button', { name: 'Vollbild' })).toBeVisible();
+    });
+
+    test('stop leaves focus mode', async ({ page }) => {
+      await page.goto(`${BASE_URL}/#/focus`);
+      await page.getByRole('button', { name: 'Vollbild' }).click();
+      await page.getByRole('button', { name: 'Fokus starten' }).click();
+      await expect(page.locator('.timer-card')).toBeVisible();
+      await page.getByRole('button', { name: 'Beenden', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Vollbild' })).toBeVisible();
+    });
   });
 
   test('Collapsing the sidebar footer keeps Settings available', async ({ page }) => {
@@ -121,9 +177,15 @@ test.describe('Study Hub v2 — Core Flows', () => {
   });
 
   test('Settings: cloud section renders', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'studyhub_ai_v1',
+        JSON.stringify({ enabled: true, baseUrl: 'https://ai.example.com', model: 'qwen3:8b', numCtx: 8192 }),
+      );
+    });
     await page.goto(`${BASE_URL}/#/settings`);
     await expect(page.locator('#sync-title')).toHaveText('Cloud');
-    await expect(page.locator('text=Gerät ist Hauptquelle')).toBeVisible();
+    await expect(page.locator('text=Daten gehen an dieses Gerät im Netzwerk')).toBeVisible();
   });
 
   test('Fullscreen toggle is not part of the shell', async ({ page }) => {

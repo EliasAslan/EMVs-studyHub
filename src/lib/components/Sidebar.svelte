@@ -5,6 +5,7 @@
   import { route, navigate, modulePath } from '../router.js';
   import { persistedStore } from '../stores/viewPrefs.js';
   import Icon from './Icon.svelte';
+  import { hint } from '../actions/hint.js';
 
   /** Drawer visibility on small screens. Ignored on desktop. */
   export let open = false;
@@ -179,7 +180,7 @@
   {/if}
 
   <nav class="nav-scroll" bind:this={navEl} aria-label="Seiten" use:closeDrawerOnNavigation>
-    <a class="nav-link" class:active={$route.name === 'today'} href="#/" aria-current={$route.name === 'today' ? 'page' : undefined} title={compact ? 'Heute' : undefined}>
+    <a class="nav-link" class:active={$route.name === 'today'} href="#/" aria-current={$route.name === 'today' ? 'page' : undefined} use:hint={compact ? { text: 'Heute' } : undefined}>
       <Icon name="today" />
       {#if !compact}<span>Heute</span>{/if}
     </a>
@@ -205,7 +206,7 @@
           class:active={$route.name === 'module' && $route.id === mod.id}
           href="#{modulePath(mod.id)}"
           aria-current={$route.name === 'module' && $route.id === mod.id ? 'page' : undefined}
-          title={compact ? moduleTitle(mod) : undefined}
+          use:hint={compact ? { text: moduleTitle(mod) } : undefined}
         >
           {#if compact}
             <span class="rail-code">{mod.code || mod.title?.slice(0, 2)}</span>
@@ -218,7 +219,7 @@
       {/each}
 
       {#if programModules.length === 0}
-        <a class="nav-link module-empty" href="#/modules" title={compact ? 'Modul erstellen' : undefined}>
+        <a class="nav-link module-empty" href="#/modules" use:hint={compact ? { text: 'Modul erstellen' } : undefined}>
           <Icon name="plus" size={16} />
           {#if !compact}<span>Modul erstellen</span>{/if}
         </a>
@@ -228,32 +229,32 @@
           <Icon name="chevronRight" size={14} />
         </a>
       {:else}
-        <a class="nav-link module-link rail-all" href="#/modules" title="Alle Module" aria-label="Alle Module">
+        <a class="nav-link module-link rail-all" href="#/modules" aria-label="Alle Module" use:hint={{ text: 'Alle Module' }}>
           <Icon name="modules" size={16} />
         </a>
       {/if}
     {/if}
 
     {#if !compact}<p class="group-label">Arbeit</p>{/if}
-    <a class="nav-link" class:active={$route.name === 'homework'} href="#/homework" aria-current={$route.name === 'homework' ? 'page' : undefined}>
+    <a class="nav-link" class:active={$route.name === 'homework'} href="#/homework" aria-current={$route.name === 'homework' ? 'page' : undefined} use:hint={compact ? { text: 'Hausaufgaben' } : undefined}>
       <Icon name="homework" />
       {#if !compact}<span>Hausaufgaben</span>{/if}
       {#if openCount > 0}<span class="nav-count" aria-label={`${openCount} offen`}>{openCount}</span>{/if}
     </a>
-    <a class="nav-link" class:active={$route.name === 'exams'} href="#/exams" aria-current={$route.name === 'exams' ? 'page' : undefined}>
+    <a class="nav-link" class:active={$route.name === 'exams'} href="#/exams" aria-current={$route.name === 'exams' ? 'page' : undefined} use:hint={compact ? { text: 'Prüfungen' } : undefined}>
       <Icon name="exams" />
       {#if !compact}<span>Prüfungen</span>{/if}
     </a>
-    <a class="nav-link" class:active={$route.name === 'notes' || $route.name === 'note'} href="#/notes" aria-current={$route.name === 'notes' || $route.name === 'note' ? 'page' : undefined}>
+    <a class="nav-link" class:active={$route.name === 'notes' || $route.name === 'note'} href="#/notes" aria-current={$route.name === 'notes' || $route.name === 'note' ? 'page' : undefined} use:hint={compact ? { text: 'Notizen' } : undefined}>
       <Icon name="notes" />
       {#if !compact}<span>Notizen</span>{/if}
     </a>
-    <a class="nav-link" class:active={$route.name === 'calendar'} href="#/calendar" aria-current={$route.name === 'calendar' ? 'page' : undefined}>
+    <a class="nav-link" class:active={$route.name === 'calendar'} href="#/calendar" aria-current={$route.name === 'calendar' ? 'page' : undefined} use:hint={compact ? { text: 'Kalender' } : undefined}>
       <Icon name="calendar" />
       {#if !compact}<span>Kalender</span>{/if}
     </a>
     {#if $aiReady}
-      <a class="nav-link" class:active={$route.name === 'assistant'} href="#/assistant" aria-current={$route.name === 'assistant' ? 'page' : undefined} title={compact ? 'Assistent' : undefined}>
+      <a class="nav-link" class:active={$route.name === 'assistant'} href="#/assistant" aria-current={$route.name === 'assistant' ? 'page' : undefined} use:hint={compact ? { text: 'Assistent' } : undefined}>
         <Icon name="sparkle" />
         {#if !compact}<span>Assistent</span>{/if}
       </a>
@@ -274,11 +275,11 @@
     </button>
     <div class="foot-clip" inert={footCollapsed}>
       <div class="foot" id="sidebar-foot" use:closeDrawerOnNavigation>
-        <a class="nav-link" class:active={$route.name === 'links'} href="#/links" aria-current={$route.name === 'links' ? 'page' : undefined} title={compact ? 'Links' : undefined}>
+        <a class="nav-link" class:active={$route.name === 'links'} href="#/links" aria-current={$route.name === 'links' ? 'page' : undefined} use:hint={compact ? { text: 'Links' } : undefined}>
           <Icon name="links" />
           {#if !compact}<span>Links</span>{/if}
         </a>
-        <a class="nav-link" class:active={$route.name === 'focus'} href="#/focus" aria-current={$route.name === 'focus' ? 'page' : undefined} title={compact ? 'Fokus' : undefined}>
+        <a class="nav-link" class:active={$route.name === 'focus'} href="#/focus" aria-current={$route.name === 'focus' ? 'page' : undefined} use:hint={compact ? { text: 'Fokus' } : undefined}>
           <Icon name="focus" />
           {#if !compact}<span>Fokus</span>{/if}
         </a>
@@ -290,7 +291,7 @@
     class:active={$route.name === 'settings'}
     href="#/settings"
     aria-current={$route.name === 'settings' ? 'page' : undefined}
-    title={compact ? 'Einstellungen' : undefined}
+    use:hint={compact ? { text: 'Einstellungen' } : undefined}
     use:closeDrawerOnNavigation
   >
     <Icon name="settings" />

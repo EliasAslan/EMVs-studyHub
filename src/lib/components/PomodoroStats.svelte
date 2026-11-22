@@ -30,8 +30,9 @@
   $: week = getLastWeekSessions(history);
   $: todayStats = summarizeSessions(today);
   $: weekStats = summarizeSessions(week);
-  $: recent = week.slice(0, visibleCount);
-  $: hasOlder = week.length > visibleCount;
+  $: recentSource = week.length ? week : sessions;
+  $: recent = recentSource.slice(0, visibleCount);
+  $: hasOlder = recentSource.length > visibleCount;
 
   function phaseName(session) {
     if (session.phase === 'work') return 'Fokus';
@@ -65,7 +66,7 @@
   }
 </script>
 
-<section class="stats card" aria-labelledby="pomodoro-stats-title">
+<section class="stats card pomodoro-stats" aria-labelledby="pomodoro-stats-title">
   <div class="stats-head">
     <h2 id="pomodoro-stats-title">Verlauf</h2>
     {#if sessions.length}
@@ -88,12 +89,14 @@
     </div>
   </div>
 
-  {#if week.length}
-    <p class="week-line">
-      Letzte 7 Tage: <strong>{weekStats.workRounds}</strong>
-      {weekStats.workRounds === 1 ? 'Runde' : 'Runden'} ·
-      <strong>{weekStats.focusMinutes}</strong> Min Fokus
-    </p>
+  {#if recent.length}
+    {#if week.length}
+      <p class="week-line">
+        Letzte 7 Tage: <strong>{weekStats.workRounds}</strong>
+        {weekStats.workRounds === 1 ? 'Runde' : 'Runden'} ·
+        <strong>{weekStats.focusMinutes}</strong> Min Fokus
+      </p>
+    {/if}
 
     <ul class="session-list">
       {#each recent as session (session.id)}
