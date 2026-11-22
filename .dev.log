@@ -304,3 +304,6 @@ https://svelte.dev/e/css_unused_selector
 13:56:22 [vite-plugin-svelte] src/lib/views/Settings.svelte:2185:2 Unused CSS selector ".auth-note"
 https://svelte.dev/e/css_unused_selector
 [2m13:56:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/views/Settings.svelte, /src/lib/views/Settings.svelte?svelte&type=style&lang.css[22m
+[2m13:56:37[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/Shell.svelte, /src/lib/views/Settings.svelte[22m
+[2m13:56:37[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte, /src/lib/components/Shell.svelte, /src/lib/views/Settings.svelte, /src/lib/components/Sidebar.svelte, /src/lib/components/Palette.svelte, /src/lib/components/QuickCapture.svelte[22m
+[2m13:56:37[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.svelte, /src/lib/components/Shell.svelte, /src/lib/views/Settings.svelte, /src/lib/components/Sidebar.svelte, /src/lib/components/Palette.svelte, /src/lib/components/QuickCapture.svelte[22m
