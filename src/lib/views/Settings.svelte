@@ -48,6 +48,8 @@ import { preferences, apply } from '../services/appearance.js';
 
   let lessonEditing = null;
   let lessonDay = 1;
+  // ---- Tab state ----
+  let activeTab = 'appearance'; // appearance | home | behaviour
   let lessonStart = '08:00';
   let lessonEnd = '09:00';
   let lessonModule = '';
@@ -498,6 +500,31 @@ import { preferences, apply } from '../services/appearance.js';
   }
 </script>
 
+
+  <!-- Tab navigation -->
+  <nav class="settings-tabs" aria-label="Einstellungsbereiche">
+    <button
+      class:active={activeTab === 'appearance'}
+      type="button"
+      on:click={() => (activeTab = 'appearance')}
+    >
+      <Icon name="palette" size={16} /> Erscheinungsbild
+    </button>
+    <button
+      class:active={activeTab === 'home'}
+      type="button"
+      on:click={() => (activeTab = 'home')}
+    >
+      <Icon name="today" size={16} /> Heute
+    </button>
+    <button
+      class:active={activeTab === 'behaviour'}
+      type="button"
+      on:click={() => (activeTab = 'behaviour')}
+    >
+      <Icon name="cog" size={16} /> Verhalten
+    </button>
+  </nav>
 <div class="page">
   <header class="page-head">
     <div>

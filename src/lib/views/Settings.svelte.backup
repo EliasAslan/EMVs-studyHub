@@ -1,0 +1,1511 @@
+<script>
+  import { onMount, tick } from 'svelte';
+  import {
+    appState,
+    updateSettings,
+    updateProgram,
+    createLesson,
+    updateLesson,
+    deleteLesson,
+    exportBackup,
+    importBackup,
+    resetAll,
+  } from '../stores/app.js';
+import { preferences, apply } from '../services/appearance.js';
+  import { downloadBackup } from '../services/backup.js';
+
+  // Apply CSS tokens when preferences that affect appearance change.
+  $: apply();
+  import {
+    downloadWidgetSnapshotJson,
+    downloadWidgetSnapshotText,
+  } from '../services/widgetSnapshot.js';
+  import { formatDate, dateKey, WEEKDAYS } from '../data/dates.js';
+  import {
+    sortedLessons,
+    lessonLabel as lessonTitle,
+    lessonConflicts,
+    lessonDuration,
+    isLessonNow,
+  } from '../data/schedule.js';
+  import { toast } from '../stores/toast.js';
+  import { cloud, signIn, signUp, signOut, resetPassword, runSync, loadCloud } from '../stores/cloud.js';
+  import { sendDeadlineReminders } from '../services/sendDeadlineReminders.js';
+  import { aiSettings, saveAiSettings } from '../stores/ai.js';
+  import { checkConnection, describeAiError } from '../services/localAI.js';
+  import Modal from '../components/Modal.svelte';
+  import Icon from '../components/Icon.svelte';
+
+  let importInput;
+  let resetOpen = false;
+  let programEditing = null;
+  let programName = '';
+  let programCode = '';
+  let busy = false;
+  let widgetBusy = false;
+  let widgetAutoSave = $appState.settings.widgetAutoSave || false;
+
+  let lessonEditing = null;
+  let lessonDay = 1;
+  let lessonStart = '08:00';
+  let lessonEnd = '09:00';
+  let lessonModule = '';
+  let lessonLabel = '';
+  let lessonRoom = '';
+  let formEl;
+  let formTouched = false;
+  let now = new Date();
+
+  let authEmail = '';
+  let authPassword = '';
+  let authBusy = false;
+  let authMode = 'signin';
+  let showAuthPassword = false;
+  let authMessage = '';
+  let authError = '';
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    authError = '';
+    authMessage = '';
+  }
+
+  function explainAuthError(error, fallback) {
+    const message = String(error?.message || error?.error?.message || error?.cause?.message || '').trim();
+    const raw = message.toLowerCase();
+    if (/invalid.*(credential|password)|incorrect.*password|user.*not found|invalid email or password/.test(raw)) {
+      return 'E-Mail oder Passwort stimmt nicht. Prüfe deine Angaben oder setze dein Passwort zurück.';
+    }
+    if (/already.*(registered|exists)|user already/.test(raw)) {
+      return 'Für diese E-Mail gibt es schon ein Konto. Melde dich an oder setze dein Passwort zurück.';
+    }
+    if (/signup_not_allowed|sign.?up.*(disabled|not allowed)/.test(raw)) {
+      return 'Die Kontoerstellung ist in Neon Auth deaktiviert. Bitte kontaktiere die Administration.';
+    }
+    if (/invalid.*domain|origin.*not.*allowed|trusted.*origin/.test(raw)) {
+      return 'Diese App-Adresse ist in Neon Auth nicht freigegeben. Füge die Website-Adresse zu den erlaubten Neon Auth Domains hinzu.';
+    }
+    if (/password.*(short|length)|at least.*characters/.test(raw)) {
+      return 'Wähle ein Passwort mit mindestens 8 Zeichen.';
+    }
+    if (/email.*(invalid|valid)/.test(raw)) return 'Bitte gib eine gültige E-Mail-Adresse ein.';
+    if (/rate limit|too many requests/.test(raw)) return 'Zu viele Versuche. Bitte warte kurz und versuche es erneut.';
+    if (/failed to fetch|network|offline|timeout/.test(raw)) return 'Keine Verbindung. Prüfe dein Internet und versuche es erneut.';
+    return message ? `${fallback} (Neon: ${message})` : fallback;
+  }
+
+  async function requestPasswordReset() {
+    authError = '';
+    authMessage = '';
+    const email = authEmail.trim();
+    if (!email) {
+      authError = 'Gib zuerst deine E-Mail-Adresse ein.';
+      return;
+    }
+    authBusy = true;
+    try {
+      await resetPassword(email);
+      authMessage = 'Falls ein Konto zu dieser Adresse gehört, erhältst du eine E-Mail mit dem Link zum Zurücksetzen.';
+    } catch (e) {
+      authError = explainAuthError(e, 'Die E-Mail konnte gerade nicht gesendet werden. Versuche es später erneut.');
+    } finally {
+      authBusy = false;
+    }
+  }
+
+  async function doSignIn() {
+    authError = '';
+    authMessage = '';
+    authBusy = true;
+    try {
+      await signIn(authEmail.trim(), authPassword);
+      authPassword = '';
+      authMessage = 'Angemeldet.';
+    } catch (e) {
+      authError = explainAuthError(e, 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+    } finally {
+      authBusy = false;
+    }
+  }
+
+  async function doSignUp() {
+    authError = '';
+    authMessage = '';
+    if (authPassword.length < 8) {
+      authError = 'Wähle ein Passwort mit mindestens 8 Zeichen.';
+      return;
+    }
+    authBusy = true;
+    try {
+      await signUp(authEmail.trim(), authPassword);
+      authPassword = '';
+      authMessage = $cloud.message || 'Konto erstellt.';
+    } catch (e) {
+      authError = explainAuthError(e, 'Konto konnte nicht erstellt werden. Bitte versuche es erneut.');
+    } finally {
+      authBusy = false;
+    }
+  }
+
+  // Local AI settings (device only).
+  let aiBase = $aiSettings.baseUrl;
+  let aiModel = $aiSettings.model;
+  let aiNumCtx = $aiSettings.numCtx;
+  let aiModels = [];
+  let aiStatus = '';
+  let aiStatusKind = '';
+  let aiBusy = false;
+  let aiRefreshing = false;
+  let aiProbed = false;
+
+  $: signedIn = !!$cloud.session;
+  $: syncStateLabel = !$cloud.online
+    ? 'Offline · wartet auf Internet'
+    : $cloud.syncing
+      ? 'Synchronisiert…'
+      : $cloud.lastError
+        ? 'Aktion nötig'
+        : signedIn
+          ? $cloud.syncPending ? 'Sync ausstehend' : 'Aktuell'
+          : 'Nicht verbunden';
+  $: settings = $appState.settings;
+  $: programs = $appState.programs || [];
+  $: modules = $appState.modules || [];
+  $: lessons = sortedLessons($appState);
+  $: lessonGroups = WEEKDAYS.map((day) => ({
+    ...day,
+    lessons: lessons.filter((l) => l.dayOfWeek === day.value),
+  }));
+  $: lessonsByDay = new Map(lessonGroups.map((group) => [group.value, group.lessons]));
+  $: scheduleDays = lessonGroups.filter(
+    (group) => group.value <= 5 || group.lessons.length > 0 || group.value === todayDow,
+  );
+  $: todayDow = now.getDay() === 0 ? 7 : now.getDay();
+  $: formActive = !!lessonEditing || formTouched;
+  $: formConflicts = lessonConflicts(
+    lessons,
+    { dayOfWeek: Number(lessonDay), start: lessonStart, end: lessonEnd },
+    lessonEditing?.id,
+  );
+  $: lastExport = settings.lastExportAt ? formatDate(dateKey(new Date(settings.lastExportAt)), 'long') : 'nie';
+  $: ai = $aiSettings;
+  $: aiModelOptions = [...new Set([aiModel, ...aiModels].filter(Boolean))];
+  $: aiIsLocal = isLoopbackUrl(normalizeBaseUrl(aiBase));
+  // Probe AI on mount if enabled
+  $: if (ai.enabled && !aiProbed) {
+    aiProbed = true;
+    // probeAi(); // deferred to onMount
+  }
+
+  onMount(() => {
+    const timer = setInterval(() => (now = new Date()), 60_000);
+    return () => clearInterval(timer);
+    // probeAi(); // start AI probing if enabled
+  });
+
+  function moduleFor(lesson) {
+    return modules.find((m) => m.id === lesson.moduleId) || null;
+  }
+
+  function shiftTime(time, minutes) {
+    const [hours, mins] = String(time || '08:00')
+      .split(':')
+      .map(Number);
+    const total = Math.min((hours || 0) * 60 + (mins || 0) + minutes, 23 * 60 + 59);
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+
+  function handleTimerAction() {
+    if (!timerState) {
+      startPomodoro({ minutes: Number(timerPrefs.workMinutes) || 25 });
+    } else if (timerState.status === STATUS.paused) {
+      resumePomodoro();
+    } else if (timerState.status === STATUS.breakDone) {
+      startNextRound();
+    }
+    navigate('/focus');
+  }
+
+  function completeHero() {
+    if (!hero || hero.kind !== 'homework') return;
+    toggleHomework(hero.item.id);
+    toast('Erledigt');
+  }
+
+  function heroReasonLabel(pick) {
+    if (!pick) return '';
+    if (pick.kind === 'exam') {
+      if (pick.days === 0) return 'Prüfung heute';
+      if (pick.days === 1) return 'Prüfung morgen';
+      return `Prüfung in ${pick.days} Tagen`;
+    }
+    if (pick.reason === 'overdue') return `${Math.abs(pick.days)} Tage überfällig`;
+    if (pick.reason === 'today') return 'Heute fällig';
+    if (pick.days === 1) return 'Morgen fällig';
+    if (pick.days === 0) return 'Heute fällig';
+    return `Fällig in ${pick.days} Tagen`;
+  }
+
+  function heroDueLabel(pick) {
+    if (!pick) return '';
+    if (pick.kind === 'exam') return formatDate(pick.item.date, 'short');
+    return pick.item.dueDate ? formatDate(pick.item.dueDate, 'short') : 'Ohne Datum';
+  }
+
+  function openCapture(mode) {
+    captureMode = mode;
+    captureOpen = true;
+  }
+
+  // ---- Tab state ----
+  let activeTab = 'appearance'; // appearance | home | behaviour
+
+  // ---- Appearance tab state ----
+  let accentPreview = $preferences.accent.value;
+  let textSizeValue = $preferences.textSize;
+  let densityValue = $preferences.density;
+  let reduceMotionValue = $preferences.reduceMotion;
+
+  // ---- Home tab state ----
+  let homeHero = $preferences.home.hero;
+  let homeNextExam = $preferences.home.nextExam;
+  let homeFocusStrip = $preferences.home.focusStrip;
+  let homeChecklist = $preferences.home.checklist;
+  let homeNextLesson = $preferences.home.nextLesson;
+  let homeRecentNotes = $preferences.home.recentNotes;
+  let homeLinks = $preferences.home.links;
+  let homeOrder = [...$preferences.homeOrder];
+
+  // ---- Behaviour tab state ----
+  let gradeMidMin = Number($preferences.gradeBands?.midMin ?? 2.5);
+  let gradeHighMin = Number($preferences.gradeBands?.highMin ?? 4);
+  let horizonDays = $preferences.checklistHorizon ?? 5;
+  let includeOverdue = $preferences.includeOverdue ?? true;
+
+  // ---- Form dirty tracking ----
+  let appearanceDirty = false;
+  let homeDirty = false;
+  let behaviourDirty = false;
+
+  /** Apply CSS tokens from appearance service. */
+  function applyAppearance() {
+    const p = $preferences;
+    // Accent colours via colour-mix
+    const accentBase = p.accent.customHex || p.accent.value;
+    document.documentElement.style.setProperty('--accent-base', accentBase);
+    document.documentElement.style.setProperty(
+      '--accent-light',
+      `color-mix(in srgb, ${accentBase} 70%, #fff)`
+    );
+    document.documentElement.style.setProperty(
+      '--accent-strong',
+      `color-mix(in srgb, ${accentBase} 85%, #000)`
+    );
+    // Text size via clamp
+    const sizeMap = { compact: '13px', default: '15px', large: '18px' };
+    const size = sizeMap[p.textSize] || sizeMap.default;
+    document.documentElement.style.setProperty(
+      '--text-size',
+      `clamp(${size}, 1rem, 1.25rem)`
+    );
+    // Density spacing
+    const densityMap = { cozy: 'var(--space-5)', compact: 'var(--space-3)' };
+    document.documentElement.style.setProperty(
+      '--spacing-density',
+      densityMap[p.density] || densityMap.cozy
+    );
+    // Reduce motion
+    document.documentElement.dataset.reduceMotion = String(p.reduceMotion);
+  }
+
+  // ---- Save appearance changes ----
+  function saveAppearance() {
+    $preferences.accent = { value: accentPreview, customHex: $('#accent-hex').value || accentPreview };
+    $preferences.textSize = textSizeValue;
+    $preferences.density = densityValue;
+    $preferences.reduceMotion = reduceMotionValue;
+    apply();
+    appearanceDirty = false;
+    toast('Erscheinungsbild aktualisiert');
+  }
+
+  // ---- Save home changes ----
+  function saveHome() {
+    $preferences.home = {
+      hero: homeHero,
+      nextExam: homeNextExam,
+      focusStrip: homeFocusStrip,
+      checklist: homeChecklist,
+      nextLesson: homeNextLesson,
+      recentNotes: homeRecentNotes,
+      links: homeLinks,
+    };
+    $preferences.homeOrder = homeOrder;
+    $preferences.checklistHorizon = horizonDays;
+    $preferences.includeOverdue = includeOverdue;
+    homeDirty = false;
+    toast('Heute-Ansicht aktualisiert');
+  }
+
+  // ---- Save behaviour changes ----
+  function saveBehaviour() {
+    $preferences.gradeBands = { midMin: gradeMidMin, highMin: gradeHighMin };
+    horizonDays = Number(horizonDaysSelect.value);
+    includeOverdue = includeOverdueSelect.checked;
+    behaviourDirty = false;
+    toast('Verhalten aktualisiert');
+  }
+
+  // ---- Helper: update horizon select DOM reference ----
+  function $(sel) {
+    return document.querySelector(sel);
+  }
+
+  // ---- Save all ----
+  async function doSave() {
+    let changed = false;
+
+    if (appearanceDirty) {
+      saveAppearance();
+      changed = true;
+    }
+    if (homeDirty) {
+      saveHome();
+      changed = true;
+    }
+    if (behaviourDirty) {
+      saveBehaviour();
+      changed = true;
+    }
+
+    if (changed) {
+      toast('Einstellungen gespeichert');
+    } else {
+      toast('Keine Änderungen');
+    }
+  }
+
+  async function doReset() {
+    await resetAll();
+    resetOpen = false;
+    // Reset all pref UI to defaults
+    accentPreview = 'indigo';
+    textSizeValue = 'default';
+    densityValue = 'cozy';
+    reduceMotionValue = false;
+    homeHero = true; homeNextExam = true; homeFocusStrip = true; homeChecklist = true; homeNextLesson = true; homeRecentNotes = true; homeLinks = true;
+    homeOrder = ['hero', 'nextExam', 'focusStrip', 'checklist', 'nextLesson', 'recentNotes', 'links'];
+    gradeMidMin = 2.5; gradeHighMin = 4;
+    horizonDays = 5; includeOverdue = true;
+    appearanceDirty = homeDirty = behaviourDirty = false;
+    toast('Alles zurückgesetzt');
+  }
+</script>
+
+<div class="page">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">Einrichten</p>
+      <h1>Einstellungen</h1>
+    </div>
+  </header>
+
+  <!-- Tab navigation -->
+  <nav class="settings-tabs" aria-label="Einstellungsbereiche">
+    <button
+      class:active={activeTab === 'appearance'}
+      type="button"
+      on:click={() => (activeTab = 'appearance')}
+    >
+      <Icon name="palette" size={16} /> Erscheinungsbild
+    </button>
+    <button
+      class:active={activeTab === 'home'}
+      type="button"
+      on:click={() => (activeTab = 'home')}
+    >
+      <Icon name="today" size={16} /> Heute
+    </button>
+    <button
+      class:active={activeTab === 'behaviour'}
+      type="button"
+      on:click={() => (activeTab = 'behaviour')}
+    >
+      <Icon name="cog" size={16} /> Verhalten
+    </button>
+  </nav>
+
+  <!-- Appearance tab -->
+  <section
+    class="card section"
+    aria-labelledby="appearance-tab"
+    style="display: {activeTab === 'appearance' ? 'block' : 'none'}"
+  >
+    <div class="section-title">
+      <h2 id="appearance-tab">Erscheinungsbild</h2>
+    </div>
+
+    <div class="preference-grid">
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Akzentfarbe</span>
+          <small>Wird für Highlights, Border und Interaktion verwendet</small>
+        </div>
+        <div class="swatch-grid" role="radiogroup" aria-label="Akzentfarbe auswählen">
+          {#each ['indigo', 'teal', 'amber', 'rose', 'violet', 'slate'] as color (color)}
+            <label
+              class:active={accentPreview === color}
+              type="radio"
+              name="accent"
+              value={color}
+              on:click={() => {
+                accentPreview = color;
+                appearanceDirty = true;
+              }}
+            >
+              <span class="swatch-preview" style="background: var(--{color})" aria-hidden="true"></span>
+              <span class="swatch-name">{color}</span>
+            </label>
+          {/each}
+        </div>
+
+        <div class="swatch-custom">
+          <label>Benutzerdefiniert</label>
+          <input
+            type="color"
+            id="accent-hex"
+            value="{$preferences.accent.customHex}"
+            on:change={(e) => {
+              const hex = e.target.value;
+              $preferences.accent = { value: hex.replace('#', '') || hex, customHex: hex };
+              accentPreview = hex.replace('#', '') || hex;
+              apply();
+              appearanceDirty = true;
+            }}
+            aria-label="Benutzerdefinierte Akzentfarbe"
+          />
+          <span class="swatch-preview-custom" style="color: var(--accent-base)" aria-hidden="true"></span>
+        </div>
+
+        <div class="preview-box">
+          <div class="preview-label">Vorschau</div>
+          <div
+            class="preview-area"
+            style="
+              background: var(--accent-soft);
+              color: var(--accent-strong);
+              border: 1px solid var(--rule);
+            "
+          >
+            <div class="preview-text">Deine Farbe wirkt hier</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Schriftgröße</span>
+          <small>Passt die Textgröße im gesamten Interface an</small>
+        </div>
+        <div class="size-selector">
+          {#each ['compact', 'default', 'large'] as size (size)}
+            <label
+              class:active={textSizeValue === size}
+              type="radio"
+              name="textSize"
+              value={size}
+              on:click={() => {
+                textSizeValue = size;
+                appearanceDirty = true;
+              }}
+            >
+              <span class="size-dot" style="font-size: var(--text-{size})"></span>
+              <span>{size === 'compact' ? 'Kompat' : size === 'default' ? 'Standard' : 'Groß'}</span>
+            </label>
+          {/each}
+        </div>
+        <div class="size-preview">
+          <p class="preview-text">Beispieltext</p>
+          <p class="preview-small">Kleiner Text</p>
+        </div>
+      </div>
+
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Zeilenabstand</span>
+          <small>Legt den Abstand zwischen Elementen fest</small>
+        </div>
+        <div class="density-selector">
+          {#each ['cozy', 'compact'] as density (density)}
+            <label
+              class:active={densityValue === density}
+              type="radio"
+              name="density"
+              value={density}
+              on:click={() => {
+                densityValue = density;
+                appearanceDirty = true;
+              }}
+            >
+              <span class="density-dot" style="margin-bottom: var(--spacing-{density})"></span>
+              <span>{density === 'cozy' ? 'Gemütlich' : 'Kompat'}</span>
+            </label>
+          {/each}
+        </div>
+        <div class="density-preview">
+          <div class="row cozy">Hochzeitskarte Mustertext</div>
+          <div class="row compact">Hochzeitskarte Mustertext</div>
+        </div>
+      </div>
+
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Reduzierte Bewegung</span>
+          <small>Überschreibt OS-Einstellungen für ruhigere Übergänge</small>
+        </div>
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            checked={reduceMotionValue}
+            on:change={() => {
+              reduceMotionValue = !reduceMotionValue;
+              appearanceDirty = true;
+            }}
+          />
+          <span class="toggle-slider"></span>
+        </label>
+        <p class="muted small">
+          Auch wenn Windows/Mac "Reduzierte Bewegung" aktiviert hat
+        </p>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-primary" on:click={saveAppearance}>Übernehmen</button>
+      <button class="btn-secondary" on:click={doReset}>Zurücksetzen</button>
+    </div>
+  </section>
+
+  <!-- Home tab -->
+  <section
+    class="card section"
+    aria-labelledby="home-tab"
+    style="display: {activeTab === 'home' ? 'block' : 'none'}"
+  >
+    <div class="section-title">
+      <h2 id="home-tab">Heute-Ansicht</h2>
+    </div>
+
+    <div class="preference-grid">
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Sichtbare Abschnitte</span>
+          <small>Ziehe, um die Reihenfolge zu ändern</small>
+        </div>
+        <div class="section-list" role="list" aria-label="Heute-Abschnitte">
+          {#each [ hero, nextExam, focusStrip, checklist, nextLesson, recentNotes, links ] as visible, i}
+            <div
+              class:active={homeOrder.indexOf(section) === i}
+              role="listitem"
+              aria-label="{section} ist sichtbar"
+              data-section={section}
+            >
+              <div class="section-checkbox">
+                <input
+                  type="checkbox"
+                  checked={visible}
+                  on:click={() => {
+                    if (section === 'hero') homeHero = !homeHero;
+                    else if (section === 'nextExam') homeNextExam = !homeNextExam;
+                    else if (section === 'focusStrip') homeFocusStrip = !homeFocusStrip;
+                    else if (section === 'checklist') homeChecklist = !homeChecklist;
+                    else if (section === 'nextLesson') homeNextLesson = !homeNextLesson;
+                    else if (section === 'recentNotes') homeRecentNotes = !homeRecentNotes;
+                    else if (section === 'links') homeLinks = !homeLinks;
+                    homeDirty = true;
+                  }}
+                />
+                <span class="checkmark" aria-hidden="true"></span>
+              </div>
+              <div class="section-label">{section}</div>
+              {#if i < homeOrder.length - 1}
+                <button class="reorder-up" title="Nach oben verschieben" aria-label="Section {section} nach oben verschieben"
+                  on:click={() => {
+                    const idx = homeOrder.indexOf(section);
+                    if (idx > 0) {
+                      [homeOrder[idx], homeOrder[idx - 1]] = [homeOrder[idx - 1], homeOrder[idx]];
+                      homeDirty = true;
+                    }
+                  }}
+                >▲</button>
+                <button class="reorder-down" title="Nach unten verschieben" aria-label="Section {section} nach unten verschieben"
+                  on:click={() => {
+                    const idx = homeOrder.indexOf(section);
+                    if (idx < homeOrder.length - 1) {
+                      [homeOrder[idx], homeOrder[idx + 1]] = [homeOrder[idx + 1], homeOrder[idx]];
+                      homeDirty = true;
+                    }
+                  }}
+                >▼</button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </div>
+
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Checklisten-Horizont</span>
+          <small>Wie viele Tage voraus angezeigt werden sollen</small>
+        </div>
+        <div class="horizon-selector">
+          {#each [3, 5, 7, 14] as days (days)}
+            <label
+              class:active={horizonDays === days}
+              type="radio"
+              name="horizon"
+              value={days}
+              on:click={() => {
+                horizonDays = days;
+                includeOverdue = $preferences.includeOverdue ?? true;
+                homeDirty = true;
+              }}
+            >
+              <span class="horizon-circle">{days}</span>
+              <span>{days} days</span>
+            </label>
+          {/each}
+        </div>
+        <div class="horizon-note">
+          <input
+            type="checkbox"
+            checked={includeOverdue}
+            on:change={() => {
+              includeOverdue = !includeOverdue;
+              homeDirty = true;
+            }}
+            id="include-overdue"
+          />
+          <label for="include-overdue">Überfällig einbeziehen</label>
+          <p class="muted small">
+            Überfällige Hausaufgaben erscheinen oben in der Checkliste
+          </p>
+        </div>
+      </div>
+
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Note-Banden</span>
+          <small>Swiss 1–6 Skala: rot < Schwellenwert, gelb dazwischen, > Schwellenwert</small>
+        </div>
+        <div class="grade-bands-visual">
+          <div class="band low" style="width: ${gradeMidMin / 6 * 100}%"></div>
+          <div class="band mid" style="width: ${(gradeHighMin - gradeMidMin) / 6 * 100}%"></div>
+          <div class="band high" style="width: ${100 - gradeHighMin / 6 * 100}%"></div>
+        </div>
+        <div class="grade-inputs">
+          <div class="input-row">
+            <label>Schwellenwert Mittel</label>
+            <input
+              type="number"
+              min="1"
+              max="6"
+              step="0.1"
+              value={gradeMidMin}
+              on:change={(e) => {
+                gradeMidMin = Math.max(1, Math.min(6, Number(e.target.value) || gradeMidMin));
+                behaviourDirty = true;
+              }}
+            />
+          </div>
+          <div class="input-row">
+            <label>Schwellenwert Hoch</label>
+            <input
+              type="number"
+              min="1"
+              max="6"
+              step="0.1"
+              value={gradeHighMin}
+              on:change={(e) => {
+                gradeHighMin = Math.max(1, Math.min(6, Number(e.target.value) || gradeHighMin));
+                behaviourDirty = true;
+                if (gradeHighMin <= gradeMidMin) {
+                  gradeHighMin = gradeMidMin + 0.1;
+                }
+              }}
+            />
+          </div>
+          <p class="muted small">Bereich: 1 (schlecht) bis 6 (ausgezeichnet)</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-primary" on:click={saveHome}>Übernehmen</button>
+      <button class="btn-secondary" on:click={doReset}>Zurücksetzen</button>
+    </div>
+  </section>
+
+  <!-- Behaviour tab -->
+  <section
+    class="card section"
+    aria-labelledby="behaviour-tab"
+    style="display: {activeTab === 'behaviour' ? 'block' : 'none'}"
+  >
+    <div class="section-title">
+      <h2 id="behaviour-tab">Verhalten</h2>
+    </div>
+
+    <div class="preference-grid">
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Checklisten-Horizont</span>
+          <small>Wie viele Tage voraus angezeigt werden sollen</small>
+        </div>
+        <div class="horizon-selector">
+          {#each [3, 5, 7, 14] as days (days)}
+            <label
+              class:active={horizonDays === days}
+              type="radio"
+              name="horizon-behaviour"
+              value={days}
+              on:click={() => {
+                horizonDays = days;
+                includeOverdue = $preferences.includeOverdue ?? true;
+                behaviourDirty = true;
+              }}
+            >
+              <span class="horizon-circle">{days}</span>
+              <span>{days} days</span>
+            </label>
+          {/each}
+        </div>
+        <div class="horizon-note">
+          <input
+            type="checkbox"
+            checked={includeOverdue}
+            on:change={() => {
+              includeOverdue = !includeOverdue;
+              behaviourDirty = true;
+            }}
+            id="include-overdue-behaviour"
+          />
+          <label for="include-overdue-behaviour">Überfällig einbeziehen</label>
+        </div>
+      </div>
+
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Datum & Woche</span>
+          <small>Legt fest, wie Daten angezeigt und Wochen berechnet werden</small>
+        </div>
+        <div class="format-selector">
+          {#each ['ch', 'iso'] as format (format)}
+            <label
+              class:active={$preferences.dateFormat === format}
+              type="radio"
+              name="dateFormat"
+              value={format}
+              on:click={() => {
+                $preferences.dateFormat = format;
+                behaviourDirty = true;
+              }}
+            >
+              <span class="format-flag">{format === 'ch' ? 'CH' : 'ISO'}</span>
+              <span>{format === 'ch' ? 'tt.MM.jjjj' : 'jjjj-MM-dd'}</span>
+            </label>
+          {/each}
+        </div>
+        <div class="week-start">
+          {#each [1, 2] as start (start)}
+            <label
+              class:active={$preferences.weekStart === (start === 1 ? 'monday' : 'sunday')}
+              type="radio"
+              name="weekStart"
+              value={start === 1 ? 'monday' : 'sunday'}
+              on:click={() => {
+                $preferences.weekStart = start === 1 ? 'monday' : 'sunday';
+                behaviourDirty = true;
+              }}
+            >
+              <span class="week-dot"></span>
+              <span>{start === 1 ? 'Montag' : 'Sonntag'}</span>
+            </label>
+          {/each}
+        </div>
+      </div>
+
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Standard-Hausaufgabe</span>
+          <small>Neue Hausaufgaben standardmäßig</small>
+        </div>
+        <div class="homework-defaults">
+          {#each ['heute', 'morgen', 'kein Termin'] as default (default)}
+            <label
+              class:active={$preferences.defaultHomework === default}
+              type="radio"
+              name="homeworkDefault"
+              value={default}
+              on:click={() => {
+                $preferences.defaultHomework = default;
+                behaviourDirty = true;
+              }}
+            >
+              <span class="default-dot"></span>
+              <span>{default}</span>
+            </label>
+          {/each}
+        </div>
+        <p class="muted small">
+          Standard-Hausaufgabe für neue Erfassungen
+        </p>
+      </div>
+
+      <div class="pref-card">
+        <div class="pref-header">
+          <span>Erinnerungen</span>
+          <small>Fristen per E-Mail remindern</small>
+        </div>
+        <div class="reminders-toggle">
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              checked={remindersOptIn}
+              on:change={() => {
+                remindersOptIn = !remindersOptIn;
+                behaviourDirty = true;
+              }}
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="reminders-freq">
+          <label>Alle {remindersDay} Tag(e)</label>
+          <input
+            type="number"
+            min="1"
+            max="14"
+            value={remindersDay}
+            on:change={(e) => {
+              remindersDay = Math.max(1, Math.min(14, Number(e.target.value) || remindersDay));
+              behaviourDirty = true;
+            }}
+          />
+          <span>Tag(e)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-primary" on:click={saveBehaviour}>Übernehmen</button>
+      <button class="btn-secondary" on:click={doReset}>Zurücksetzen</button>
+    </div>
+  </section>
+</div>
+
+<footer class="settings-footer">
+  <button class="btn btn-full" on:click={doSave}>Alle Änderungen speichern</button>
+  <button class="btn btn-outline" on:click={doReset}>Alle zurücksetzen</button>
+</footer>
+
+<style>
+  .page {
+    font-family: var(--font-base);
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--ink);
+  }
+
+  .page-head {
+    padding: var(--space-5) var(--space-6);
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .eyebrow {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-2);
+  }
+
+  h1 {
+    font-size: clamp(1.9rem, 3.4vw, 2.4rem);
+    font-weight: 600;
+    letter-spacing: -0.035em;
+  }
+
+  .settings-tabs {
+    display: flex;
+    background: var(--surface);
+    border-radius: var(--radius-2);
+    padding: var(--space-2) var(--space-3);
+    margin: 0 var(--space-6);
+    gap: var(--space-1);
+  }
+
+  .tab-btn {
+    all: unset;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-1);
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+
+  .tab-btn:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .tab-btn.active {
+    all: unset;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-1);
+    background: var(--accent);
+    color: white;
+  }
+
+  .card.section {
+    margin: 0 var(--space-6);
+    border: 1px solid var(--surface);
+    border-radius: var(--radius-3);
+    overflow: hidden;
+  }
+
+  .section-title {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .section-title h2 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .preference-grid {
+    padding: var(--space-5) var(--space-6);
+    display: grid;
+    gap: var(--space-4);
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .pref-card {
+    background: var(--surface);
+    border: 1px solid var(--surface);
+    border-radius: var(--radius-3);
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .pref-card h3 {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .pref-card small {
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+    gap: 4px;
+  }
+
+  .swatch-item {
+    all: unset;
+    border: 2px solid var(--rule);
+    border-radius: var(--radius-2);
+    padding: 4px;
+    cursor: pointer;
+    transition: border-color 120ms ease;
+  }
+
+  .swatch-item.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .swatch-item:hover {
+    border-color: var(--accent-strong);
+  }
+
+  .swatch-preview {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-1);
+    flex-shrink: 0;
+  }
+
+  .swatch-name {
+    display: block;
+    text-align: center;
+    font-size: var(--text-xs);
+    margin-top: 2px;
+  }
+
+  .swatch-custom {
+    margin-top: var(--space-2);
+  }
+
+  .swatch-custom label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+    margin-bottom: 4px;
+  }
+
+  .swatch-custom input {
+    width: 100%;
+    height: auto;
+    cursor: pointer;
+  }
+
+  .swatch-preview-custom {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-1);
+  }
+
+  .size-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    gap: 4px;
+  }
+
+  .size-option {
+    all: unset;
+    border: 2px solid var(--rule);
+    border-radius: var(--radius-2);
+    padding: 6px 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 120ms ease;
+  }
+
+  .size-option.active {
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .size-option:hover {
+    border-color: var(--accent-strong);
+  }
+
+  .size-dot {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .density-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    gap: 4px;
+  }
+
+  .density-option {
+    all: unset;
+    border: 2px solid var(--rule);
+    border-radius: var(--radius-2);
+    padding: 6px 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 120ms ease;
+  }
+
+  .density-option.active {
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .density-option:hover {
+    border-color: var(--accent-strong);
+  }
+
+  .density-dot {
+    margin-bottom: var(--spacing-cozy);
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 24px;
+  }
+
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--rule);
+    transition: 0.3s;
+    border-radius: 24px;
+  }
+
+  .toggle-slider:before {
+    position: absolute;
+    content: '';
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    transform: translateX(16px);
+  }
+
+  .toggle-switch input:checked + .toggle-slider {
+    background: var(--accent);
+  }
+
+  .toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(0);
+  }
+
+  .horizon-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+    gap: 8px;
+  }
+
+  .horizon-option {
+    all: unset;
+    border: 2px solid var(--rule);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    transition: border-color 120ms ease, color 120ms ease;
+  }
+
+  .horizon-option.active {
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .horizon-option:hover {
+    border-color: var(--accent-strong);
+  }
+
+  .horizon-circle {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+
+  .horizon-note {
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+  }
+
+  .grade-bands-visual {
+    height: 20px;
+    background: var(--surface);
+    border-radius: var(--radius-2);
+    overflow: hidden;
+    margin: var(--space-2) 0;
+  }
+
+  .band {
+    height: 100%;
+    float: left;
+  }
+
+  .band.low {
+    background: var(--warn);
+    width: 33.33%;
+  }
+
+  .band.mid {
+    background: var(--accent);
+    width: 33.33%;
+  }
+
+  .band.high {
+    background: var(--green);
+    width: 33.34%;
+  }
+
+  .grade-inputs {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .input-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-2);
+    align-items: baseline;
+  }
+
+  .input-row label {
+    font-size: var(--text-sm);
+  }
+
+  .format-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 8px;
+  }
+
+  .format-option {
+    all: unset;
+    border: 2px solid var(--rule);
+    border-radius: var(--radius-2);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    text-align: center;
+    transition: border-color 120ms ease;
+  }
+
+  .format-option.active {
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .format-option:hover {
+    border-color: var(--accent-strong);
+  }
+
+  .format-flag {
+    width: 20px;
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+
+  .week-start {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 8px;
+  }
+
+  .week-start-option {
+    all: unset;
+    border: 2px solid var(--rule);
+    border-radius: var(--radius-2);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    text-align: center;
+    transition: border-color 120ms ease;
+  }
+
+  .week-start-option.active {
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .week-start-option:hover {
+    border-color: var(--accent-strong);
+  }
+
+  .week-dot {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+
+  .homework-defaults {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 6px;
+  }
+
+  .homework-default {
+    all: unset;
+    border: 2px solid var(--rule);
+    border-radius: var(--radius-2);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    text-align: center;
+    transition: border-color 120ms ease;
+  }
+
+  .homework-default.active {
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .homework-default:hover {
+    border-color: var(--accent-strong);
+  }
+
+  .default-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+
+  .reminders-toggle {
+    margin-bottom: var(--space-3);
+  }
+
+  .reminders-freq {
+    margin-top: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+  }
+
+  .section-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .section-item {
+    all: unset;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-2);
+    background: var(--surface);
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+
+  .section-item:hover {
+    background: var(--surface-2);
+  }
+
+  .section-checkbox {
+    flex: none;
+  }
+
+  .section-checkbox input {
+    transform: scale(0.8);
+    margin: 0;
+  }
+
+  .section-label {
+    flex: 1;
+    font-size: var(--text-sm);
+  }
+
+  .reorder-up, .reorder-down {
+    all: unset;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: var(--text-lg);
+    color: var(--ink-2);
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .reorder-up:hover, .reorder-down:hover {
+    color: var(--accent);
+  }
+
+  .form-actions {
+    padding: var(--space-4) var(--space-5);
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  .btn-primary {
+    all: unset;
+    background: var(--accent);
+    color: white;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-2);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-strong);
+  }
+
+  .btn-secondary {
+    all: unset;
+    background: transparent;
+    color: var(--ink);
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-2);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 120ms ease;
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--accent);
+  }
+
+  .btn-full {
+    all: unset;
+    width: 100%;
+    background: var(--accent);
+    color: white;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-2);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: var(--space-3);
+  }
+
+  .settings-footer {
+    padding: var(--space-5) var(--space-6);
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .swatch-item:focus-visible,
+  .size-option:focus-visible,
+  .density-option:focus-visible,
+  .format-option:focus-visible,
+  .week-start-option:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
