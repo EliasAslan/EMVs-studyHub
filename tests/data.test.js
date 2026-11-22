@@ -137,7 +137,8 @@ describe('checklist', () => {
         { id: 'h1', title: 'Heute', dueDate: '2026-11-04', done: false },
         { id: 'h2', title: 'Alt', dueDate: '2026-11-01', done: false },
         { id: 'h3', title: 'Später', dueDate: '2026-11-10', done: false },
-        { id: 'h4', title: 'Fertig', dueDate: '2026-11-04', done: true },
+        { id: 'h4', title: 'Früher fertig', dueDate: '2026-11-04', done: true },
+        { id: 'h5', title: 'Heute erledigt', dueDate: '2026-11-04', done: true, doneAt: new Date(2026, 10, 4, 9, 0).getTime() },
       ],
       checklistItems: [
         { id: 'studied', text: 'studiert heute', kind: 'studied', order: 0 },
@@ -146,10 +147,26 @@ describe('checklist', () => {
       checklist: { date: '2026-11-04', checked: { c1: true } },
     });
     const day = checklistForDay(state, NOW);
-    expect(day.items.map((i) => i.id)).toEqual(['hw:h2', 'hw:h1', 'c1', 'studied']);
+    expect(day.items.map((i) => i.id)).toEqual(['hw:h2', 'hw:h1', 'hw:h5', 'c1', 'studied']);
     expect(day.items.find((i) => i.id === 'c1').checked).toBe(true);
     expect(day.items.find((i) => i.id === 'hw:h1').checked).toBe(false);
+    expect(day.items.find((i) => i.id === 'hw:h5').checked).toBe(true);
     expect(remainingCount(state, NOW)).toBe(3);
+  });
+
+  it('keeps homework completed today visible until the next day', () => {
+    const state = baseState({
+      homework: [
+        { id: 'h1', title: 'Heute erledigt', dueDate: '2026-11-04', done: true, doneAt: new Date(2026, 10, 4, 9, 0).getTime() },
+      ],
+      checklistItems: [],
+    });
+
+    const todayItems = checklistForDay(state, NOW).items;
+    const tomorrowItems = checklistForDay(state, new Date(2026, 10, 5, 8, 0)).items;
+
+    expect(todayItems.find((item) => item.id === 'hw:h1')?.checked).toBe(true);
+    expect(tomorrowItems.some((item) => item.id === 'hw:h1')).toBe(false);
   });
 
   it('includes homework due within the five-day horizon', () => {
