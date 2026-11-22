@@ -10,12 +10,13 @@
  *   --reduce-motion
  */
 
+import { get } from 'svelte/store';
 import { $preferences } from '../stores/preferences.js';
 
-function apply() {
+function apply(prefs) {
   if (typeof document === 'undefined') return;
 
-  const p = $preferences;
+  const p = prefs || get($preferences);
 
   // ── Accent colour ─────────────────────────────────────────────────────
   const accentBase = p.accent.customHex || p.accent.value;

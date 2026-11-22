@@ -15,7 +15,7 @@ import { preferences, apply } from '../services/appearance.js';
   import { downloadBackup } from '../services/backup.js';
 
   // Apply CSS tokens when preferences that affect appearance change.
-  $: apply();
+  $: apply($preferences);
   import {
     downloadWidgetSnapshotJson,
     downloadWidgetSnapshotText,
@@ -552,6 +552,14 @@ import { preferences, apply } from '../services/appearance.js';
 </script>
 
 
+<div class="page">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">Einrichten</p>
+      <h1>Einstellungen</h1>
+    </div>
+  </header>
+
   <!-- Tab navigation -->
   <nav class="settings-tabs" aria-label="Einstellungsbereiche">
     <button
@@ -576,13 +584,6 @@ import { preferences, apply } from '../services/appearance.js';
       <Icon name="cog" size={16} /> Verhalten
     </button>
   </nav>
-<div class="page">
-  <header class="page-head">
-    <div>
-      <p class="eyebrow">Einrichten</p>
-      <h1>Einstellungen</h1>
-    </div>
-  </header>
 
   <nav class="subnav" aria-label="Einstellungsbereiche">
     <a href="#settings-programs" on:click|preventDefault={() => document.getElementById('settings-programs')?.scrollIntoView({ block: 'start' })}>Programme</a>
@@ -619,6 +620,7 @@ import { preferences, apply } from '../services/appearance.js';
     </div>
   </section>
 
+  {#if activeTab === 'appearance'}
   <section class="card section" id="settings-theme" aria-labelledby="theme-title">
     <div class="section-title">
       <h2 id="theme-title">Darstellung</h2>
@@ -709,6 +711,9 @@ import { preferences, apply } from '../services/appearance.js';
     </div>
   </section>
 
+  {/if}
+
+  {#if activeTab === 'home'}
   <section class="card section" id="settings-today" aria-labelledby="today-title">
     <div class="section-title">
       <h2 id="today-title">Heute-Ansicht</h2>
@@ -765,6 +770,9 @@ import { preferences, apply } from '../services/appearance.js';
     </div>
   </section>
 
+  {/if}
+
+  {#if activeTab === 'behaviour'}
   <section class="card section" id="settings-shortcuts" aria-labelledby="shortcuts-title">
     <div class="section-title">
       <h2 id="shortcuts-title">Tastaturkürzel</h2>
@@ -1155,6 +1163,7 @@ import { preferences, apply } from '../services/appearance.js';
     <p class="muted small">Löscht alle Daten und Dateien auf diesem Gerät. Exportiere vorher ein Backup.</p>
     <button class="btn btn-danger" type="button" on:click={() => (resetOpen = true)}>Alles löschen</button>
   </section>
+  {/if}
 </div>
 
 <Modal open={!!programEditing} title="Programm bearbeiten" on:close={() => (programEditing = null)}>
@@ -2395,5 +2404,40 @@ import { preferences, apply } from '../services/appearance.js';
   .auth-story,
   .auth-note {
     display: none;
+  }
+
+  /* Settings tab navigation */
+  .settings-tabs {
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    margin: 0 0 var(--space-2);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-2);
+    background: var(--surface);
+    overflow-x: auto;
+  }
+  .settings-tabs button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-1);
+    background: transparent;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .settings-tabs button:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .settings-tabs button.active {
+    background: var(--accent-soft, color-mix(in srgb, var(--accent) 12%, transparent));
+    color: var(--accent-strong, var(--accent));
+    border-color: color-mix(in srgb, var(--accent) 20%, transparent);
   }
 </style>
