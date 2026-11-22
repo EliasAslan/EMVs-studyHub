@@ -32,6 +32,11 @@
   let custom = '';
   let tick = 0;
   let now = Date.now();
+  let focusMode = false;
+  let edgeNavVisible = false;
+  let edgeTimer = null;
+  let fullscreenActive = false;
+  let pageRoot = null;
 
   onMount(() => {
     prefs = getPomodoroPrefs();
@@ -42,7 +47,22 @@
       prefs = detail.prefs;
       if (detail.reason === 'tick') tick += 1;
     });
-    return unsubscribe;
+    const onFullscreen = () => { fullscreenActive = !!document.fullscreenElement; };
+    const onPointerMove = (event) => {
+      if (!focusMode) return;
+      if (event.clientX <= 18) revealEdgeNav();
+      else if (event.clientX > 220) scheduleEdgeHide();
+    };
+    document.addEventListener('fullscreenchange', onFullscreen);
+    window.addEventListener('pointermove', onPointerMove);
+    return () => {
+      unsubscribe();
+      document.removeEventListener('fullscreenchange', onFullscreen);
+      window.removeEventListener('pointermove', onPointerMove);
+      clearTimeout(edgeTimer);
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      document.body.classList.remove('pomodoro-immersive', 'pomodoro-nav-visible');
+    };
   });
 
   $: running = state?.status === STATUS.running;
@@ -57,9 +77,43 @@
   $: label = state ? phaseLabel(state) : 'Bereit';
   $: round = state ? roundLabel(state) : '';
   $: notification = prefs && typeof window !== 'undefined' && 'Notification' in window ? notificationStatus() : 'unsupported';
+  $: remainingPercent = Math.max(0, Math.ceil(remainingMs(state, now) / 60000));
+  $: timerStatus = !state ? 'Wähle eine Dauer und starte deine erste Runde.' : paused ? 'Pausiert. Setze fort, wenn du bereit bist.' : workDone ? 'Runde geschafft. Gönn dir eine Pause.' : breakDone ? 'Pause vorbei. Starte die nächste Runde.' : isWork ? 'Eine Aufgabe, ein Tab, ein Schritt nach dem anderen.' : 'Lass den Bildschirm kurz hinter dir.';
 
   const RADIUS = 108;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+  async function setFocusMode(enabled) {
+    focusMode = enabled;
+    edgeNavVisible = false;
+    document.body.classList.toggle('pomodoro-immersive', enabled);
+    document.body.classList.remove('pomodoro-nav-visible');
+    if (enabled) {
+      try {
+        await document.documentElement.requestFullscreen?.();
+        fullscreenActive = !!document.fullscreenElement;
+      } catch {
+        fullscreenActive = false;
+      }
+    } else if (document.fullscreenElement) {
+      await document.exitFullscreen?.().catch(() => {});
+    }
+  }
+
+  function revealEdgeNav() {
+    if (!focusMode) return;
+    clearTimeout(edgeTimer);
+    edgeNavVisible = true;
+    document.body.classList.add('pomodoro-nav-visible');
+  }
+
+  function scheduleEdgeHide() {
+    clearTimeout(edgeTimer);
+    edgeTimer = setTimeout(() => {
+      edgeNavVisible = false;
+      document.body.classList.remove('pomodoro-nav-visible');
+    }, 700);
+  }
 
   function start() {
     updatePomodoroPrefs({ workMinutes: minutes });
@@ -107,9 +161,22 @@
   }
 </script>
 
-<div class="focus-page">
+<div class="focus-page" class:focus-mode={focusMode} class:edge-visible={edgeNavVisible} bind:this={pageRoot}>
+  {#if focusMode}
+    <div class="edge-trigger" aria-hidden="true" on:mouseenter={revealEdgeNav} on:mousemove={revealEdgeNav}></div>
+    <button class="focus-exit" type="button" on:click={() => setFocusMode(false)} on:mouseenter={revealEdgeNav} title="Fokusmodus beenden">Beenden</button>
+  {/if}
   <header class="focus-head">
-    <h1>Fokus</h1>
+    <div>
+      <p class="eyebrow">STUDY HUB · POMODORO</p>
+      <h1>Fokus</h1>
+      <p class="focus-intro">Arbeite in klaren Intervallen. Pausen und dein Verlauf bleiben automatisch gespeichert.</p>
+    </div>
+    {#if state}
+      <button class="btn btn-ghost focus-toggle" type="button" aria-pressed={focusMode} on:click={() => setFocusMode(!focusMode)} title="Timer im Vollbild anzeigen">
+        <Icon name={focusMode ? 'x' : 'focus'} size={16} /> {focusMode ? 'Ansicht verlassen' : 'Vollbild'}
+      </button>
+    {/if}
   </header>
 
   <section class="timer-card" class:is-break={state && !isWork} aria-label="Fokus-Timer">
@@ -134,10 +201,17 @@
         />
       </svg>
       <div class="clock-wrap">
-        <span class="clock mono" role="timer" aria-live="off">{clock}</span>
+        <span class="clock mono" role="timer" aria-live="off" aria-label={`${clock} verbleibend`}>{clock}</span>
         <span class="clock-label">{state && !isWork ? 'Pause' : 'Fokus'}</span>
       </div>
     </div>
+
+    {#if state}
+      <div class="timer-context">
+        <p>{timerStatus}</p>
+        <span class="remaining-label">{remainingPercent} Min verbleibend</span>
+      </div>
+    {/if}
 
     {#if !state}
       <div class="duration" role="group" aria-label="Dauer wählen">
@@ -169,7 +243,7 @@
       <button class="btn btn-primary start" type="button" on:click={start}>
         <Icon name="focus" size={18} /> Fokus starten
       </button>
-      <p class="hint">Bereit</p>
+      <p class="hint">Deine Zeit bleibt gespeichert, auch wenn du zu einer anderen Seite wechselst.</p>
     {:else if isWork && !workDone}
       <div class="actions">
         <button class="btn btn-primary" type="button" on:click={toggle}>
@@ -223,7 +297,8 @@
 
   <section class="prefs card" aria-labelledby="prefs-title">
     <div class="prefs-head">
-      <h2 id="prefs-title">Timer</h2>
+      <div><p class="eyebrow">PERSÖNLICH</p><h2 id="prefs-title">Timer-Einstellungen</h2></div>
+      <p class="prefs-subtitle">Passe den Klang, Hinweise und deinen Lernverlauf an.</p>
     </div>
     <label class="pref-row check-row">
       <input
@@ -261,15 +336,41 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
-    max-width: 620px;
+    max-width: 720px;
     margin: 0 auto;
   }
-  .focus-head {
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+   .focus-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-4); text-align:left; }
+   :global(body.pomodoro-immersive .mobile-head), :global(body.pomodoro-immersive .tabbar), :global(body.pomodoro-immersive .fab) { visibility:hidden; }
+  :global(body.pomodoro-immersive #main) { width:100%; max-width:none; height:100dvh; padding:0; }
+  :global(body.pomodoro-immersive .toasts), :global(body.pomodoro-immersive .fab-menu), :global(body.pomodoro-immersive .fab-scrim) { display:none !important; }
+  :global(body.pomodoro-immersive .scrim) { display:none !important; }
+  :global(body.pomodoro-immersive #app-sidebar) { z-index:1004; visibility:visible; transform:translateX(-100%); transition:transform 160ms ease-out; }
+   :global(body.pomodoro-nav-visible #app-sidebar) { transform:translateX(0); }
+
+  .eyebrow { margin-bottom:var(--space-1); color:var(--accent-strong); font-size:10px; font-weight:800; letter-spacing:.13em; }
+  .focus-intro { margin-top:var(--space-2); max-width:52ch; color:var(--ink-2); font-size:var(--text-sm); }
+  .focus-toggle { flex:none; }
+  .focus-mode .focus-head, .focus-mode .prefs, .focus-mode :global(.pomodoro-stats) { display:none; }
+  .focus-mode {
+    position:fixed; inset:0; z-index:1000; width:100vw; height:100dvh; max-width:none;
+    margin:0; padding:0; justify-content:center; gap:0; overflow:auto;
+    background:var(--bg); color:var(--ink);
   }
+  .focus-mode .timer-card {
+    width:min(100vw, 960px); min-height:100dvh; justify-content:center;
+    border:0; border-radius:0; box-shadow:none; background:var(--bg);
+  }
+  .focus-mode .ring-wrap { width:min(48vh, 420px, 74vw); }
+  .focus-mode .clock { font-size:clamp(4rem, 12vw, 8rem); }
+  .focus-mode .timer-context, .focus-mode .actions, .focus-mode .breaks, .focus-mode .duration { z-index:1; }
+  .edge-trigger { position:fixed; inset:0 auto 0 0; z-index:1002; width:18px; }
+  .focus-exit {
+    position:fixed; top:var(--space-4); right:var(--space-4); z-index:1005;
+    padding:var(--space-2) var(--space-3); border:0; background:transparent;
+    color:var(--ink-3); opacity:0; transition:opacity 140ms ease-out; cursor:pointer;
+  }
+  .focus-mode.edge-visible .focus-exit, .focus-mode .focus-exit:focus-visible { opacity:1; }
+
   h1 {
     font-family: var(--font-read);
     font-size: clamp(1.8rem, 4vw, 2.4rem);
@@ -281,13 +382,14 @@
     flex-direction: column;
     align-items: center;
     gap: var(--space-4);
-    padding: var(--space-5);
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-3);
-    background: var(--surface);
+    padding: clamp(var(--space-5), 6vw, var(--space-7));
+    border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--rule));
+    border-radius: 20px;
+    background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 56%), var(--surface);
+    box-shadow: var(--shadow-1);
   }
   .timer-card.is-break {
-    background: var(--surface-2);
+    background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--ok) 8%, transparent), transparent 56%), var(--surface);
   }
   .status-row {
     display: flex;
@@ -299,8 +401,8 @@
     color: var(--ink-3);
   }
   .phase {
-    font-weight: 600;
-    color: var(--ink-2);
+    font-weight: 700;
+    color: var(--accent-strong);
   }
   .round,
   .rounds {
@@ -381,16 +483,24 @@
     gap: var(--space-2);
   }
   .hint {
+    max-width: 44ch;
     font-size: var(--text-xs);
     color: var(--ink-3);
     text-align: center;
   }
+  .timer-context { max-width:48ch; text-align:center; }
+  .timer-context p { color:var(--ink-2); font-size:var(--text-sm); }
+  .remaining-label { display:inline-block; margin-top:var(--space-1); color:var(--ink-3); font-family:var(--font-mono); font-size:10px; }
+
   .prefs {
-    padding: var(--space-4);
+    padding: var(--space-5);
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
   }
+  .prefs-head { display:flex; flex-direction:column; gap:var(--space-1); margin-bottom:var(--space-2); }
+  .prefs-subtitle { color:var(--ink-3); font-size:var(--text-xs); }
+  .prefs :global(.badge[title]) { cursor:help; text-decoration:underline dotted; text-underline-offset:3px; }
   .prefs-head h2 {
     font-size: 0.9375rem;
     font-weight: 600;
@@ -418,6 +528,11 @@
   }
   .pref-label {
     flex: 1;
+  }
+  @media (max-width: 600px) {
+    .focus-head { align-items:flex-start; flex-direction:column; }
+    .timer-card { padding:var(--space-4); }
+    .breaks { flex-wrap:wrap; justify-content:center; }
   }
   @media (min-width: 700px) {
     .ring-wrap {

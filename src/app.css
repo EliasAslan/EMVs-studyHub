@@ -8,14 +8,14 @@
   --accent-soft: #eef1ff;
   --accent-ink: #ffffff;
 
-  --bg: #f5f5f7;
+  --bg: #f4f5f8;
   --surface: #ffffff;
-  --surface-2: #f0f0f3;
+  --surface-2: #f0f2f7;
   --ink: #1d1d1f;
   --ink-2: #4b4b53;
   --ink-3: #5f5f67;
-  --rule: #e6e6e9;
-  --rule-strong: #d3d3d8;
+  --rule: #e3e6ee;
+  --rule-strong: #cdd3e0;
 
   --tint-today: #f7f7f9;
   --tint-homework: #e7eefc;
@@ -33,7 +33,7 @@
 
   --radius-1: 6px;
   --radius-2: 9px;
-  --radius-3: 12px;
+  --radius-3: 14px;
   --radius-pill: 999px;
 
   --space-1: 4px;
@@ -57,8 +57,8 @@
   --text-2xl: 1.75rem;
   --text-3xl: 2.25rem;
 
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.04);
-  --shadow-2: 0 8px 30px rgb(0 0 0 / 0.08);
+  --shadow-1: 0 1px 3px rgb(24 34 66 / 0.05), 0 4px 12px rgb(24 34 66 / 0.035);
+  --shadow-2: 0 10px 32px rgb(24 34 66 / 0.1);
   --shadow-3: 0 20px 60px rgb(0 0 0 / 0.14);
 
   --motion: 160ms cubic-bezier(0.2, 0.7, 0.3, 1);
@@ -249,7 +249,7 @@ ol {
 
 /* ---------- shared controls ---------- */
 
-.btn {
+ .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -264,11 +264,13 @@ ol {
   font-weight: 550;
   line-height: 1;
   text-decoration: none;
-  transition: background var(--motion), border-color var(--motion), transform var(--motion);
+  transition: background var(--motion), border-color var(--motion), transform var(--motion), box-shadow var(--motion), color var(--motion);
 }
 
 .btn:hover {
   background: var(--surface-2);
+  border-color: var(--rule-strong);
+  box-shadow: var(--shadow-1);
 }
 
 .btn:active {
@@ -361,7 +363,7 @@ ol {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--radius-3);
-  box-shadow: none;
+  box-shadow: var(--shadow-1);
 }
 
 .chip {
@@ -418,12 +420,13 @@ ol {
   background: var(--warn);
 }
 
-.section-title {
+ .section-title {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
+  padding-bottom: var(--space-1);
 }
 
 .section-title h2 {
@@ -485,4 +488,14 @@ ol {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Shared interaction cues: make clickable cards and rows feel intentional. */
+a[href]:not(.btn):focus-visible,
+button:not(.btn):focus-visible {
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .card:has(a:hover) { border-color: var(--rule-strong); }
 }

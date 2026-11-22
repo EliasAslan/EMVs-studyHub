@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import {
     appState,
     todayChecklist,
@@ -10,6 +11,9 @@
     moduleTitle,
   } from '../stores/app.js';
   import { openPalette } from '../stores/ui.js';
+  import { navigate } from '../router.js';
+  import { subscribePomodoro, getPomodoroPrefs, startPomodoro, STATUS, PHASE, remainingMs } from '../services/pomodoroEngine.js';
+  import { formatClock, progressPct, roundLabel } from '../services/pomodoro.js';
   import {
     todayKey,
     formatDate,
@@ -26,6 +30,10 @@
 
   let captureOpen = false;
   let captureMode = 'note';
+  let timerState = null;
+  let timerPrefs = { workMinutes: 25 };
+  let timerNow = Date.now();
+  let timerTick = 0;
 
   const isMac =
     typeof navigator !== 'undefined' &&
@@ -33,6 +41,11 @@
   const shortcutLabel = isMac ? '⌘K' : 'Ctrl K';
 
   $: today = todayKey();
+  $: timerClock = timerState ? formatClock(remainingMs(timerState, timerNow)) : formatClock((Number(timerPrefs.workMinutes) || 25) * 60000);
+  $: timerRound = timerState ? (roundLabel(timerState) || (timerState.phase === PHASE.work ? 'Fokus-Runde' : 'Pause')) : `${Number(timerPrefs.workMinutes) || 25} min Fokus · 5 min Pause`;
+  $: timerProgress = timerState ? progressPct(timerState, timerNow) : 0;
+  $: timerStatus = !timerState ? 'Bereit für eine fokussierte Runde?' : timerState.status === STATUS.paused ? 'Pausiert — mach weiter, wenn du bereit bist.' : timerState.status === STATUS.workDone ? 'Stark gemacht. Zeit für eine Pause.' : timerState.status === STATUS.breakDone ? 'Pause vorbei. Bereit für die nächste Runde?' : timerState.phase === PHASE.work ? 'Du bist gerade in deiner Fokusrunde.' : 'Deine Pause läuft gerade.';
+  $: timerActionLabel = !timerState ? 'Fokus starten' : timerState.status === STATUS.paused ? 'Timer fortsetzen' : timerState.status === STATUS.workDone ? 'Pause auswählen' : timerState.status === STATUS.breakDone ? 'Nächste Runde' : timerState.phase === PHASE.work ? 'Weiter fokussieren' : 'Pause fortsetzen';
   $: nextExam =
     ($appState.exams || [])
       .filter((exam) => exam.date && exam.date >= today)
@@ -46,6 +59,35 @@
   $: shortcuts = ($appState.links || [])
     .filter((link) => !link.moduleId || programModules.some((m) => m.id === link.moduleId))
     .slice(0, 2);
+
+  onMount(() => {
+    timerPrefs = getPomodoroPrefs();
+    const unsubscribe = subscribePomodoro(({ state, prefs }) => {
+      timerState = state;
+      timerPrefs = prefs;
+    });
+    const interval = setInterval(() => {
+      timerTick += 1;
+      timerNow = Date.now();
+    }, 1000);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  });
+
+  $: if (timerTick >= 0) timerNow = Date.now();
+
+  function goToFocus() {
+    navigate('/focus');
+  }
+
+  function startFromHome() {
+    if (!timerState) {
+      startPomodoro({ minutes: Number(timerPrefs.workMinutes) || 25 });
+    }
+    navigate('/focus');
+  }
 
   function openCapture(mode) {
     captureMode = mode;
@@ -88,6 +130,17 @@
       </span>
     </a>
   {/if}
+
+  <section class="focus-compact" aria-label="Fokus-Timer">
+    <div class="focus-compact-copy">
+      <strong>{timerState ? (timerState.phase === PHASE.work ? 'Fokus läuft' : 'Pause läuft') : 'Fokuszeit'}</strong>
+      <span>{timerState ? timerStatus : timerRound}</span>
+    </div>
+    <span class="focus-compact-clock mono">{timerClock}</span>
+    <button class="focus-compact-action" type="button" on:click={startFromHome} title="Pomodoro öffnen">
+      {timerState ? 'Öffnen' : 'Starten'} <Icon name="chevronRight" size={15} />
+    </button>
+  </section>
 
   <section class="block" aria-labelledby="checklist-title">
     <div class="section-title">
@@ -237,6 +290,27 @@
   }
   .block {
     min-width: 0;
+  }
+  .focus-compact {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    width: min(100%, 720px);
+    padding: var(--space-3) var(--space-4);
+    border-block: 1px solid var(--rule);
+    color: var(--ink);
+  }
+  .focus-compact-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:2px; }
+  .focus-compact-copy strong { font-size:var(--text-sm); font-weight:650; }
+  .focus-compact-copy span { overflow:hidden; color:var(--ink-3); font-size:var(--text-xs); text-overflow:ellipsis; white-space:nowrap; }
+  .focus-compact-clock { color:var(--accent-strong); font-size:var(--text-lg); font-weight:650; }
+  .focus-compact-action { display:inline-flex; align-items:center; gap:4px; min-height:36px; padding:0 var(--space-2); border:0; border-radius:var(--radius-1); background:transparent; color:var(--accent-strong); font-size:var(--text-sm); font-weight:600; }
+  .focus-compact-action:hover { background:var(--accent-soft); }
+  @media (max-width: 480px) {
+    .focus-compact { gap:var(--space-2); padding-inline:var(--space-2); }
+    .focus-compact-copy span { max-width:18ch; }
+    .focus-compact-clock { font-size:var(--text-base); }
+    .focus-compact-action { font-size:var(--text-xs); }
   }
   .count {
     font-size: var(--text-xs);
