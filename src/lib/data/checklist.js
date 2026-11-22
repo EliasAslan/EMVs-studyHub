@@ -4,6 +4,7 @@
  * Rules (Part 4):
  * - open homework due within the checklist horizon (today .. +5 days) appears
  *   automatically, sorted by due date
+ * - homework completed today remains visible as checked until the next day
  * - custom items are always visible
  * - "studiert heute" is a per-day item
  * - checked state is per-day and resets on the next day
@@ -37,12 +38,17 @@ export function checklistForDay(state, now = new Date()) {
   const checked = checkedForDay(state, now);
 
   const homework = (state.homework || [])
-    .filter(
-      (h) =>
-        !h.done &&
+    .filter((h) => {
+      const completedToday =
+        h.done &&
+        Number.isFinite(h.doneAt) &&
+        todayKey(new Date(h.doneAt)) === today;
+      return (
+        (!h.done || completedToday) &&
         h.dueDate &&
-        h.dueDate <= addDaysKey(today, CHECKLIST_HORIZON_DAYS),
-    )
+        h.dueDate <= addDaysKey(today, CHECKLIST_HORIZON_DAYS)
+      );
+    })
     .sort((a, b) => {
       const ad = a.dueDate || '9999-12-31';
       const bd = b.dueDate || '9999-12-31';
@@ -56,7 +62,7 @@ export function checklistForDay(state, now = new Date()) {
       dueDate: h.dueDate || null,
       dueLabel: h.dueDate ? relativeDayLabel(h.dueDate, now) : '',
       isOverdue: !!h.dueDate && h.dueDate < today,
-      checked: false,
+      checked: !!h.done,
     }));
 
   const custom = (state.checklistItems || [])

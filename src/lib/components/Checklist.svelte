@@ -33,21 +33,23 @@
   {#each items as item (item.id)}
     <div class="item" class:done={item.checked}>
       <button
-        class="check"
+        class="item-toggle"
         type="button"
         aria-pressed={item.checked}
         aria-label={`${item.checked ? 'Erledigt' : 'Offen'}: ${item.text}`}
         on:click={() => toggle(item)}
       >
-        {#if item.checked}<Icon name="check" size={14} />{/if}
-      </button>
-      <span class="text">{item.text}</span>
-      {#if item.kind === 'homework'}
-        <span class="tag">Hausaufgabe</span>
-        <span class="homework-due" class:overdue={item.isOverdue}>
-          {#if item.dueDate}{formatDate(item.dueDate, 'short') || item.dueDate}{#if item.dueLabel} · {item.dueLabel}{/if}{:else}Kein Termin{/if}
+        <span class="check" aria-hidden="true">
+          {#if item.checked}<Icon name="check" size={12} />{/if}
         </span>
-      {/if}
+        <span class="text">{item.text}</span>
+        {#if item.kind === 'homework'}
+          <span class="tag">Hausaufgabe</span>
+          <span class="homework-due" class:overdue={item.isOverdue}>
+            {#if item.dueDate}{formatDate(item.dueDate, 'short') || item.dueDate}{#if item.dueLabel} · {item.dueLabel}{/if}{:else}Kein Termin{/if}
+          </span>
+        {/if}
+      </button>
       {#if item.kind === 'custom'}
         <button class="remove" type="button" aria-label={`${item.text} entfernen`} on:click={() => dispatch('remove', item)}>
           <Icon name="x" size={14} />
@@ -90,28 +92,50 @@
   .item {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    min-height: 48px;
-    padding: var(--space-1) var(--space-2);
+    min-height: 40px;
+    padding: 2px 4px;
     border-radius: var(--radius-2);
   }
   .item:hover {
     background: var(--surface-2);
   }
+  .item-toggle {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    gap: var(--space-3);
+    min-width: 0;
+    min-height: 36px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: var(--radius-1);
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .item-toggle:focus-visible,
+  .remove:focus-visible,
+  .add-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .check {
     display: grid;
     place-items: center;
-    width: 44px;
-    height: 44px;
+    width: 18px;
+    height: 18px;
     flex: none;
     border: 1.5px solid var(--rule-strong);
-    border-radius: 6px;
+    border-radius: 5px;
     background: var(--surface);
     color: var(--accent-ink);
+    transition: background 120ms ease, border-color 120ms ease;
   }
   .item.done .check {
     background: var(--accent);
     border-color: var(--accent);
+    color: white;
   }
   .item.done .text {
     color: var(--ink-3);
@@ -119,9 +143,11 @@
   }
   .text {
     flex: 1;
+    min-width: 0;
     font-size: var(--text-sm);
   }
   .tag {
+    flex: none;
     padding: 1px 6px;
     border-radius: var(--radius-pill);
     background: var(--surface-2);
@@ -132,12 +158,14 @@
   .remove {
     display: grid;
     place-items: center;
-    width: 44px;
-    height: 44px;
+    width: 30px;
+    height: 30px;
+    flex: none;
     border: 0;
     border-radius: var(--radius-1);
     background: transparent;
     color: var(--ink-3);
+    cursor: pointer;
   }
   .remove:hover {
     background: var(--surface);
@@ -148,13 +176,14 @@
     align-items: center;
     gap: var(--space-2);
     align-self: flex-start;
-    min-height: 44px;
+    min-height: 36px;
     padding: var(--space-1) var(--space-2);
     border: 0;
     border-radius: var(--radius-2);
     background: transparent;
     color: var(--ink-3);
     font-size: var(--text-sm);
+    cursor: pointer;
   }
   .add-btn:hover {
     color: var(--ink);
@@ -165,8 +194,8 @@
     gap: var(--space-2);
     padding: var(--space-2);
   }
-
   .homework-due {
+    flex: none;
     color: var(--ink-3);
     font-size: var(--text-xs);
     white-space: nowrap;
@@ -176,16 +205,16 @@
     font-weight: 600;
   }
   @media (max-width: 620px) {
-    .item {
+    .item-toggle {
       flex-wrap: wrap;
       column-gap: var(--space-2);
       row-gap: 3px;
     }
-    .item .text {
-      min-width: calc(100% - 92px);
+    .item-toggle .text {
+      min-width: calc(100% - 28px);
     }
     .homework-due {
-      margin-left: 34px;
+      margin-left: 30px;
       white-space: normal;
     }
   }
