@@ -50,6 +50,34 @@ import { preferences, apply } from '../services/appearance.js';
   let lessonDay = 1;
   // ---- Tab state ----
   let activeTab = 'appearance'; // appearance | home | behaviour
+
+  // ---- Appearance tab state ----
+  let accentPreview = $preferences.accent.value;
+  let textSizeValue = $preferences.textSize;
+  let densityValue = $preferences.density;
+  let reduceMotionValue = $preferences.reduceMotion;
+
+  // ---- Home tab state ----
+  let homeHero = $preferences.home.hero;
+  let homeNextExam = $preferences.home.nextExam;
+  let homeFocusStrip = $preferences.home.focusStrip;
+  let homeChecklist = $preferences.home.checklist;
+  let homeNextLesson = $preferences.home.nextLesson;
+  let homeRecentNotes = $preferences.home.recentNotes;
+  let homeLinks = $preferences.home.links;
+  let homeOrder = [...$preferences.homeOrder];
+
+  // ---- Behaviour tab state ----
+  let gradeMidMin = Number($preferences.gradeBands?.midMin ?? 2.5);
+  let gradeHighMin = Number($preferences.gradeBands?.highMin ?? 4);
+  let horizonDays = $preferences.checklistHorizon ?? 5;
+  let includeOverdue = $preferences.includeOverdue ?? true;
+
+  // ---- Form dirty tracking ----
+  let appearanceDirty = false;
+  let homeDirty = false;
+  let behaviourDirty = false;
+
   let lessonStart = '08:00';
   let lessonEnd = '09:00';
   let lessonModule = '';
@@ -305,6 +333,29 @@ import { preferences, apply } from '../services/appearance.js';
       toast('Datei konnte nicht gelesen werden');
     } finally {
       busy = false;
+    }
+  }
+
+  async function doSave() {
+    let changed = false;
+
+    if (appearanceDirty) {
+      saveAppearance();
+      changed = true;
+    }
+    if (homeDirty) {
+      saveHome();
+      changed = true;
+    }
+    if (behaviourDirty) {
+      saveBehaviour();
+      changed = true;
+    }
+
+    if (changed) {
+      toast('Einstellungen gespeichert');
+    } else {
+      toast('Keine Änderungen');
     }
   }
 
