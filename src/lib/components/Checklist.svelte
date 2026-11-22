@@ -36,7 +36,6 @@
         class="item-toggle"
         type="button"
         aria-pressed={item.checked}
-        aria-label={`${item.checked ? 'Erledigt' : 'Offen'}: ${item.text}`}
         on:click={() => toggle(item)}
       >
         <span class="check" aria-hidden="true">

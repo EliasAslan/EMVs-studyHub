@@ -49,8 +49,8 @@ export function checklistForDay(state, now = new Date(), horizonDays = DEFAULT_H
   const checked = checkedForDay(state, now);
 
   const horizonFromPrefs = $preferences.checklistHorizon;
-  const effectiveHorizon = horizonDays ?? horizonFromPrefs ?? DEFAULT_HORIZON_DAYS;
-  const effectiveIncludeOverdue = includeOverdue !== false && ($preferences.includeOverdue ?? includeOverdue);
+  const effectiveHorizon = horizonFromPrefs ?? DEFAULT_HORIZON_DAYS;
+  const effectiveIncludeOverdue = $preferences.includeOverdue ?? includeOverdue;
 
   const homework = (state.homework || [])
     .filter((h) => {
@@ -58,11 +58,13 @@ export function checklistForDay(state, now = new Date(), horizonDays = DEFAULT_H
         h.done &&
         Number.isFinite(h.doneAt) &&
         todayKey(new Date(h.doneAt)) === today;
+      const dueWithinHorizon = h.dueDate <= addDaysKey(today, effectiveHorizon);
+      const shouldInclude = effectiveIncludeOverdue || h.dueDate >= today;
       return (
         (!h.done || completedToday) &&
         h.dueDate &&
-        h.dueDate <= addDaysKey(today, effectiveHorizon) &&
-        (effectiveIncludeOverdue || h.dueDate >= today),
+        dueWithinHorizon &&
+        shouldInclude
       );
     })
     .sort((a, b) => {
@@ -70,16 +72,19 @@ export function checklistForDay(state, now = new Date(), horizonDays = DEFAULT_H
       const bd = b.dueDate || '9999-12-31';
       return ad < bd ? -1 : ad > bd ? 1 : (a.createdAt || 0) - (b.createdAt || 0);
     })
-    .map((h) => ({
-      id: `hw:${h.id}`,
-      kind: 'homework',
-      homeworkId: h.id,
-      text: h.title,
-      dueDate: h.dueDate || null,
-      dueLabel: h.dueDate ? relativeDayLabel(h.dueDate, now) : '',
-      isOverdue: !!h.dueDate && h.dueDate < today && effectiveIncludeOverdue,
-      checked: false,
-    }));
+    .map((h) => {
+      const isDoneToday = h.done && Number.isFinite(h.doneAt) && todayKey(new Date(h.doneAt)) === today;
+      return {
+        id: `hw:${h.id}`,
+        kind: 'homework',
+        homeworkId: h.id,
+        text: h.title,
+        dueDate: h.dueDate || null,
+        dueLabel: h.dueDate ? relativeDayLabel(h.dueDate, now) : '',
+        isOverdue: !!h.dueDate && h.dueDate < today && effectiveIncludeOverdue,
+        checked: isDoneToday,
+      };
+    });
 
   const custom = (state.checklistItems || [])
     .filter((c) => c.kind !== 'studied')
