@@ -293,6 +293,20 @@
 
   $: modules = $appState.modules || [];
   $: primaryModes = ['note', 'photo', 'homework'];
+  function onModesKeydown(event) {
+    const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+    const index = tabs.findIndex((t) => t === document.activeElement);
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      const next = tabs[(index + 1) % tabs.length];
+      next?.focus();
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const prev = tabs[(index - 1 + tabs.length) % tabs.length];
+      prev?.focus();
+    }
+  }
+
   $: modalTitle =
     mode === 'exam'
       ? 'Neue Prüfung'
@@ -305,20 +319,25 @@
 
 <Modal {open} title={modalTitle} on:close={close}>
   {#if primaryModes.includes(mode)}
-    <div class="modes" role="tablist" aria-label="Was erfassen?">
-      <button class="mode" class:active={mode === 'note'} type="button" role="tab" aria-selected={mode === 'note'} on:click={() => (mode = 'note')}>
-        <Icon name="notes" /> Notiz
-      </button>
-      <button class="mode" class:active={mode === 'photo'} type="button" role="tab" aria-selected={mode === 'photo'} on:click={() => (mode = 'photo')}>
-        <Icon name="photo" /> Foto
-      </button>
-      <button class="mode" class:active={mode === 'homework'} type="button" role="tab" aria-selected={mode === 'homework'} on:click={() => (mode = 'homework')}>
-        <Icon name="homework" /> Hausaufgabe
-      </button>
+    <div class="modes" role="tablist" aria-label="Was erfassen?" tabindex="-1" on:keydown={onModesKeydown}>
+      {#each primaryModes as m (m)}
+        <button
+          class="mode"
+          class:active={mode === m}
+          type="button"
+          role="tab"
+          id="capture-tab-{m}"
+          aria-selected={mode === m}
+          aria-controls="capture-panel"
+          tabindex={mode === m ? 0 : -1}
+          on:click={() => (mode = m)}
+        >
+          <Icon name={m === 'photo' ? 'photo' : m === 'homework' ? 'homework' : 'notes'} /> {m === 'homework' ? 'Hausaufgabe' : m === 'note' ? 'Notiz' : 'Foto'}
+        </button>
+      {/each}
     </div>
-  {/if}
-
-  <div class="stack">
+    <div class="modes-panel" id="capture-panel" role="tabpanel" aria-labelledby="capture-tab-{mode}">
+      <div class="stack">
     {#if mode === 'homework'}
       <label class="field">
         <span>Titel</span>
@@ -421,7 +440,9 @@
     {#if error}
       <p class="error" role="alert">{error}</p>
     {/if}
-  </div>
+    </div>
+    </div>
+  {/if}
 
   <svelte:fragment slot="footer">
     <button class="btn btn-ghost" type="button" on:click={close}>Abbrechen</button>

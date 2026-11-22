@@ -105,7 +105,7 @@
             on:click={() => (selected = day.key)}
           >
             <span class="sr-only">
-              {`${formatDate(day.key, 'long')}${day.homework.length ? `, ${day.homework.length} Hausaufgaben` : ''}${day.exams.length ? `, ${day.exams.length} Prüfungen` : ''}`}
+              {`${formatDate(day.key, 'long')}${day.isToday ? ', heute' : ''}${day.homework.length ? `, ${day.homework.length} Hausaufgaben` : ''}${day.exams.length ? `, ${day.exams.length} Prüfungen` : ''}`}
             </span>
             <span class="num mono" aria-hidden="true">{Number(day.key.slice(8, 10))}</span>
             <span class="marks" aria-hidden="true">

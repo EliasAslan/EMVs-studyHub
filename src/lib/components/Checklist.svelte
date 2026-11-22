@@ -101,8 +101,8 @@
   .check {
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: 44px;
+    height: 44px;
     flex: none;
     border: 1.5px solid var(--rule-strong);
     border-radius: 6px;
@@ -132,8 +132,8 @@
   .remove {
     display: grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     border: 0;
     border-radius: var(--radius-1);
     background: transparent;
@@ -148,7 +148,7 @@
     align-items: center;
     gap: var(--space-2);
     align-self: flex-start;
-    min-height: 36px;
+    min-height: 44px;
     padding: var(--space-1) var(--space-2);
     border: 0;
     border-radius: var(--radius-2);
@@ -182,7 +182,7 @@
       row-gap: 3px;
     }
     .item .text {
-      min-width: calc(100% - 36px);
+      min-width: calc(100% - 92px);
     }
     .homework-due {
       margin-left: 34px;

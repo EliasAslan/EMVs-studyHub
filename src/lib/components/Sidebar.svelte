@@ -109,7 +109,15 @@
   }
 </script>
 
-<aside class="sidebar" class:collapsed={compact} class:open aria-label="Hauptnavigation" id="app-sidebar">
+<aside
+  class="sidebar"
+  class:collapsed={compact}
+  class:open
+  aria-label="Hauptnavigation"
+  id="app-sidebar"
+  role={open && !isDesktop ? 'dialog' : undefined}
+  aria-modal={open && !isDesktop ? 'true' : undefined}
+>
   <div class="brand-row">
     <a class="brand" href="#/" aria-label={compact ? 'Study Hub' : undefined} on:click={() => !isDesktop && onClose?.()}>
       <span class="brand-mark" aria-hidden="true">S</span>
@@ -383,7 +391,7 @@
     justify-content: center;
     gap: 6px;
     flex: 1;
-    min-height: 28px;
+    min-height: 40px;
     padding: 0 6px;
     border: 0;
     border-radius: 7px;
@@ -484,7 +492,7 @@
     align-items: center;
     gap: 6px;
     width: 100%;
-    min-height: 26px;
+    min-height: 40px;
     padding: 0 10px;
     border: 0;
     border-radius: 6px;
@@ -607,13 +615,13 @@
   }
   .foot-toggle {
     position: absolute;
-    top: -11px;
+    top: -32px;
     left: 50%;
     z-index: 1;
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     border: 1px solid var(--rule);
     border-radius: 50%;

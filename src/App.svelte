@@ -47,7 +47,9 @@
 <Shell>
   {#if viewPromise}
     {#await viewPromise}
-      <div class="route-loading" aria-busy="true" aria-label="Ansicht wird geladen"></div>
+      <div class="route-loading" role="status" aria-live="polite" aria-busy="true">
+        <span class="sr-only">Ansicht wird geladen</span>
+      </div>
     {:then module}
       <svelte:component this={module.default} />
     {:catch}

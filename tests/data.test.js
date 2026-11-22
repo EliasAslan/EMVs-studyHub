@@ -152,6 +152,20 @@ describe('checklist', () => {
     expect(remainingCount(state, NOW)).toBe(3);
   });
 
+  it('includes homework due within the five-day horizon', () => {
+    const state = baseState({
+      homework: [
+        { id: 'h1', title: 'In drei Tagen', dueDate: '2026-11-07', done: false },
+        { id: 'h2', title: 'In sechs Tagen', dueDate: '2026-11-10', done: false },
+      ],
+      checklistItems: [],
+      checklist: { date: '2026-11-04', checked: {} },
+    });
+    const items = checklistForDay(state, NOW).items;
+    expect(items.some((i) => i.id === 'hw:h1')).toBe(true);
+    expect(items.some((i) => i.id === 'hw:h2')).toBe(false);
+  });
+
   it('ignores checks from a previous day', () => {
     const state = baseState({
       checklistItems: [{ id: 'c1', text: 'Alt', kind: 'custom', order: 0 }],

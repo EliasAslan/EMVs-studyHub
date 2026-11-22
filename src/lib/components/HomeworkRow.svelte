@@ -159,7 +159,7 @@
     border-radius: var(--radius-1);
     background: transparent;
     color: var(--ink-3);
-    opacity: 0.45;
+    opacity: 1;
   }
   .hw-row:hover .icon,
   .icon:focus-visible {

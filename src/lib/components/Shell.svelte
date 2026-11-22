@@ -55,6 +55,32 @@
     const first = items[0];
     const last = items[items.length - 1];
     const active = document.activeElement;
+    const move = (from, delta) => {
+      const index = items.indexOf(from);
+      const next = items[(index + delta + items.length) % items.length];
+      next?.focus();
+      return next;
+    };
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      move(active, 1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      move(active, -1);
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      items[0]?.focus();
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      items[items.length - 1]?.focus();
+      return;
+    }
     if (event.shiftKey && (active === first || !fabMenu.contains(active))) {
       event.preventDefault();
       last.focus();
@@ -186,6 +212,9 @@
       }
 
       if (editable) return;
+      // Focus mode is a full-screen layer; global shortcuts must not open
+      // overlays or move routes behind it.
+      if (typeof document !== 'undefined' && document.querySelector('.focus-mode')) return;
       if ($paletteOpen || switcherOpen || captureOpen || drawerOpen || captureMenuOpen) return;
 
       if (event.key === '?') {
@@ -232,6 +261,7 @@
       if (document.visibilityState === 'hidden') flush();
     };
     const onHelpShortcut = () => {
+      if (typeof document !== 'undefined' && document.querySelector('.focus-mode')) return;
       helpOpen = true;
     };
     window.addEventListener('keydown', onKey);

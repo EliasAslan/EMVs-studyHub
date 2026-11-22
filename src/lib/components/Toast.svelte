@@ -53,7 +53,11 @@
     color: inherit;
   }
   .close {
-    padding: 0 var(--space-1);
+    display: grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
   }
   @media (min-width: 900px) {
     .toasts {

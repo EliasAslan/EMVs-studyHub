@@ -137,6 +137,7 @@ h4 {
   line-height: 1.2;
   font-weight: 600;
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 h1 { font-size: var(--text-3xl); }
@@ -151,6 +152,7 @@ h4 { font-size: var(--text-lg); }
 
 p {
   margin: 0;
+  text-wrap: pretty;
 }
 
 a {
@@ -192,7 +194,6 @@ ol {
 :focus-visible {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
-  border-radius: var(--radius-1);
   box-shadow: 0 0 0 4px var(--accent-soft);
 }
 

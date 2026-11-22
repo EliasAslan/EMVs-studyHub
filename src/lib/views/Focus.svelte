@@ -166,7 +166,7 @@
       class="focus-exit"
       type="button"
       on:click={() => setFocusMode(false)}
-      use:hint={{ text: 'Fokusmodus beenden', shortcut: 'Esc' }}
+      use:hint={{ text: 'Esc-Taste' }}
       aria-label="Fokusmodus beenden"
     >
       <Icon name="x" size={16} /> Beenden
@@ -378,7 +378,6 @@
   .focus-mode .ring-wrap { width:min(44vh, 400px, 72vw); }
   .focus-mode .clock { font-size:clamp(3.5rem, 10vw, 7rem); }
   .focus-mode .hint, .focus-mode .remaining-label { display:none; }
-  .focus-mode .timer-context, .focus-mode .actions, .focus-mode .breaks, .focus-mode .duration { z-index:1; }
   .focus-exit {
     position:fixed;
     top:max(16px, env(safe-area-inset-top, 0px));

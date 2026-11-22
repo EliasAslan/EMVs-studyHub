@@ -19,7 +19,7 @@
   $: today = todayKey(dayNow);
   $: exams = [...($appState.exams || [])].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   $: upcoming = exams.filter((e) => e.date && e.date >= today).sort((a, b) => (a.date < b.date ? -1 : 1));
-  $: past = exams.filter((e) => !e.date || e.date < today);
+  $: past = exams.filter((e) => !e.date || e.date < today).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   function openCreate() {
     editing = null;
@@ -81,6 +81,14 @@
   function gradeLabel(grade) {
     if (typeof grade !== 'number') return '';
     return Number.isInteger(grade) ? String(grade) : grade.toFixed(1);
+  }
+
+  /** Grade bands for the small feedback display: rot < mid < grün. */
+  function gradeBand(grade) {
+    if (typeof grade !== 'number') return null;
+    if (grade >= 4) return 'high';
+    if (grade >= 2.5) return 'mid';
+    return 'low';
   }
 
   /** 6-segment fill: 1-5 full, 6th segment half when the grade has a .5 */
@@ -186,7 +194,7 @@
             </button>
             {#if typeof exam.grade === 'number'}
               <span class="grade-block">
-                <span class="grade mono">{gradeLabel(exam.grade)}</span>
+                <span class="grade mono" class:low={gradeBand(exam.grade) === 'low'} class:mid={gradeBand(exam.grade) === 'mid'} class:high={gradeBand(exam.grade) === 'high'}>{gradeLabel(exam.grade)}</span>
                 <span class="grade-scale" aria-hidden="true">
                   <span class="scale-end">1</span>
                   {#each [1, 2, 3, 4, 5, 6] as i (i)}
@@ -288,12 +296,14 @@
     padding: var(--space-1);
   }
   .exam-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-3);
     min-height: 64px;
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-2);
+    cursor: pointer;
   }
   .exam-row:hover {
     background: var(--surface-2);
@@ -337,10 +347,6 @@
   .month {
     font-size: 9px;
     color: var(--ink-3);
-  }
-  .exam-row {
-    position: relative;
-    cursor: pointer;
   }
   .exam-open {
     position: relative;
@@ -417,12 +423,17 @@
     font-weight: 600;
     letter-spacing: 0.05em;
   }
-  .grade {
-    padding: 2px var(--space-3);
-    border-radius: var(--radius-pill);
+  .grade.low {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+  .grade.mid {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  .grade.high {
     background: var(--ok-soft);
     color: var(--ok);
-    font-weight: 700;
   }
   .grade-seg {
     width: 8px;
@@ -448,7 +459,7 @@
     border-radius: var(--radius-1);
     background: transparent;
     color: var(--ink-3);
-    opacity: 0.45;
+    opacity: 1;
   }
   .exam-row:hover .icon,
   .icon:focus-visible {

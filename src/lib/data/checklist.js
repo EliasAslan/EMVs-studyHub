@@ -2,7 +2,8 @@
  * Daily checklist derivation. Pure and DOM-free.
  *
  * Rules (Part 4):
- * - homework due today or overdue appears automatically, sorted by due date
+ * - open homework due within the checklist horizon (today .. +5 days) appears
+ *   automatically, sorted by due date
  * - custom items are always visible
  * - "studiert heute" is a per-day item
  * - checked state is per-day and resets on the next day
@@ -11,6 +12,18 @@
 
 import { STUDIED_ID } from './entities.js';
 import { todayKey, relativeDayLabel } from './dates.js';
+
+/** How far ahead the daily checklist lists open homework. */
+const CHECKLIST_HORIZON_DAYS = 5;
+
+function addDaysKey(key, days) {
+  const d = new Date(`${key}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export function checkedForDay(state, now = new Date()) {
   const today = todayKey(now);
@@ -24,7 +37,12 @@ export function checklistForDay(state, now = new Date()) {
   const checked = checkedForDay(state, now);
 
   const homework = (state.homework || [])
-    .filter((h) => !h.done && h.dueDate && h.dueDate <= today)
+    .filter(
+      (h) =>
+        !h.done &&
+        h.dueDate &&
+        h.dueDate <= addDaysKey(today, CHECKLIST_HORIZON_DAYS),
+    )
     .sort((a, b) => {
       const ad = a.dueDate || '9999-12-31';
       const bd = b.dueDate || '9999-12-31';

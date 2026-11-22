@@ -23,6 +23,7 @@
   let url = '';
   let kind = 'custom';
   let moduleId = '';
+  let error = '';
 
   $: modules = $appState.modules || [];
   $: links = ($appState.links || [])
@@ -39,6 +40,7 @@
     url = '';
     kind = 'custom';
     moduleId = $filters.moduleId === 'all' ? '' : $filters.moduleId;
+    error = '';
     open = true;
   }
 
@@ -48,6 +50,7 @@
     url = link.url;
     kind = link.kind || 'custom';
     moduleId = link.moduleId || '';
+    error = '';
     open = true;
   }
 
@@ -61,13 +64,14 @@
     const nextLabel = label.trim();
     const nextUrl = normaliseUrl(url);
     if (!nextLabel) {
-      toast('Bezeichnung fehlt.');
+      error = 'Bezeichnung fehlt.';
       return;
     }
     if (!nextUrl || !/^https?:\/\/[^\s.]+\.[^\s]+/i.test(nextUrl)) {
-      toast('Bitte eine gültige URL angeben.');
+      error = 'Bitte eine gültige URL angeben.';
       return;
     }
+    error = '';
     if (editing) {
       updateLink(editing.id, { label: nextLabel, url: nextUrl, kind, moduleId: moduleId || null });
       toast('Link gespeichert');
@@ -146,11 +150,11 @@
   <div class="stack">
     <label class="field">
       <span>Bezeichnung</span>
-      <input class="input" bind:value={label} data-autofocus placeholder="z. B. Teams M294" />
+      <input class="input" bind:value={label} data-autofocus placeholder="z. B. Teams M294" on:input={() => (error = '')} />
     </label>
     <label class="field">
       <span>URL</span>
-      <input class="input" bind:value={url} placeholder="https://…" inputmode="url" />
+      <input class="input" bind:value={url} placeholder="https://…" inputmode="url" on:input={() => (error = '')} />
     </label>
     <div class="two">
       <label class="field">
@@ -173,6 +177,9 @@
     </div>
     {#if editing && editing.moduleId}
       <p class="muted small">Aktuell: {moduleLabel(editing.moduleId)}</p>
+    {/if}
+    {#if error}
+      <p class="error" role="alert">{error}</p>
     {/if}
   </div>
   <svelte:fragment slot="footer">
@@ -244,5 +251,9 @@
   }
   .small {
     font-size: var(--text-xs);
+  }
+  .error {
+    color: var(--danger);
+    font-size: var(--text-sm);
   }
 </style>

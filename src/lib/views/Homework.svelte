@@ -508,7 +508,7 @@
     padding: var(--space-1);
   }
   .muted-list {
-    opacity: 0.8;
+    color: var(--ink-2);
   }
   .section-label {
     margin-bottom: var(--space-2);

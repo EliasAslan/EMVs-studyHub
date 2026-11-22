@@ -17,6 +17,8 @@
   let inputEl;
   let paletteEl;
   let wasOpen = false;
+  let previousOverflow = null;
+  let lastFocused = null;
 
   const navigation = [
     { id: 'nav-today', label: 'Heute', group: 'Gehen', icon: 'today', href: '#/' },
@@ -54,9 +56,20 @@
     wasOpen = true;
     query = '';
     activeIndex = 0;
+    lastFocused = document.activeElement;
+    previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     queueMicrotask(() => inputEl?.focus());
   }
-  $: if (!open) wasOpen = false;
+  $: if (!open) {
+    if (previousOverflow !== null) document.body.style.overflow = previousOverflow;
+    previousOverflow = null;
+    wasOpen = false;
+  }
+  $: if (!open && lastFocused) {
+    lastFocused.focus?.();
+    lastFocused = null;
+  }
 
   function normText(v) {
     return String(v || '').toLowerCase();
@@ -183,7 +196,7 @@
         {:else}
           {#each items as item, i (item.id)}
             {#if i === 0 || items[i - 1].group !== item.group}
-              <p class="group">{item.group}</p>
+              <p class="group" role="group">{item.group}</p>
             {/if}
             <button
               id={`palette-item-${i}`}
@@ -224,6 +237,7 @@
     padding: var(--space-4);
     background: var(--overlay);
     backdrop-filter: blur(4px);
+    overscroll-behavior: contain;
   }
   @media (min-width: 640px) {
     .overlay {

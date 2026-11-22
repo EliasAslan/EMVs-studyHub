@@ -8,6 +8,7 @@
 
   let dialog;
   let previousFocus = null;
+  let previousOverflow = null;
 
   function onKeydown(event) {
     if (event.key === 'Escape') {
@@ -37,20 +38,46 @@
     }
   }
 
+  function onOpen() {
+    previousFocus = document.activeElement;
+    previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function onClose() {
+    if (previousFocus) previousFocus.focus?.();
+    if (previousOverflow !== null) document.body.style.overflow = previousOverflow;
+    previousFocus = null;
+    previousOverflow = null;
+  }
+
   export function close() {
     dispatch('close');
   }
 
   $: if (open && dialog && !previousFocus) {
     previousFocus = document.activeElement;
+    previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     queueMicrotask(() => {
       const target = dialog.querySelector('[data-autofocus]') || dialog.querySelector('button, input, textarea, select, a[href]');
       target?.focus?.();
     });
   }
+  function restoreFocus(target, attempts = 20) {
+    if (!target || !target.isConnected) return;
+    if (!target.hasAttribute('disabled')) {
+      target.focus?.();
+      if (document.activeElement === target) return;
+    }
+    if (attempts > 0) requestAnimationFrame(() => restoreFocus(target, attempts - 1));
+  }
+
   $: if (!open && previousFocus) {
-    previousFocus.focus?.();
+    restoreFocus(previousFocus);
+    if (previousOverflow !== null) document.body.style.overflow = previousOverflow;
     previousFocus = null;
+    previousOverflow = null;
   }
 </script>
 
@@ -97,10 +124,11 @@
     padding: var(--space-4);
     background: var(--overlay);
     backdrop-filter: blur(3px);
+    overscroll-behavior: contain;
   }
   .modal {
     width: min(560px, 100%);
-    max-height: min(86vh, 760px);
+    max-height: min(86dvh, 760px);
     display: flex;
     flex-direction: column;
     background: var(--surface);
