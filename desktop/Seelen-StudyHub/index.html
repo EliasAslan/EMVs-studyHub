@@ -1,27 +1,79 @@
-<main class="studyhub-widget" aria-label="StudyHub desktop widget">
-  <header class="widget-header">
-    <div class="brand"><div class="brand-mark" aria-hidden="true">S</div><div><p class="eyebrow">YOUR STUDY SPACE</p><h1>StudyHub</h1></div></div>
-    <button class="icon-button" id="refresh-button" type="button" title="Refresh snapshot" aria-label="Refresh snapshot">↻</button>
+<main class="studyhub-widget" data-state="sidebar" aria-label="StudyHub desktop widget">
+  <!-- ══ Sidebar (compact) ══ -->
+  <header class="sbx-header">
+    <div class="sbx-brand">
+      <span class="sbx-mark" aria-hidden="true">S</span>
+      <span class="sbx-title">StudyHub</span>
+    </div>
+    <div class="sbx-right">
+      <span class="sbx-exam" id="sbx-exam" aria-label="Days until next exam">—</span>
+      <span class="sbx-timer" id="sbx-timer">00:00</span>
+    </div>
   </header>
-  <section class="start-card" aria-live="polite">
-    <div class="section-topline"><span class="eyebrow">START HERE</span><span class="live-dot"></span></div>
-    <p class="start-title" id="start-title">No snapshot loaded yet</p>
-    <p class="start-meta" id="start-meta">Import a StudyHub JSON snapshot to get started.</p>
-    <div class="start-actions"><span class="kind-pill" id="start-kind">READY WHEN YOU ARE</span><button class="text-button" id="open-app" type="button">Open StudyHub <span aria-hidden="true">↗</span></button></div>
+  <button type="button" class="sbx-body" id="sbx-body" aria-expanded="false">
+    <span class="sbx-task" id="sbx-task">Next task — click to open the panel</span>
+  </button>
+
+  <!-- ══ Expanded panel ══ -->
+  <section class="panel" id="panel" aria-hidden="true">
+    <header class="panel-header">
+      <span class="panel-brand">StudyHub</span>
+      <div class="panel-actions">
+        <button type="button" class="panel-pin" id="pin" aria-pressed="false">Pin</button>
+        <button type="button" class="panel-close" id="close" aria-label="Close StudyHub panel">✕</button>
+      </div>
+    </header>
+
+    <section class="start-card" aria-live="polite">
+      <span class="section-topline">
+        <span class="eyebrow">START HERE</span>
+        <span class="live-dot" aria-hidden="true"></span>
+      </span>
+      <p class="start-title" id="start-title">No snapshot loaded yet</p>
+      <p class="start-meta" id="start-meta">Import a StudyHub JSON snapshot to get started.</p>
+      <div class="start-actions">
+        <span class="kind-pill" id="start-kind">READY WHEN YOU ARE</span>
+        <button type="button" class="text-button" id="open-app">Open StudyHub</button>
+      </div>
+    </section>
+
+    <section class="stats-row" aria-label="Study overview">
+      <div class="stat">
+        <span class="stat-value" id="homework-count">—</span>
+        <span class="stat-label">Open tasks</span>
+      </div>
+      <div class="stat-divider" aria-hidden="true"></div>
+      <div class="stat">
+        <span class="stat-value" id="exam-countdown">—</span>
+        <span class="stat-label">Days to exam</span>
+      </div>
+    </section>
+
+    <section class="deadlines-section" aria-label="Upcoming deadlines">
+      <div class="section-heading">
+        <h2>Coming up</h2>
+        <span class="muted" id="deadline-count">0 deadlines</span>
+      </div>
+      <div class="deadline-list" id="deadline-list"><p class="empty-state">Your upcoming deadlines will appear here.</p></div>
+    </section>
+
+    <section class="focus-card">
+      <div class="focus-copy">
+        <span class="eyebrow">FOCUS SESSION</span>
+        <strong id="timer-display">00:00</strong>
+        <span class="muted" id="timer-mode">Ready to focus</span>
+      </div>
+      <div class="timer-actions">
+        <button type="button" class="timer-button primary" id="timer-toggle">Start</button>
+        <button type="button" class="timer-button secondary" id="timer-reset" aria-label="Reset timer">↺</button>
+      </div>
+    </section>
+
+    <footer class="panel-footer">
+      <span id="updated-at">No snapshot loaded</span>
+      <label class="import-button" for="snapshot-file">Import JSON</label>
+      <input id="snapshot-file" type="file" accept=".json,application/json" />
+    </footer>
+    <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
   </section>
-  <section class="stats-row" aria-label="Study overview">
-    <div class="stat"><span class="stat-value" id="homework-count">—</span><span class="stat-label">Open tasks</span></div>
-    <div class="stat-divider"></div>
-    <div class="stat"><span class="stat-value" id="exam-countdown">—</span><span class="stat-label">Days to exam</span></div>
-  </section>
-  <section class="deadlines-section" id="deadlines-section">
-    <div class="section-heading"><h2>Coming up</h2><span class="muted" id="deadline-count">0 deadlines</span></div>
-    <div class="deadline-list" id="deadline-list"><p class="empty-state">Your upcoming deadlines will appear here.</p></div>
-  </section>
-  <section class="focus-card">
-    <div class="focus-copy"><span class="eyebrow">FOCUS SESSION</span><strong id="timer-display">25:00</strong><span class="muted" id="timer-mode">Ready to focus</span></div>
-    <div class="timer-actions"><button class="timer-button primary" id="timer-toggle" type="button">Start</button><button class="timer-button secondary" id="timer-reset" type="button" aria-label="Reset timer">↺</button></div>
-  </section>
-  <footer class="widget-footer"><span id="updated-at">No snapshot loaded</span><label class="import-button" for="snapshot-file">Import JSON</label><input id="snapshot-file" type="file" accept=".json,application/json" /></footer>
-  <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
 </main>
