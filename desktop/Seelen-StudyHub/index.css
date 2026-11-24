@@ -90,8 +90,8 @@ button { font: inherit; cursor: pointer; }
 }
 
 .sbx-body {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 29px;
+  min-height: 29px;
   display: flex;
   align-items: center;
   padding: 0 13px 7px;
