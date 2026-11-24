@@ -1,11 +1,12 @@
-import { Widget } from "@seelen-ui/lib";
+import "./index.css";
+import { Settings, Widget } from "@seelen-ui/lib";
 
 const widget = Widget.self;
 const STORAGE_KEY = "studyhub-seelen-snapshot-v1";
 const TIMER_KEY = "studyhub-seelen-timer-v1";
 const DEFAULT_APP_URL = "https://em-vs-study-hub.vercel.app";
 const $ = (id) => document.getElementById(id);
-const settings = widget.settings ?? {};
+const settings = Settings.getCurrentWidgetConfig();
 const appUrl = safeUrl(settings["app-url"] || DEFAULT_APP_URL);
 document.documentElement.style.setProperty("--accent", settings.accent || "#7770f5");
 
