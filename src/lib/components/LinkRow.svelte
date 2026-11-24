@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { appState, moduleTitle } from '../stores/app.js';
+  import { defaultLinkColor } from '../data/entities.js';
   import Icon from './Icon.svelte';
 
   export let link;
@@ -23,11 +24,12 @@
     }
   })();
   $: module = link.moduleId ? moduleTitle($appState, link.moduleId) : '';
+  $: linkColor = link.color || defaultLinkColor(link.kind);
 </script>
 
 <div class="link-row">
   <a class="main" href={link.url} target="_blank" rel="noopener noreferrer">
-    <span class="icon"><Icon name={icons[link.kind] || 'links'} size={16} /></span>
+    <span class="icon" style={`--link-color: ${linkColor}`}><Icon name={icons[link.kind] || 'links'} size={16} /></span>
     <span class="text">
       <span class="label">{link.label}</span>
       <span class="host mono">{host}{#if showModule && module} · {module}{/if}</span>
@@ -66,8 +68,8 @@
     height: 34px;
     flex: none;
     border-radius: var(--radius-1);
-    background: var(--accent-soft);
-    color: var(--accent-strong);
+    background: color-mix(in srgb, var(--link-color, var(--accent-strong)) 14%, transparent);
+    color: var(--link-color, var(--accent-strong));
   }
   .text {
     display: flex;

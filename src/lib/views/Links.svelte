@@ -2,6 +2,7 @@
   import { appState, createLink, updateLink, deleteLink, restoreEntity } from '../stores/app.js';
   import { persistedStore } from '../stores/viewPrefs.js';
   import { toast } from '../stores/toast.js';
+  import { defaultLinkColor, LINK_KIND_COLORS } from '../data/entities.js';
   import LinkRow from '../components/LinkRow.svelte';
   import Modal from '../components/Modal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
@@ -22,8 +23,18 @@
   let label = '';
   let url = '';
   let kind = 'custom';
+  let color = defaultLinkColor('custom');
   let moduleId = '';
   let error = '';
+
+  const colorPresets = [
+    { value: LINK_KIND_COLORS.youtube, label: 'YouTube' },
+    { value: LINK_KIND_COLORS.teams, label: 'Teams' },
+    { value: LINK_KIND_COLORS.onenote, label: 'OneNote' },
+    { value: LINK_KIND_COLORS.website, label: 'Website' },
+    { value: '#0f766e', label: 'Teal' },
+    { value: '#4f46e5', label: 'Indigo' },
+  ];
 
   $: modules = $appState.modules || [];
   $: links = ($appState.links || [])
@@ -39,6 +50,7 @@
     label = '';
     url = '';
     kind = 'custom';
+    color = defaultLinkColor('custom');
     moduleId = $filters.moduleId === 'all' ? '' : $filters.moduleId;
     error = '';
     open = true;
@@ -49,9 +61,14 @@
     label = link.label;
     url = link.url;
     kind = link.kind || 'custom';
+    color = link.color || defaultLinkColor(link.kind || 'custom');
     moduleId = link.moduleId || '';
     error = '';
     open = true;
+  }
+
+  function onKindChange() {
+    color = defaultLinkColor(kind);
   }
 
   function normaliseUrl(value) {
@@ -72,11 +89,12 @@
       return;
     }
     error = '';
+    const nextColor = String(color || '').trim() || defaultLinkColor(kind);
     if (editing) {
-      updateLink(editing.id, { label: nextLabel, url: nextUrl, kind, moduleId: moduleId || null });
+      updateLink(editing.id, { label: nextLabel, url: nextUrl, kind, color: nextColor, moduleId: moduleId || null });
       toast('Link gespeichert');
     } else {
-      createLink({ label: nextLabel, url: nextUrl, kind, moduleId: moduleId || null });
+      createLink({ label: nextLabel, url: nextUrl, kind, color: nextColor, moduleId: moduleId || null });
       toast('Link erfasst');
     }
     open = false;
@@ -159,7 +177,7 @@
     <div class="two">
       <label class="field">
         <span>Art</span>
-        <select class="select" bind:value={kind}>
+        <select class="select" bind:value={kind} on:change={onKindChange}>
           {#each kinds as k (k.value)}
             <option value={k.value}>{k.label}</option>
           {/each}
@@ -175,6 +193,29 @@
         </select>
       </label>
     </div>
+      <div class="field">
+        <span>Farbe</span>
+        <div class="color-row">
+          <div class="swatches" role="group" aria-label="Farbauswahl">
+            {#each colorPresets as preset (preset.value + preset.label)}
+              <button
+                class="swatch"
+                class:active={color === preset.value}
+                type="button"
+                style={`--swatch:${preset.value}`}
+                aria-label={preset.label}
+                aria-pressed={color === preset.value}
+                on:click={() => (color = preset.value)}
+              ></button>
+            {/each}
+          </div>
+          <label class="custom-color">
+            <span class="sr-only">Eigene Farbe</span>
+            <input class="color-input" type="color" bind:value={color} aria-label="Eigene Farbe wählen" />
+            <span class="mono color-hex">{color}</span>
+          </label>
+        </div>
+      </div>
     {#if editing && editing.moduleId}
       <p class="muted small">Aktuell: {moduleLabel(editing.moduleId)}</p>
     {/if}
@@ -256,4 +297,45 @@
     color: var(--danger);
     font-size: var(--text-sm);
   }
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .swatches {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: var(--swatch);
+    cursor: pointer;
+    padding: 0;
+  }
+  .swatch.active {
+    outline: 2px solid var(--swatch);
+    outline-offset: 2px;
+  }
+  .custom-color {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+  .color-input {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-1);
+    background: transparent;
+    cursor: pointer;
+  }
+  .color-hex { color: var(--ink-3); }
 </style>

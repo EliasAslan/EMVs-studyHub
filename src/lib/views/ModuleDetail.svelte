@@ -30,6 +30,7 @@
     recurrenceFromValue,
     recurrenceValue,
   } from '../data/recurrence.js';
+  import { defaultLinkColor, LINK_KIND_COLORS } from '../data/entities.js';
   import { aiSettings, aiReady } from '../stores/ai.js';
   import { chatComplete, describeAiError } from '../services/localAI.js';
   import { SYSTEM_PROMPT, buildContextBlock, resolveContext } from '../data/aiContext.js';
@@ -84,7 +85,17 @@
   let linkLabel = '';
   let linkUrl = '';
   let linkKind = 'custom';
+  let linkColor = defaultLinkColor('custom');
   let linkEditing = null;
+
+  const linkColorPresets = [
+    { value: LINK_KIND_COLORS.youtube, label: 'YouTube' },
+    { value: LINK_KIND_COLORS.teams, label: 'Teams' },
+    { value: LINK_KIND_COLORS.onenote, label: 'OneNote' },
+    { value: LINK_KIND_COLORS.website, label: 'Website' },
+    { value: '#0f766e', label: 'Teal' },
+    { value: '#4f46e5', label: 'Indigo' },
+  ];
 
   let editModuleOpen = false;
   let editCode = '';
@@ -246,6 +257,7 @@
     linkLabel = '';
     linkUrl = '';
     linkKind = 'custom';
+    linkColor = defaultLinkColor('custom');
     linkOpen = true;
   }
 
@@ -253,7 +265,8 @@
     linkEditing = link;
     linkLabel = link.label;
     linkUrl = link.url;
-    linkKind = link.kind;
+    linkKind = link.kind || 'custom';
+    linkColor = link.color || defaultLinkColor(link.kind || 'custom');
     linkOpen = true;
   }
 
@@ -265,8 +278,9 @@
       toast('Bitte eine vollständige URL angeben (https://…)');
       return;
     }
-    if (linkEditing) updateLink(linkEditing.id, { label, url, kind: linkKind });
-    else createLink({ moduleId: mod.id, label, url, kind: linkKind });
+    const color = String(linkColor || '').trim() || defaultLinkColor(linkKind);
+    if (linkEditing) updateLink(linkEditing.id, { label, url, kind: linkKind, color });
+    else createLink({ moduleId: mod.id, label, url, kind: linkKind, color });
     linkOpen = false;
     toast('Link gespeichert');
   }
@@ -699,7 +713,7 @@
     <label class="field"><span>URL</span><input class="input" bind:value={linkUrl} placeholder="https://…" /></label>
     <label class="field">
       <span>Art</span>
-      <select class="select" bind:value={linkKind}>
+      <select class="select" bind:value={linkKind} on:change={() => (linkColor = defaultLinkColor(linkKind))}>
         <option value="teams">Teams</option>
         <option value="onenote">OneNote</option>
         <option value="website">Website</option>
@@ -707,6 +721,29 @@
         <option value="custom">Andere</option>
       </select>
     </label>
+    <div class="field">
+      <span>Farbe</span>
+      <div class="color-row">
+        <div class="swatches" role="group" aria-label="Farbauswahl">
+          {#each linkColorPresets as preset (preset.value + preset.label)}
+            <button
+              class="swatch"
+              class:active={linkColor === preset.value}
+              type="button"
+              style={`--swatch:${preset.value}`}
+              aria-label={preset.label}
+              aria-pressed={linkColor === preset.value}
+              on:click={() => (linkColor = preset.value)}
+            ></button>
+          {/each}
+        </div>
+        <label class="custom-color">
+          <span class="sr-only">Eigene Farbe</span>
+          <input class="color-input" type="color" bind:value={linkColor} aria-label="Eigene Farbe wählen" />
+          <span class="mono color-hex">{linkColor}</span>
+        </label>
+      </div>
+    </div>
   </div>
   <svelte:fragment slot="footer">
     <button class="btn btn-ghost" type="button" on:click={() => (linkOpen = false)}>Abbrechen</button>
@@ -1028,6 +1065,29 @@
     outline: 2px solid var(--swatch);
     outline-offset: 2px;
   }
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .custom-color {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+  .color-input {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-1);
+    background: transparent;
+    cursor: pointer;
+  }
+  .color-hex { color: var(--ink-3); }
   @media (min-width: 720px) {
     .inline-add {
       flex-direction: row;
