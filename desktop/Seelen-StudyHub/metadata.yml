@@ -15,8 +15,8 @@ instances: Single
 lazy: false
 
 html: !include index.html
-js: !include index.js
-css: !include index.css
+js: !include dist/index.js
+css: !include dist/index.css
 
 settings:
   - type: text
