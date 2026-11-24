@@ -1,0 +1,41 @@
+id: "@eliasaslan/studyhub-card"
+
+metadata:
+  displayName: StudyHub Card
+  description: A compact desktop companion for your StudyHub deadlines and focus sessions.
+  tags:
+    - study
+    - productivity
+    - homework
+    - focus
+
+icon: PiGraduationCap
+preset: Desktop
+instances: Single
+lazy: false
+
+html: !include index.html
+js: !include index.js
+css: !include index.css
+
+settings:
+  - type: text
+    key: app-url
+    label: StudyHub app URL
+    description: URL opened when you click the card.
+    defaultValue: https://em-vs-study-hub.vercel.app
+  - type: color
+    key: accent
+    label: Accent colour
+    defaultValue: "#7770f5"
+  - type: switch
+    key: show-deadlines
+    label: Show upcoming deadlines
+    defaultValue: true
+  - type: number
+    key: refresh-seconds
+    label: Refresh interval (seconds)
+    defaultValue: 60
+    min: 15
+    max: 600
+    step: 15
