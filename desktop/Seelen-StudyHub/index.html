@@ -10,7 +10,7 @@
       <span class="sbx-timer" id="sbx-timer">00:00</span>
     </div>
   </header>
-  <button type="button" class="sbx-body" id="sbx-body" aria-expanded="false">
+  <button type="button" class="sbx-body" id="sbx-body" aria-expanded="false" aria-controls="panel">
     <span class="sbx-task" id="sbx-task">Next task — click to open the panel</span>
   </button>
 
@@ -71,7 +71,7 @@
 
     <footer class="panel-footer">
       <span id="updated-at">No snapshot loaded</span>
-      <label class="import-button" for="snapshot-file">Import JSON</label>
+      <label class="import-button" for="snapshot-file" role="button" tabindex="0" aria-controls="snapshot-file">Import JSON</label>
       <input id="snapshot-file" type="file" accept=".json,application/json" />
     </footer>
     <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
