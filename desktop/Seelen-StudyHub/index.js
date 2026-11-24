@@ -312,6 +312,13 @@ document.addEventListener("keydown", (event) => {
 });
 
 bodyBtn.addEventListener("click", togglePanel);
+const importButton = document.querySelector(".import-button");
+importButton.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    $("snapshot-file").click();
+  }
+});
 $("close").addEventListener("click", () => {
   uiState.pinned = false;
   applyUiState({ save: true, expanded: false });
