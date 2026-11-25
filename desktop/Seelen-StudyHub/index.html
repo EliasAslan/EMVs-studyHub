@@ -57,11 +57,12 @@
       <div class="deadline-list" id="deadline-list"><p class="empty-state">Your upcoming deadlines will appear here.</p></div>
     </section>
 
-    <section class="focus-card">
+    <section class="focus-card" id="focus-card">
       <div class="focus-copy">
         <span class="eyebrow">FOCUS SESSION</span>
         <strong id="timer-display">00:00</strong>
-        <span class="muted" id="timer-mode">Ready to focus</span>
+        <span class="muted" id="timer-mode">Ready for a focus session</span>
+        <div class="timer-progress" id="timer-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Focus session progress"><span></span></div>
       </div>
       <div class="timer-actions">
         <button type="button" class="timer-button primary" id="timer-toggle">Start</button>
