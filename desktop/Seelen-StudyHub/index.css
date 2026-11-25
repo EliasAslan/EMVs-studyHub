@@ -88,6 +88,7 @@ button { font: inherit; cursor: pointer; }
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+.sbx-timer.is-running { color: #b9b5ff; }
 
 .sbx-body {
   flex: 0 0 29px;
@@ -311,7 +312,7 @@ h2 { margin: 0; color: #dedde5; font-size: 10px; font-weight: 700; }
   background: var(--surface);
 }
 
-.focus-copy { display: flex; flex-direction: column; gap: 3px; }
+.focus-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
 .focus-copy strong {
   color: #f3f2f7;
   font-size: 22px;
@@ -322,7 +323,27 @@ h2 { margin: 0; color: #dedde5; font-size: 10px; font-weight: 700; }
   font-variant-numeric: tabular-nums;
 }
 
-.timer-actions { display: flex; align-items: center; gap: 6px; }
+.timer-progress {
+  width: min(100%, 190px);
+  height: 3px;
+  margin-top: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+}
+.timer-progress span {
+  display: block;
+  width: var(--progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 300ms linear;
+}
+.focus-card.is-running {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.timer-actions { display: flex; align-items: center; gap: 6px; flex: none; }
 .timer-button {
   min-width: 54px;
   height: 29px;
