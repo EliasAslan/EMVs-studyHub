@@ -57,7 +57,7 @@ function safeUrl(value) {
 function loadSnapshot() {
   try {
     const data = JSON.parse(localStorage.getItem(SNAPSHOT_KEY) || "null");
-    return data?.version === 1 ? data : null;
+    return data ? validateSnapshot(data) : null;
   } catch (error) {
     console.warn("[StudyHub] Saved snapshot could not be read:", error);
     return null;
@@ -65,19 +65,35 @@ function loadSnapshot() {
 }
 
 function validateSnapshot(data) {
+  const generatedAt = Date.parse(data?.generatedAt);
   if (
     !data ||
     data.version !== 1 ||
+    !Number.isFinite(generatedAt) ||
     !Array.isArray(data.deadlines) ||
     !Number.isFinite(data.openHomeworkCount)
   ) {
     throw new Error("This doesn't look like a StudyHub v1 snapshot.");
   }
 
+  const cleanEntry = (item) => {
+    if (!item || typeof item !== "object") return null;
+    return {
+      kind: item.kind === "exam" ? "exam" : "homework",
+      title: typeof item.title === "string" ? item.title.slice(0, 120) : "Untitled",
+      date: typeof item.date === "string" ? item.date.slice(0, 32) : null,
+      days: Number.isFinite(item.days) ? item.days : null,
+      overdue: item.overdue === true,
+    };
+  };
+
   return {
-    ...data,
+    version: 1,
+    generatedAt: new Date(generatedAt).toISOString(),
+    startHere: cleanEntry(data.startHere),
+    nextExam: cleanEntry(data.nextExam),
     openHomeworkCount: Math.max(0, Math.floor(data.openHomeworkCount)),
-    deadlines: data.deadlines.slice(0, 50).filter((item) => item && typeof item === "object"),
+    deadlines: data.deadlines.slice(0, 3).map(cleanEntry).filter(Boolean),
   };
 }
 
@@ -293,12 +309,27 @@ function renderPanel() {
     }
   }
 
-  $("updated-at").textContent = snapshot?.generatedAt
-    ? "Updated " + new Date(snapshot.generatedAt).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "No snapshot loaded";
+  const updatedAt = snapshot?.generatedAt ? Date.parse(snapshot.generatedAt) : NaN;
+  const ageSeconds = Number.isFinite(updatedAt)
+    ? Math.max(0, Math.floor((Date.now() - updatedAt) / 1000))
+    : null;
+  const ageLabel = ageSeconds === null
+    ? "No snapshot loaded"
+    : ageSeconds < 60
+      ? "Updated just now"
+      : ageSeconds < 3600
+        ? "Updated " + Math.floor(ageSeconds / 60) + "m ago"
+        : ageSeconds < 86400
+          ? "Updated " + Math.floor(ageSeconds / 3600) + "h ago"
+          : "Updated " + Math.floor(ageSeconds / 86400) + "d ago";
+  const updatedEl = $("updated-at");
+  updatedEl.textContent = ageSeconds !== null && ageSeconds >= 86400
+    ? ageLabel + " · import a fresh snapshot"
+    : ageLabel;
+  updatedEl.classList.toggle("stale", ageSeconds !== null && ageSeconds >= 86400);
+  updatedEl.title = snapshot?.generatedAt
+    ? "Snapshot generated " + new Date(updatedAt).toLocaleString()
+    : "";
 
   renderTimer();
 }
