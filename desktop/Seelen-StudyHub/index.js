@@ -219,6 +219,11 @@ function formatTimer(value = timer) {
   return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
 }
 
+function timerProgress() {
+  const total = DURATIONS[timer.mode] || DURATIONS.focus;
+  return Math.min(100, Math.max(0, ((total - timer.remaining) / total) * 100));
+}
+
 function showStatus(message, error = false) {
   const el = $("status-message");
   if (!el) return;
@@ -251,6 +256,7 @@ function renderSidebar() {
   $("sbx-exam").textContent = examDaysLabel();
   $("sbx-timer").textContent = formatTimer();
 }
+  $("sbx-timer").classList.toggle("is-running", timer.running);
 
 function renderPanel() {
   const start = snapshot?.startHere;
@@ -365,11 +371,12 @@ $("snapshot-file").addEventListener("change", async (event) => {
 
   try {
     const imported = validateSnapshot(JSON.parse(await file.text()));
-    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(imported));
+    const serialized = JSON.stringify(imported);
+    localStorage.setItem(SNAPSHOT_KEY, serialized);
     snapshot = imported;
     renderSidebar();
     renderPanel();
-    showStatus("StudyHub snapshot imported.");
+    showStatus("Snapshot imported · " + imported.deadlines.length + " deadlines loaded.");
   } catch (error) {
     showStatus(error?.message || "Could not read that file.", true);
   } finally {
@@ -379,11 +386,20 @@ $("snapshot-file").addEventListener("change", async (event) => {
 
 // --- Pomodoro timer ---
 function renderTimer() {
+  const progress = timerProgress();
   $("timer-display").textContent = formatTimer();
-  $("timer-mode").textContent = timer.mode === "focus" ? "Focus · 25 min" : "Break · 5 min";
+  $("timer-mode").textContent = timer.running
+    ? (timer.mode === "focus" ? "Focus session in progress" : "Break in progress")
+    : timer.remaining === 0
+      ? (timer.mode === "focus" ? "Focus complete" : "Break complete")
+      : (timer.mode === "focus" ? "Ready for a focus session" : "Ready for a break");
   $("timer-toggle").textContent = timer.running
     ? "Pause"
     : timer.remaining === 0 ? "Restart" : "Start";
+  $("timer-progress").style.setProperty("--progress", progress + "%");
+  $("timer-progress").setAttribute("aria-valuenow", String(Math.round(progress)));
+  $("timer-progress").setAttribute("aria-label", timer.mode === "focus" ? "Focus session progress" : "Break progress");
+  $("focus-card").classList.toggle("is-running", timer.running);
   renderSidebar();
 }
 
