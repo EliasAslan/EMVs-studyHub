@@ -455,7 +455,7 @@ function scheduleRefresh() {
   clearInterval(refreshHandle);
   refreshHandle = setInterval(() => {
     const latest = loadSnapshot();
-    if (latest?.generatedAt !== snapshot?.generatedAt) {
+    if (latest && latest.generatedAt !== snapshot?.generatedAt) {
       snapshot = latest;
       renderSidebar();
       if (uiState.expanded) renderPanel();
