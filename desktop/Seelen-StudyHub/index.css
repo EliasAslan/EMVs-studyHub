@@ -388,3 +388,8 @@ button:focus-visible, [tabindex]:focus-visible, .import-button:focus-visible {
     to { opacity: 1; transform: translateY(0); }
   }
 }
+
+/* Snapshot freshness */
+.panel-footer #updated-at.stale {
+  color: var(--warning);
+}
