@@ -12,18 +12,22 @@ const STATE_KEY = "studyhub-seelen-ui-state-v1";
 const DURATIONS = { focus: 25 * 60, break: 5 * 60 };
 const WINDOW_SIZE = { width: 340, compactHeight: 68, expandedHeight: 560 };
 
-function readSettings() {
+let settings = {};
+const loadSettings = async () => {
   try {
-    const config = Settings.getCurrentWidgetConfig?.();
-    return config && typeof config === "object" ? config : {};
+    const instance = await Settings.getAsync();
+    const config = instance.getCurrentWidgetConfig?.();
+    settings = config && typeof config === "object" ? config : {};
   } catch (error) {
-    console.warn("[StudyHub] Could not read widget settings:", error);
-    return {};
+    console.warn("[StudyHub] could not read settings, using defaults");
+    settings = {};
   }
-}
-
-const settings = readSettings();
-const setting = (key, fallback) => settings[key] ?? fallback;
+};
+loadSettings();
+const setting = (key, fallback) => {
+  const value = settings?.[key];
+  return value === undefined || value === null ? fallback : value;
+};
 const appUrl = safeUrl(setting("app-url", DEFAULT_APP_URL));
 const showDeadlines = setting("show-deadlines", true) !== false;
 const refreshSeconds = Math.max(15, Number(setting("refresh-seconds", 60)) || 60);
